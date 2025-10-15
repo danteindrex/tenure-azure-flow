@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
+import DashboardSimple from "./pages/DashboardSimple";
 import Profile from "./pages/dashboard/Profile";
 import Transactions from "./pages/dashboard/Transactions";
 import Settings from "./pages/dashboard/Settings";
@@ -34,7 +35,7 @@ const App = () => (
           <Route path="/signup" element={<SignUp />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/dashboard" element={<DashboardLayout />}>
-            <Route index element={<Dashboard />} />
+            <Route index element={<DashboardSimple />} />
             <Route path="profile" element={<Profile />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="queue" element={<Queue />} />
