@@ -17,6 +17,7 @@ const Dashboard = () => {
   const potentialWinners = useCounterAnimation(2, 800, 300);
   const daysUntilDraw = useCounterAnimation(45, 1000, 250);
   const paymentAmount = useCounterAnimation(25, 800, 150);
+  const queueCounter = useCounterAnimation(1, 500, 0);
 
   // Mock data
   const userData = {
@@ -125,7 +126,7 @@ const Dashboard = () => {
                     <Clock className="w-4 h-4" />
                     Next Payment
                   </p>
-                  <p className="text-lg font-bold text-warning">{daysUntilPayment} days</p>
+                  <p className="text-lg font-bold text-warning" ref={daysUntilPayment.ref}>{daysUntilPayment.count} days</p>
                 </div>
               </Card>
             </div>
@@ -136,7 +137,7 @@ const Dashboard = () => {
                 <Users className="w-5 h-5 text-accent" />
                 Tenure Queue
               </h2>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" ref={queueCounter.ref}>
                 <table className="w-full">
                   <thead className="border-b border-border">
                     <tr className="text-left text-sm text-muted-foreground">
@@ -201,22 +202,22 @@ const Dashboard = () => {
               <div className="space-y-6">
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Total Revenue Collected</p>
-                  <p className="text-4xl font-bold bg-gradient-to-r from-accent to-secondary bg-clip-text text-transparent">
-                    ${totalRevenue.toLocaleString()}
+                  <p className="text-4xl font-bold bg-gradient-to-r from-accent to-secondary bg-clip-text text-transparent" ref={totalRevenue.ref}>
+                    ${totalRevenue.count.toLocaleString()}
                   </p>
                 </div>
 
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Potential Winners</p>
-                  <p className="text-3xl font-bold text-success">
-                    {potentialWinners}
+                  <p className="text-3xl font-bold text-success" ref={potentialWinners.ref}>
+                    {potentialWinners.count}
                   </p>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Next Draw</span>
-                    <span className="font-medium">{daysUntilDraw} days</span>
+                    <span className="font-medium" ref={daysUntilDraw.ref}>{daysUntilDraw.count} days</span>
                   </div>
                   <Progress value={(45 / 90) * 100} className="h-2" />
                   <p className="text-xs text-muted-foreground">{fundData.nextDrawDate}</p>
@@ -230,10 +231,10 @@ const Dashboard = () => {
               <div className="space-y-4">
                 <div className="text-center py-4">
                   <p className="text-sm text-muted-foreground">Next payment in</p>
-                  <p className="text-3xl font-bold text-warning my-2">
-                    {daysUntilPayment} Days
+                  <p className="text-3xl font-bold text-warning my-2" ref={paymentAmount.ref}>
+                    {daysUntilPayment.count} Days
                   </p>
-                  <p className="text-2xl font-bold text-accent">${paymentAmount.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-accent">${paymentAmount.count.toFixed(2)}</p>
                 </div>
 
                 <Button className="w-full bg-accent text-background hover:glow-blue-lg" size="lg">

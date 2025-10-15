@@ -1,13 +1,38 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
-export const useCounterAnimation = (
+export const useCounterAnimation = <T extends HTMLElement = HTMLDivElement>(
   target: number,
   duration: number = 1000,
   delay: number = 0
 ) => {
   const [count, setCount] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef<T>(null);
 
   useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !isVisible) {
+          setIsVisible(true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => {
+      if (ref.current) {
+        observer.unobserve(ref.current);
+      }
+    };
+  }, [isVisible]);
+
+  useEffect(() => {
+    if (!isVisible) return;
+
     const timeout = setTimeout(() => {
       let startTime: number | null = null;
       const animate = (currentTime: number) => {
@@ -31,7 +56,7 @@ export const useCounterAnimation = (
     }, delay);
 
     return () => clearTimeout(timeout);
-  }, [target, duration, delay]);
+  }, [target, duration, delay, isVisible]);
 
-  return count;
+  return { count, ref };
 };
