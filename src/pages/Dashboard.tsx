@@ -4,10 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router-dom";
+import { useCounterAnimation } from "@/hooks/use-counter-animation";
+import { QueueRow } from "@/components/QueueRow";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // Animated counters
+  const daysUntilPayment = useCounterAnimation(15, 1200, 100);
+  const totalRevenue = useCounterAnimation(250000, 1500, 200);
+  const potentialWinners = useCounterAnimation(2, 800, 300);
+  const daysUntilDraw = useCounterAnimation(45, 1000, 250);
+  const paymentAmount = useCounterAnimation(25, 800, 150);
 
   // Mock data
   const userData = {
@@ -15,15 +24,14 @@ const Dashboard = () => {
     memberId: "TRP-2024-001",
     tenureStart: "January 1, 2025",
     nextPaymentDue: "February 1, 2025",
-    daysUntilPayment: 15,
   };
 
   const queueData = [
-    { rank: 1, name: "Alice Johnson", tenureTime: "24 months", status: "Active" },
-    { rank: 2, name: "Bob Smith", tenureTime: "22 months", status: "Active" },
-    { rank: 3, name: "John Doe", tenureTime: "18 months", status: "Active", isCurrentUser: true },
-    { rank: 4, name: "Emma Wilson", tenureTime: "15 months", status: "Active" },
-    { rank: 5, name: "Michael Brown", tenureTime: "12 months", status: "Active" },
+    { rank: 1, name: "Alice Johnson", tenureMonths: 24, status: "Active" },
+    { rank: 2, name: "Bob Smith", tenureMonths: 22, status: "Active" },
+    { rank: 3, name: "John Doe", tenureMonths: 18, status: "Active", isCurrentUser: true },
+    { rank: 4, name: "Emma Wilson", tenureMonths: 15, status: "Active" },
+    { rank: 5, name: "Michael Brown", tenureMonths: 12, status: "Active" },
   ];
 
   const activityFeed = [
@@ -33,10 +41,7 @@ const Dashboard = () => {
   ];
 
   const fundData = {
-    totalRevenue: 250000,
-    potentialWinners: 2,
     nextDrawDate: "March 15, 2025",
-    daysUntilDraw: 45,
   };
 
   const handleLogout = () => {
@@ -120,7 +125,7 @@ const Dashboard = () => {
                     <Clock className="w-4 h-4" />
                     Next Payment
                   </p>
-                  <p className="text-lg font-bold text-warning">{userData.daysUntilPayment} days</p>
+                  <p className="text-lg font-bold text-warning">{daysUntilPayment} days</p>
                 </div>
               </Card>
             </div>
@@ -142,22 +147,16 @@ const Dashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {queueData.map((member) => (
-                      <tr
+                    {queueData.map((member, index) => (
+                      <QueueRow
                         key={member.rank}
-                        className={`border-b border-border/50 hover:bg-accent/5 transition-colors ${
-                          member.isCurrentUser ? "border-l-4 border-l-accent bg-accent/10 pulse-glow" : ""
-                        }`}
-                      >
-                        <td className="py-4 font-mono">{member.rank}</td>
-                        <td className="py-4 font-medium">{member.name}</td>
-                        <td className="py-4">{member.tenureTime}</td>
-                        <td className="py-4">
-                          <span className="px-2 py-1 rounded-full bg-success/20 text-success text-xs">
-                            {member.status}
-                          </span>
-                        </td>
-                      </tr>
+                        rank={member.rank}
+                        name={member.name}
+                        tenureMonths={member.tenureMonths}
+                        status={member.status}
+                        isCurrentUser={member.isCurrentUser}
+                        index={index}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -202,22 +201,22 @@ const Dashboard = () => {
               <div className="space-y-6">
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Total Revenue Collected</p>
-                  <p className="text-4xl font-bold bg-gradient-to-r from-accent to-secondary bg-clip-text text-transparent counter-animate">
-                    ${fundData.totalRevenue.toLocaleString()}
+                  <p className="text-4xl font-bold bg-gradient-to-r from-accent to-secondary bg-clip-text text-transparent">
+                    ${totalRevenue.toLocaleString()}
                   </p>
                 </div>
 
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Potential Winners</p>
-                  <p className="text-3xl font-bold text-success counter-animate">
-                    {fundData.potentialWinners}
+                  <p className="text-3xl font-bold text-success">
+                    {potentialWinners}
                   </p>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Next Draw</span>
-                    <span className="font-medium">{fundData.daysUntilDraw} days</span>
+                    <span className="font-medium">{daysUntilDraw} days</span>
                   </div>
                   <Progress value={(45 / 90) * 100} className="h-2" />
                   <p className="text-xs text-muted-foreground">{fundData.nextDrawDate}</p>
@@ -232,9 +231,9 @@ const Dashboard = () => {
                 <div className="text-center py-4">
                   <p className="text-sm text-muted-foreground">Next payment in</p>
                   <p className="text-3xl font-bold text-warning my-2">
-                    {userData.daysUntilPayment} Days
+                    {daysUntilPayment} Days
                   </p>
-                  <p className="text-2xl font-bold text-accent">$25.00</p>
+                  <p className="text-2xl font-bold text-accent">${paymentAmount.toFixed(2)}</p>
                 </div>
 
                 <Button className="w-full bg-accent text-background hover:glow-blue-lg" size="lg">
