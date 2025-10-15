@@ -13,6 +13,9 @@ import Transactions from "./pages/dashboard/Transactions";
 import Settings from "./pages/dashboard/Settings";
 import Notifications from "./pages/dashboard/Notifications";
 import Help from "./pages/dashboard/Help";
+import History from "./pages/dashboard/History";
+import Analytics from "./pages/dashboard/Analytics";
+import Queue from "./pages/dashboard/Queue";
 import DashboardLayout from "./components/DashboardLayout";
 import NotFound from "./pages/NotFound";
 
@@ -33,9 +36,9 @@ const App = () => (
             <Route index element={<Dashboard />} />
             <Route path="profile" element={<Profile />} />
             <Route path="transactions" element={<Transactions />} />
-            <Route path="queue" element={<Dashboard />} />
-            <Route path="analytics" element={<Dashboard />} />
-            <Route path="history" element={<Dashboard />} />
+            <Route path="queue" element={<Queue />} />
+            <Route path="analytics" element={<Analytics />} />
+            <Route path="history" element={<History />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="settings" element={<Settings />} />
             <Route path="help" element={<Help />} />
