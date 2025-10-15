@@ -101,32 +101,35 @@ const Dashboard = () => {
           <div className="lg:col-span-2 space-y-6">
             {/* Status Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="glass-card p-6 hover-glow group">
+              <Card className="glass-card p-6 hover-glow group border-indigo-600">
                 <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">Member ID</p>
-                  <p className="text-2xl font-mono font-bold text-accent group-hover:glow-blue transition-all">
+                  <p className="text-sm text-indigo-300 font-medium">Anonymous Member ID</p>
+                  <p className="text-2xl font-mono font-bold text-white group-hover:glow-blue transition-all">
                     {userData.memberId}
                   </p>
+                  <p className="text-xs text-indigo-400">Unique identifier for system use.</p>
                 </div>
               </Card>
 
-              <Card className="glass-card p-6 hover-glow group">
+              <Card className="glass-card p-6 hover-glow group border-green-600">
                 <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <p className="text-sm text-green-300 font-medium flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    Tenure Start
+                    Tenure Start Date
                   </p>
-                  <p className="text-lg font-bold text-success">{userData.tenureStart}</p>
+                  <p className="text-lg font-bold text-white">{userData.tenureStart}</p>
+                  <p className="text-xs text-green-400">Tenure is calculated to the millisecond.</p>
                 </div>
               </Card>
 
-              <Card className="glass-card p-6 hover-glow group">
+              <Card className="glass-card p-6 hover-glow group border-red-600">
                 <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <p className="text-sm text-red-300 font-medium flex items-center gap-2">
                     <Clock className="w-4 h-4" />
-                    Next Payment
+                    Next Payment Due (Critical)
                   </p>
-                  <p className="text-lg font-bold text-warning" ref={daysUntilPayment.ref}>{daysUntilPayment.count} days</p>
+                  <p className="text-lg font-bold text-red-400" ref={daysUntilPayment.ref}>{daysUntilPayment.count} days</p>
+                  <p className="text-xs text-red-400">Defaulting means instant loss of rank! ($25.00)</p>
                 </div>
               </Card>
             </div>
@@ -197,52 +200,52 @@ const Dashboard = () => {
             <Card className="glass-card p-6 hover-glow">
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                 <DollarSign className="w-5 h-5 text-accent" />
-                Payout Fund
+                💰 Payout Fund Tracker
               </h2>
               <div className="space-y-6">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">Total Revenue Collected</p>
-                  <p className="text-4xl font-bold bg-gradient-to-r from-accent to-secondary bg-clip-text text-transparent" ref={totalRevenue.ref}>
-                    ${totalRevenue.count.toLocaleString()}
+                <div className="p-4 bg-purple-900/50 rounded-lg border border-purple-600">
+                  <p className="text-sm text-purple-300 font-medium">Current Revenue Collected (Member Fees)</p>
+                  <p className="text-4xl font-bold text-purple-400 mt-1" ref={totalRevenue.ref}>
+                    ${totalRevenue.count.toLocaleString()}.00
                   </p>
                 </div>
 
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">Potential Winners</p>
-                  <p className="text-3xl font-bold text-success" ref={potentialWinners.ref}>
-                    {potentialWinners.count}
+                <div className="p-4 bg-yellow-900/50 rounded-lg border-2 border-yellow-500">
+                  <p className="text-sm text-yellow-300 font-medium">Potential Winners Funded</p>
+                  <p className="text-4xl font-bold text-yellow-400 mt-1" ref={potentialWinners.ref}>
+                    {potentialWinners.count} Winners
                   </p>
+                  <p className="text-xs text-yellow-500 mt-1">The top {potentialWinners.count} tenured members' prizes are currently covered.</p>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Next Draw</span>
-                    <span className="font-medium" ref={daysUntilDraw.ref}>{daysUntilDraw.count} days</span>
-                  </div>
-                  <Progress value={(45 / 90) * 100} className="h-2" />
-                  <p className="text-xs text-muted-foreground">{fundData.nextDrawDate}</p>
+                <div className="text-center p-3 bg-red-900/50 rounded-lg border border-red-600 countdown-pulse">
+                  <p className="text-sm text-red-300 font-medium">12 Month Payout Countdown:</p>
+                  <p className="text-3xl font-bold text-red-400 tracking-wider" ref={daysUntilDraw.ref}>
+                    {daysUntilDraw.count} DAYS
+                  </p>
                 </div>
               </div>
             </Card>
 
             {/* Payment Card */}
-            <Card className="glass-card p-6 border-2 border-accent/50 glow-blue">
-              <h2 className="text-lg font-bold mb-4">Monthly Payment Due</h2>
+            <Card className="glass-card p-6 border-2 border-green-600 glow-blue">
+              <h2 className="text-xl font-bold mb-4">Time to Renew?</h2>
+              <p className="text-sm text-muted-foreground mb-4">Secure your position by ensuring your next payment is processed on time.</p>
               <div className="space-y-4">
                 <div className="text-center py-4">
                   <p className="text-sm text-muted-foreground">Next payment in</p>
-                  <p className="text-3xl font-bold text-warning my-2" ref={paymentAmount.ref}>
+                  <p className="text-3xl font-bold text-red-400 my-2" ref={paymentAmount.ref}>
                     {daysUntilPayment.count} Days
                   </p>
                   <p className="text-2xl font-bold text-accent">${paymentAmount.count.toFixed(2)}</p>
                 </div>
 
-                <Button className="w-full bg-accent text-background hover:glow-blue-lg" size="lg">
-                  Pay Now
+                <Button className="w-full py-4 px-4 bg-green-500 hover:bg-green-600 text-gray-900 font-extrabold rounded-xl shadow-xl transition duration-150 transform hover:scale-[1.02]" size="lg">
+                  PROCESS $25.00 MONTHLY FEE NOW
                 </Button>
 
                 <p className="text-xs text-center text-muted-foreground">
-                  Auto-pay scheduled for {userData.nextPaymentDue}
+                  Auto-renewal status: **Active** (Update Payment Method)
                 </p>
               </div>
             </Card>

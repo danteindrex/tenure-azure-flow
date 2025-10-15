@@ -44,6 +44,37 @@ export default {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
+        // HTML Dashboard Indicator Colors
+        indigo: {
+          300: "hsl(var(--indigo-300))",
+          400: "hsl(var(--indigo-400))",
+          600: "hsl(var(--indigo-600))",
+          700: "hsl(var(--indigo-700))",
+          900: "hsl(var(--indigo-900))",
+        },
+        purple: {
+          300: "hsl(var(--purple-300))",
+          400: "hsl(var(--purple-400))",
+          600: "hsl(var(--purple-600))",
+          900: "hsl(var(--purple-900))",
+        },
+        yellow: {
+          300: "hsl(var(--yellow-300))",
+          400: "hsl(var(--yellow-400))",
+          500: "hsl(var(--yellow-500))",
+        },
+        red: {
+          300: "hsl(var(--red-300))",
+          400: "hsl(var(--red-400))",
+          600: "hsl(var(--red-600))",
+          900: "hsl(var(--red-900))",
+        },
+        green: {
+          300: "hsl(var(--green-300))",
+          400: "hsl(var(--green-400))",
+          600: "hsl(var(--green-600))",
+          900: "hsl(var(--green-900))",
+        },
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
@@ -90,6 +121,7 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
+        "countdown-pulse": "countdown-pulse 1.5s infinite",
         "sweep": "sweep 1.5s ease-in-out",
         "counter-up": "counter-up 0.5s ease-out",
         "slide-in": "slide-in 0.3s ease-out",

@@ -36,6 +36,28 @@ All colors MUST be HSL.
     --success: 158 100% 48%;  /* #00f5a0 Success Green */
     --warning: 43 96% 56%;  /* #fbbf24 Warning Yellow */
 
+    /* HTML Dashboard Indicator Colors */
+    --indigo-300: 217 91% 60%;  /* #818cf8 */
+    --indigo-400: 217 91% 60%;  /* #818cf8 */
+    --indigo-600: 217 91% 60%;  /* #818cf8 */
+    --indigo-700: 217 91% 60%;  /* #818cf8 */
+    --indigo-900: 217 91% 60%;  /* #818cf8 */
+    --purple-300: 262 83% 58%;  /* #a855f7 */
+    --purple-400: 262 83% 58%;  /* #a855f7 */
+    --purple-600: 262 83% 58%;  /* #a855f7 */
+    --purple-900: 262 83% 58%;  /* #a855f7 */
+    --yellow-300: 45 93% 47%;   /* #fbbf24 */
+    --yellow-400: 45 93% 47%;   /* #fbbf24 */
+    --yellow-500: 45 93% 47%;   /* #fbbf24 */
+    --red-300: 0 84% 60%;       /* #ef4444 */
+    --red-400: 0 84% 60%;       /* #ef4444 */
+    --red-600: 0 84% 60%;       /* #ef4444 */
+    --red-900: 0 84% 60%;       /* #ef4444 */
+    --green-300: 142 76% 36%;   /* #10b981 */
+    --green-400: 142 76% 36%;   /* #10b981 */
+    --green-600: 142 76% 36%;   /* #10b981 */
+    --green-900: 142 76% 36%;   /* #10b981 */
+
     --border: 213 39% 20%;
     --input: 213 39% 20%;
     --ring: 190 100% 42%;
@@ -114,6 +136,22 @@ All colors MUST be HSL.
 
   .pulse-glow {
     animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  /* HTML Dashboard Pulse Countdown Animation */
+  @keyframes pulse-countdown {
+    0%, 100% { 
+      opacity: 1; 
+      transform: scale(1); 
+    }
+    50% { 
+      opacity: 0.7; 
+      transform: scale(1.02); 
+    }
+  }
+
+  .countdown-pulse {
+    animation: pulse-countdown 1.5s infinite;
   }
 
   /* Sweep Animation */
