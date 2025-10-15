@@ -142,7 +142,40 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Left Column - 2/3 */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-            {/* Status Cards */}
+            {/* Tenure Queue - Moved to top */}
+            <Card className="glass-card p-3 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
+                Tenure Queue
+              </h2>
+              <div className="overflow-x-auto" ref={queueCounter.ref}>
+                <table className="w-full min-w-[400px]">
+                  <thead className="border-b border-border">
+                    <tr className="text-left text-xs sm:text-sm text-muted-foreground">
+                      <th className="pb-2 sm:pb-3 pr-2">Rank</th>
+                      <th className="pb-2 sm:pb-3 pr-2">Member</th>
+                      <th className="pb-2 sm:pb-3 pr-2">Tenure</th>
+                      <th className="pb-2 sm:pb-3 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {queueData.map((member, index) => (
+                      <QueueRow
+                        key={member.rank}
+                        rank={member.rank}
+                        name={member.name}
+                        tenureMonths={member.tenureMonths}
+                        status={member.status}
+                        isCurrentUser={member.isCurrentUser}
+                        index={index}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            {/* Status Cards - Moved below queue */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               <Card className="glass-card p-4 sm:p-6 hover-glow group border-indigo-600">
                 <div className="space-y-1 sm:space-y-2">
@@ -176,39 +209,6 @@ const Dashboard = () => {
                 </div>
               </Card>
             </div>
-
-            {/* Tenure Queue */}
-            <Card className="glass-card p-3 sm:p-6">
-              <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
-                Tenure Queue
-              </h2>
-              <div className="overflow-x-auto" ref={queueCounter.ref}>
-                <table className="w-full min-w-[400px]">
-                  <thead className="border-b border-border">
-                    <tr className="text-left text-xs sm:text-sm text-muted-foreground">
-                      <th className="pb-2 sm:pb-3 pr-2">Rank</th>
-                      <th className="pb-2 sm:pb-3 pr-2">Member</th>
-                      <th className="pb-2 sm:pb-3 pr-2">Tenure</th>
-                      <th className="pb-2 sm:pb-3 text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {queueData.map((member, index) => (
-                      <QueueRow
-                        key={member.rank}
-                        rank={member.rank}
-                        name={member.name}
-                        tenureMonths={member.tenureMonths}
-                        status={member.status}
-                        isCurrentUser={member.isCurrentUser}
-                        index={index}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
 
             {/* Activity Feed */}
             <Card className="glass-card p-6">
