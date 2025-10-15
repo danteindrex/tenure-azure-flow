@@ -8,6 +8,12 @@ import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
+import Profile from "./pages/dashboard/Profile";
+import Transactions from "./pages/dashboard/Transactions";
+import Settings from "./pages/dashboard/Settings";
+import Notifications from "./pages/dashboard/Notifications";
+import Help from "./pages/dashboard/Help";
+import DashboardLayout from "./components/DashboardLayout";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,7 +29,17 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard" element={<DashboardLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="transactions" element={<Transactions />} />
+            <Route path="queue" element={<Dashboard />} />
+            <Route path="analytics" element={<Dashboard />} />
+            <Route path="history" element={<Dashboard />} />
+            <Route path="notifications" element={<Notifications />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="help" element={<Help />} />
+          </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

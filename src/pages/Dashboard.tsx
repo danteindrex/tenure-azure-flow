@@ -1,15 +1,12 @@
 import { useState } from "react";
-import { Crown, LogOut, User, Calendar, DollarSign, Users, Clock, TrendingUp } from "lucide-react";
+import { Crown, Calendar, DollarSign, Users, Clock, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useNavigate } from "react-router-dom";
 import { useCounterAnimation } from "@/hooks/use-counter-animation";
 import { QueueRow } from "@/components/QueueRow";
 
 const Dashboard = () => {
-  const navigate = useNavigate();
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   // Animated counters
   const daysUntilPayment = useCounterAnimation(15, 1200, 100);
@@ -21,7 +18,6 @@ const Dashboard = () => {
 
   // Mock data
   const userData = {
-    name: "John Doe",
     memberId: "TRP-2024-001",
     tenureStart: "January 1, 2025",
     nextPaymentDue: "February 1, 2025",
@@ -45,57 +41,8 @@ const Dashboard = () => {
     nextDrawDate: "March 15, 2025",
   };
 
-  const handleLogout = () => {
-    navigate("/login");
-  };
-
   return (
-    <div className="min-h-screen bg-background">
-      {/* Sweep Animation on Load */}
-      <div className="fixed top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-accent to-transparent sweep-line z-50" />
-
-      {/* Header */}
-      <header className="sticky top-0 z-40 backdrop-blur-lg bg-background/95 border-b border-border shadow-sm">
-        <div className="container mx-auto px-4 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
-            {/* Logo */}
-            <div className="flex items-center gap-2 text-accent">
-              <Crown className="w-5 h-5 sm:w-6 sm:h-6" />
-              <span className="text-lg sm:text-xl font-bold">Tenure</span>
-            </div>
-
-            {/* User Menu */}
-            <div className="relative">
-              <Button
-                variant="ghost"
-                className="flex items-center gap-1 sm:gap-2 hover:bg-accent/10 p-2 sm:px-3"
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-              >
-                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-accent/20 flex items-center justify-center">
-                  <User className="w-3 h-3 sm:w-4 sm:h-4 text-accent" />
-                </div>
-                <span className="hidden sm:inline text-sm sm:text-base">{userData.name}</span>
-                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-success pulse-glow" />
-              </Button>
-
-              {showProfileMenu && (
-                <Card className="absolute right-0 mt-2 w-40 sm:w-48 glass-card p-2 animate-fade-in">
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent/10 rounded-md text-destructive"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Logout
-                  </button>
-                </Card>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
+    <div className="space-y-6">
         {/* Mobile Priority Section - Compact Vertical Layout */}
         <div className="lg:hidden space-y-3 mb-6">
           {/* Compact Payout Fund & Payment Row */}
@@ -294,7 +241,6 @@ const Dashboard = () => {
             </Card>
           </div>
         </div>
-      </main>
     </div>
   );
 };
