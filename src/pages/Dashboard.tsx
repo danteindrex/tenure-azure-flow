@@ -55,7 +55,11 @@ const Dashboard = () => {
       <div className="fixed top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-accent to-transparent sweep-line z-50" />
 
       {/* Header */}
+<<<<<<< HEAD
       <header className="sticky top-0 z-40 backdrop-blur-lg bg-background/95 border-b border-border shadow-sm">
+=======
+      <header className="sticky top-0 z-40 backdrop-blur-lg bg-background/80 border-b border-border">
+>>>>>>> 79d67b7c74fea40b0cf1fb9c2501baf76da7a82f
         <div className="container mx-auto px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             {/* Logo */}
