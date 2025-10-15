@@ -17,15 +17,9 @@ const Login = () => {
   };
 
   return (
-<<<<<<< HEAD
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
       {/* Background Glow Effect */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
-=======
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Glow Effect */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/10 rounded-full blur-[120px] pointer-events-none" />
->>>>>>> 79d67b7c74fea40b0cf1fb9c2501baf76da7a82f
       
       <Card className="glass-card w-full max-w-md p-8 hover-float relative z-10">
         {/* Logo */}

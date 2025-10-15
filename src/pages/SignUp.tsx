@@ -4,10 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-<<<<<<< HEAD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-=======
->>>>>>> 79d67b7c74fea40b0cf1fb9c2501baf76da7a82f
 import { Crown, Check } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,7 +16,6 @@ const SignUp = () => {
     email: "",
     password: "",
     confirmPassword: "",
-<<<<<<< HEAD
     phoneCountryCode: "+1",
     phoneNumber: "",
     streetAddress: "",
@@ -82,12 +78,6 @@ const SignUp = () => {
     { value: "WI", label: "Wisconsin" },
     { value: "WY", label: "Wyoming" },
   ];
-
-=======
-    agreeToTerms: false,
-  });
-
->>>>>>> 79d67b7c74fea40b0cf1fb9c2501baf76da7a82f
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -98,7 +88,6 @@ const SignUp = () => {
       toast.error("Passwords do not match");
       return;
     }
-<<<<<<< HEAD
     if (!formData.phoneNumber.trim()) {
       toast.error("Phone number is required");
       return;
@@ -107,8 +96,6 @@ const SignUp = () => {
       toast.error("All address fields are required");
       return;
     }
-=======
->>>>>>> 79d67b7c74fea40b0cf1fb9c2501baf76da7a82f
     setStep(2);
   };
 
@@ -127,19 +114,11 @@ const SignUp = () => {
   };
 
   return (
-<<<<<<< HEAD
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
       {/* Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent/5 rounded-full blur-[100px] animate-pulse" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
-=======
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent/10 rounded-full blur-[100px] animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
->>>>>>> 79d67b7c74fea40b0cf1fb9c2501baf76da7a82f
       </div>
 
       <Card className="glass-card w-full max-w-lg p-8 hover-float relative z-10">
@@ -209,7 +188,6 @@ const SignUp = () => {
                 />
               </div>
 
-<<<<<<< HEAD
               {/* Phone Number */}
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
@@ -299,8 +277,6 @@ const SignUp = () => {
                 />
               </div>
 
-=======
->>>>>>> 79d67b7c74fea40b0cf1fb9c2501baf76da7a82f
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
@@ -408,7 +384,6 @@ const SignUp = () => {
                   <span className="font-medium">{formData.email}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-<<<<<<< HEAD
                   <span className="text-muted-foreground">Phone:</span>
                   <span className="font-medium">{formData.phoneCountryCode} {formData.phoneNumber}</span>
                 </div>
@@ -420,8 +395,6 @@ const SignUp = () => {
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-=======
->>>>>>> 79d67b7c74fea40b0cf1fb9c2501baf76da7a82f
                   <span className="text-muted-foreground">Membership Fee:</span>
                   <span className="font-bold text-accent">$300.00</span>
                 </div>
