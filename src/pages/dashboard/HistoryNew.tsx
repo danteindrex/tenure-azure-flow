@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { 
   History, 
   Search, 
-  Filter, 
   Calendar,
   Clock,
   DollarSign,
@@ -17,12 +15,9 @@ import {
   AlertCircle
 } from "lucide-react";
 
-const History = () => {
+const HistoryNew = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("all");
-
-  console.log("History component rendering");
 
   const historyData = [
     {
@@ -33,8 +28,7 @@ const History = () => {
       amount: 25.00,
       status: "completed",
       date: "2025-01-15",
-      time: "14:30",
-      details: "Payment method: Credit Card ending in 1234"
+      time: "14:30"
     },
     {
       id: "HIST-002",
@@ -44,8 +38,7 @@ const History = () => {
       amount: null,
       status: "completed",
       date: "2025-01-14",
-      time: "09:15",
-      details: "Previous rank: #5, New rank: #3"
+      time: "09:15"
     },
     {
       id: "HIST-003",
@@ -55,52 +48,7 @@ const History = () => {
       amount: 250000.00,
       status: "completed",
       date: "2025-01-12",
-      time: "16:45",
-      details: "2 winners will be selected soon"
-    },
-    {
-      id: "HIST-004",
-      type: "profile",
-      action: "Profile Updated",
-      description: "Updated contact information",
-      amount: null,
-      status: "completed",
-      date: "2025-01-10",
-      time: "11:20",
-      details: "Changed phone number and address"
-    },
-    {
-      id: "HIST-005",
-      type: "payment",
-      action: "Payment Failed",
-      description: "Monthly payment failed due to insufficient funds",
-      amount: 25.00,
-      status: "failed",
-      date: "2025-01-05",
-      time: "08:00",
-      details: "Card declined - insufficient funds"
-    },
-    {
-      id: "HIST-006",
-      type: "bonus",
-      action: "Referral Bonus Earned",
-      description: "Earned bonus for referring new member",
-      amount: 5.00,
-      status: "completed",
-      date: "2025-01-03",
-      time: "13:30",
-      details: "Referred: jane.doe@example.com"
-    },
-    {
-      id: "HIST-007",
-      type: "system",
-      action: "Account Created",
-      description: "Successfully created new account",
-      amount: 300.00,
-      status: "completed",
-      date: "2025-01-01",
-      time: "10:00",
-      details: "Initial membership fee paid"
+      time: "16:45"
     }
   ];
 
@@ -110,40 +58,17 @@ const History = () => {
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       case "failed":
         return <XCircle className="w-4 h-4 text-red-500" />;
-      case "pending":
-        return <Clock className="w-4 h-4 text-yellow-500" />;
       default:
         return <AlertCircle className="w-4 h-4 text-gray-500" />;
-    }
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "payment":
-        return <DollarSign className="w-4 h-4 text-blue-500" />;
-      case "queue":
-        return <User className="w-4 h-4 text-purple-500" />;
-      case "milestone":
-        return <AlertCircle className="w-4 h-4 text-orange-500" />;
-      case "profile":
-        return <User className="w-4 h-4 text-green-500" />;
-      case "bonus":
-        return <DollarSign className="w-4 h-4 text-green-500" />;
-      case "system":
-        return <History className="w-4 h-4 text-gray-500" />;
-      default:
-        return <History className="w-4 h-4 text-gray-500" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "completed":
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Completed</Badge>;
+        return <Badge className="bg-green-100 text-green-800">Completed</Badge>;
       case "failed":
-        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Failed</Badge>;
-      case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Pending</Badge>;
+        return <Badge className="bg-red-100 text-red-800">Failed</Badge>;
       default:
         return <Badge variant="secondary">Unknown</Badge>;
     }
@@ -153,26 +78,20 @@ const History = () => {
     const matchesSearch = item.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === "all" || item.type === categoryFilter;
-    const matchesDate = dateFilter === "all" || 
-                       (dateFilter === "today" && item.date === "2025-01-15") ||
-                       (dateFilter === "week" && new Date(item.date) >= new Date("2025-01-08")) ||
-                       (dateFilter === "month" && new Date(item.date) >= new Date("2025-01-01"));
     
-    return matchesSearch && matchesCategory && matchesDate;
+    return matchesSearch && matchesCategory;
   });
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">History</h1>
-          <p className="text-muted-foreground">View your account activity and transaction history</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold">History</h1>
+        <p className="text-muted-foreground">View your account activity and transaction history</p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -180,15 +99,6 @@ const History = () => {
               <p className="text-2xl font-bold">{historyData.length}</p>
             </div>
             <History className="w-8 h-8 text-accent" />
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">This Month</p>
-              <p className="text-2xl font-bold">{historyData.filter(h => new Date(h.date) >= new Date("2025-01-01")).length}</p>
-            </div>
-            <Calendar className="w-8 h-8 text-blue-500" />
           </div>
         </Card>
         <Card className="p-4">
@@ -234,20 +144,6 @@ const History = () => {
               <SelectItem value="payment">Payments</SelectItem>
               <SelectItem value="queue">Queue</SelectItem>
               <SelectItem value="milestone">Milestones</SelectItem>
-              <SelectItem value="profile">Profile</SelectItem>
-              <SelectItem value="bonus">Bonuses</SelectItem>
-              <SelectItem value="system">System</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="w-full sm:w-40 bg-background/50">
-              <SelectValue placeholder="Date Range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Time</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="week">This Week</SelectItem>
-              <SelectItem value="month">This Month</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -268,7 +164,7 @@ const History = () => {
                 className="flex items-start gap-4 p-4 border border-border rounded-lg hover:bg-accent/5 transition-colors"
               >
                 <div className="p-2 rounded-full bg-background/50">
-                  {getTypeIcon(item.type)}
+                  <DollarSign className="w-4 h-4 text-blue-500" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">
@@ -278,17 +174,12 @@ const History = () => {
                         {getStatusIcon(item.status)}
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">{item.description}</p>
-                      <p className="text-xs text-muted-foreground">{item.details}</p>
                     </div>
                     <div className="text-right ml-4">
                       <div className="flex items-center gap-2 mb-1">
                         {item.amount !== null && (
-                          <p className={`font-bold ${
-                            item.type === "payment" && item.status === "failed" ? "text-red-500" :
-                            item.type === "bonus" ? "text-green-500" :
-                            "text-blue-500"
-                          }`}>
-                            {item.type === "payment" && item.status === "failed" ? "-" : "+"}${item.amount?.toFixed(2)}
+                          <p className="font-bold text-blue-500">
+                            +${item.amount?.toFixed(2)}
                           </p>
                         )}
                         {getStatusBadge(item.status)}
@@ -307,4 +198,4 @@ const History = () => {
   );
 };
 
-export default History;
+export default HistoryNew;
