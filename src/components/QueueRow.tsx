@@ -20,11 +20,11 @@ export const QueueRow = ({ rank, name, tenureMonths, status, isCurrentUser, inde
       }`}
       ref={animatedRank.ref}
     >
-      <td className="py-4 font-mono">{animatedRank.count}</td>
-      <td className="py-4 font-medium">{name}</td>
-      <td className="py-4">{animatedMonths.count} months</td>
-      <td className="py-4">
-        <span className="px-2 py-1 rounded-full bg-success/20 text-success text-xs">
+      <td className="py-2 sm:py-4 font-mono text-xs sm:text-sm">{animatedRank.count}</td>
+      <td className="py-2 sm:py-4 font-medium text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">{name}</td>
+      <td className="py-2 sm:py-4 text-xs sm:text-sm" ref={animatedMonths.ref}>{animatedMonths.count}m</td>
+      <td className="py-2 sm:py-4 text-right">
+        <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-success/20 text-success text-xs">
           {status}
         </span>
       </td>
