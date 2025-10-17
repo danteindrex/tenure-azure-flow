@@ -4,7 +4,7 @@ import { Request, Response, NextFunction } from 'express';
  * Middleware to capture raw body for Stripe webhook signature verification
  * Must be applied before express.json()
  */
-export function rawBodyMiddleware(req: Request, res: Response, next: NextFunction): void {
+export function rawBodyMiddleware(req: Request, _res: Response, next: NextFunction): void {
   if (req.originalUrl === '/api/webhooks/stripe') {
     let data = '';
     req.setEncoding('utf8');

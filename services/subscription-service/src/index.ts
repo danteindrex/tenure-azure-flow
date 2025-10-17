@@ -31,7 +31,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/', limiter);
 
 // Health check
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'healthy',
     service: 'subscription-service',
@@ -52,7 +52,7 @@ app.use((req: Request, res: Response) => {
 });
 
 // Error handler
-app.use((err: Error, req: Request, res: Response, next: any) => {
+app.use((err: Error, _req: Request, res: Response, _next: any) => {
   logger.error('Unhandled error:', err);
   res.status(500).json({
     error: 'Internal server error',

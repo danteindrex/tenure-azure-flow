@@ -8,7 +8,7 @@ import { CreateCheckoutSessionRequest, CreateCheckoutSessionResponse } from '../
 import { pool } from '../config/database';
 
 const stripe = new Stripe(config.stripe.secretKey, {
-  apiVersion: '2024-10-28.acacia',
+  apiVersion: '2023-10-16',
   typescript: true,
 });
 
@@ -57,20 +57,7 @@ export class StripeService {
         });
       }
 
-      // Create price for initial payment ($325)
-      const initialPrice = await stripe.prices.create({
-        currency: config.pricing.currency,
-        unit_amount: Math.round(config.pricing.initialAmount * 100), // $325
-        recurring: {
-          interval: 'month',
-        },
-        product_data: {
-          name: 'Home Solutions - Initial Payment',
-          description: 'First month payment ($325)',
-        },
-      });
-
-      // Create price for recurring payment ($25)
+      // Create price for recurring payment ($25/month)
       const recurringPrice = await stripe.prices.create({
         currency: config.pricing.currency,
         unit_amount: Math.round(config.pricing.recurringAmount * 100), // $25
@@ -79,7 +66,6 @@ export class StripeService {
         },
         product_data: {
           name: 'Home Solutions - Monthly Subscription',
-          description: 'Monthly recurring payment ($25)',
         },
       });
 
@@ -90,19 +76,13 @@ export class StripeService {
         payment_method_types: ['card'],
         line_items: [
           {
-            price: initialPrice.id,
+            price: recurringPrice.id,
             quantity: 1,
           },
         ],
         subscription_data: {
-          items: [
-            {
-              price: recurringPrice.id,
-            },
-          ],
           metadata: {
             memberId: memberId.toString(),
-            isFirstPayment: 'true',
           },
         },
         success_url: successUrl || `${config.frontendUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}`,

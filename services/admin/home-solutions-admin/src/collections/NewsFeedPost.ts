@@ -1,16 +1,22 @@
 import type { CollectionConfig } from 'payload'
 
+interface User {
+  id: string | number
+  role?: string
+}
+
 export const NewsFeedPost: CollectionConfig = {
   slug: 'newsfeedpost',
   admin: {
     useAsTitle: 'title',
     defaultColumns: ['title', 'status', 'priority', 'publish_date'],
     description: 'Manage news feed posts and announcements for members',
+    group: 'Content',
   },
   access: {
     // Only admins can create/update/delete posts
-    create: ({ req: { user } }) => !!user,
-    read: ({ req: { user } }) => {
+    create: ({ req: { user } }: { req: { user: User | null } }) => !!user,
+    read: ({ req: { user } }: { req: { user: User | null } }) => {
       // Public can read published posts, admins can read all
       if (user) return true
       return {
@@ -19,8 +25,8 @@ export const NewsFeedPost: CollectionConfig = {
         },
       }
     },
-    update: ({ req: { user } }) => !!user,
-    delete: ({ req: { user } }) => !!user,
+    update: ({ req: { user } }: { req: { user: User | null } }) => !!user,
+    delete: ({ req: { user } }: { req: { user: User | null } }) => !!user,
   },
   fields: [
     {

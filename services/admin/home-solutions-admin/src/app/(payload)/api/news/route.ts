@@ -36,13 +36,13 @@ export async function GET(request: Request) {
       hasNextPage: result.hasNextPage,
       hasPrevPage: result.hasPrevPage,
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching news posts:', error)
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to fetch news posts',
-        message: error.message,
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     )

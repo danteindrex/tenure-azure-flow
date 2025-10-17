@@ -5,6 +5,8 @@ export const Members: CollectionConfig = {
   admin: {
     useAsTitle: 'name',
     defaultColumns: ['name', 'email', 'status', 'join_date', 'tenure'],
+    description: 'Program members who sign up via the frontend',
+    group: 'Member Management',
   },
   fields: [
     {

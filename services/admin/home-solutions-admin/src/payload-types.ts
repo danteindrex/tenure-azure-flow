@@ -69,6 +69,7 @@ export interface Config {
   collections: {
     admin: Admin;
     member: Member;
+    queue: Queue;
     newsfeedpost: Newsfeedpost;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -78,6 +79,7 @@ export interface Config {
   collectionsSelect: {
     admin: AdminSelect<false> | AdminSelect<true>;
     member: MemberSelect<false> | MemberSelect<true>;
+    queue: QueueSelect<false> | QueueSelect<true>;
     newsfeedpost: NewsfeedpostSelect<false> | NewsfeedpostSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -141,6 +143,8 @@ export interface Admin {
   password?: string | null;
 }
 /**
+ * Program members who sign up via the frontend
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "member".
  */
@@ -170,6 +174,33 @@ export interface Member {
    * Supabase auth user ID (auto-populated on signup)
    */
   auth_user_id?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Member tenure queue management
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "queue".
+ */
+export interface Queue {
+  id: number;
+  memberid: number;
+  /**
+   * Current position in the tenure queue
+   */
+  queue_position: number;
+  subscription_active?: boolean | null;
+  joined_at?: string | null;
+  is_eligible?: boolean | null;
+  total_months_subscribed?: number | null;
+  last_payment_date?: string | null;
+  /**
+   * Total amount paid over lifetime
+   */
+  lifetime_payment_total?: number | null;
+  has_received_payout?: boolean | null;
+  notes?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -233,6 +264,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'member';
         value: number | Member;
+      } | null)
+    | ({
+        relationTo: 'queue';
+        value: number | Queue;
       } | null)
     | ({
         relationTo: 'newsfeedpost';
@@ -320,6 +355,24 @@ export interface MemberSelect<T extends boolean = true> {
   tenure?: T;
   admin_i_d_id?: T;
   auth_user_id?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "queue_select".
+ */
+export interface QueueSelect<T extends boolean = true> {
+  memberid?: T;
+  queue_position?: T;
+  subscription_active?: T;
+  joined_at?: T;
+  is_eligible?: T;
+  total_months_subscribed?: T;
+  last_payment_date?: T;
+  lifetime_payment_total?: T;
+  has_received_payout?: T;
+  notes?: T;
   updatedAt?: T;
   createdAt?: T;
 }

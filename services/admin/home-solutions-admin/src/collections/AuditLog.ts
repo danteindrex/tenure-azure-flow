@@ -1,5 +1,10 @@
 import type { CollectionConfig } from 'payload'
 
+interface User {
+  id: string | number
+  role?: string
+}
+
 export const AuditLog: CollectionConfig = {
   slug: 'auditlog',
   admin: {
@@ -11,7 +16,7 @@ export const AuditLog: CollectionConfig = {
   access: {
     // Only admins can view audit logs
     create: () => false, // Audit logs should be created programmatically only
-    read: ({ req: { user } }) => {
+    read: ({ req: { user } }: { req: { user: User | null } }) => {
       if (!user) return false
       // Super Admin can see all, others can see only their own actions
       return user.role === 'Super Admin' ? true : {
@@ -21,7 +26,7 @@ export const AuditLog: CollectionConfig = {
       }
     },
     update: () => false, // Audit logs should never be updated
-    delete: ({ req: { user } }) => {
+    delete: ({ req: { user } }: { req: { user: User | null } }) => {
       // Only Super Admin can delete audit logs
       return user?.role === 'Super Admin'
     },
