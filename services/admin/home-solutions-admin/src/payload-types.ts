@@ -69,6 +69,7 @@ export interface Config {
   collections: {
     admin: Admin;
     member: Member;
+    newsfeedpost: Newsfeedpost;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -77,6 +78,7 @@ export interface Config {
   collectionsSelect: {
     admin: AdminSelect<false> | AdminSelect<true>;
     member: MemberSelect<false> | MemberSelect<true>;
+    newsfeedpost: NewsfeedpostSelect<false> | NewsfeedpostSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -172,6 +174,52 @@ export interface Member {
   createdAt: string;
 }
 /**
+ * Manage news feed posts and announcements for members
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "newsfeedpost".
+ */
+export interface Newsfeedpost {
+  id: number;
+  title: string;
+  /**
+   * Rich text content for the news post
+   */
+  content: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  };
+  /**
+   * Admin user who created this post
+   */
+  admin_i_d_id: number | Admin;
+  /**
+   * Date and time to publish this post
+   */
+  publish_date: string;
+  /**
+   * Current status of the post
+   */
+  status: 'Draft' | 'Published' | 'Scheduled' | 'Archived';
+  /**
+   * Priority level for displaying the post
+   */
+  priority?: ('Low' | 'Normal' | 'High' | 'Urgent') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-locked-documents".
  */
@@ -185,6 +233,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'member';
         value: number | Member;
+      } | null)
+    | ({
+        relationTo: 'newsfeedpost';
+        value: number | Newsfeedpost;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -268,6 +320,20 @@ export interface MemberSelect<T extends boolean = true> {
   tenure?: T;
   admin_i_d_id?: T;
   auth_user_id?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "newsfeedpost_select".
+ */
+export interface NewsfeedpostSelect<T extends boolean = true> {
+  title?: T;
+  content?: T;
+  admin_i_d_id?: T;
+  publish_date?: T;
+  status?: T;
+  priority?: T;
   updatedAt?: T;
   createdAt?: T;
 }
