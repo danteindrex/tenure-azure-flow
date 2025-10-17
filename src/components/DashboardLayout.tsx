@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LogOut, User } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
 
-const DashboardLayout = () => {
-  const navigate = useNavigate();
+const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
+  const router = useRouter();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -17,8 +16,11 @@ const DashboardLayout = () => {
     memberId: "TRP-2024-001",
   };
 
-  const handleLogout = () => {
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {}
+    router.replace("/login");
   };
 
   return (
@@ -76,7 +78,7 @@ const DashboardLayout = () => {
 
         {/* Main Content */}
         <main className="flex-1 container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-          <Outlet />
+          {children}
         </main>
       </div>
     </div>

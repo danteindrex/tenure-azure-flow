@@ -1,19 +1,37 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Crown } from "lucide-react";
+import { toast } from "sonner";
+import { useRouter } from "next/router";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const supabase = useSupabaseClient();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Authentication logic here
-    console.log("Login attempt:", { email, password });
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) throw error;
+      toast.success("Logged in successfully");
+      router.replace("/dashboard");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Invalid email or password");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -69,13 +87,13 @@ const Login = () => {
               <input type="checkbox" className="w-4 h-4 rounded border-border" />
               <span className="text-muted-foreground">Remember me</span>
             </label>
-            <Link to="/reset-password" className="text-accent hover:underline">
+            <Link href="/reset-password" className="text-accent hover:underline">
               Forgot password?
             </Link>
           </div>
 
-          <Button type="submit" className="w-full bg-primary hover:glow-blue-lg" size="lg">
-            Login
+          <Button type="submit" className="w-full bg-primary hover:glow-blue-lg" size="lg" disabled={loading}>
+            {loading ? "Signing in..." : "Login"}
           </Button>
         </form>
 
@@ -110,8 +128,8 @@ const Login = () => {
 
         {/* Sign Up Link */}
         <p className="text-center text-sm text-muted-foreground mt-6">
-          New here?{" "}
-          <Link to="/signup" className="text-accent hover:underline font-medium">
+          {"Don't"} have an account?{" "}
+          <Link href="/signup" className="text-accent hover:underline font-medium">
             Sign up
           </Link>
         </p>
