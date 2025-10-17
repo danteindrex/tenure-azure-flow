@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,7 +63,7 @@ const ResetPassword = () => {
 
             <p className="text-center text-sm text-muted-foreground mt-6">
               Remember your password?{" "}
-              <Link to="/login" className="text-accent hover:underline font-medium">
+              <Link href="/login" className="text-accent hover:underline font-medium">
                 Back to Login
               </Link>
             </p>
@@ -96,10 +96,8 @@ const ResetPassword = () => {
                 </button>
               </div>
 
-              <Link to="/login">
-                <Button variant="outline" className="w-full">
-                  Back to Login
-                </Button>
+              <Link href="/login">
+                <Button variant="link" className="p-0">Back to Login</Button>
               </Link>
             </div>
           </>

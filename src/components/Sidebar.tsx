@@ -1,17 +1,18 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import Link from "next/link";
+import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { 
-  Crown, 
-  Home, 
-  User, 
-  Settings, 
-  CreditCard, 
-  History, 
-  Users, 
-  BarChart3, 
-  Bell, 
+import {
+  Crown,
+  Home,
+  User,
+  Settings,
+  CreditCard,
+  History,
+  Users,
+  BarChart3,
+  Bell,
   HelpCircle,
   ChevronLeft,
   ChevronRight
@@ -23,7 +24,7 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
-  const location = useLocation();
+  const router = useRouter();
 
   const menuItems = [
     { path: "/dashboard", icon: Home, label: "Dashboard", badge: null },
@@ -35,13 +36,14 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
     { path: "/dashboard/notifications", icon: Bell, label: "Notifications", badge: "3" },
     { path: "/dashboard/settings", icon: Settings, label: "Settings", badge: null },
     { path: "/dashboard/help", icon: HelpCircle, label: "Help & Support", badge: null },
+    { path: "/dashboard/users", icon: Users, label: "Users", badge: "Live" },
   ];
 
   const isActive = (path: string) => {
     if (path === "/dashboard") {
-      return location.pathname === "/dashboard";
+      return router.pathname === "/dashboard";
     }
-    return location.pathname.startsWith(path);
+    return router.pathname.startsWith(path);
   };
 
   return (
@@ -73,11 +75,11 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
         {menuItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
-          
+
           return (
             <Link
               key={item.path}
-              to={item.path}
+              href={item.path}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                 active
                   ? "bg-accent text-accent-foreground shadow-sm"
@@ -90,7 +92,7 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
                   <span className="flex-1 text-sm font-medium">{item.label}</span>
                   {item.badge && (
                     <span className={`px-2 py-1 text-xs rounded-full ${
-                      item.badge === "Live" 
+                      item.badge === "Live"
                         ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                         : "bg-accent/20 text-accent"
                     }`}>

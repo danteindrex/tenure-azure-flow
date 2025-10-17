@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import Link from "next/link";
+import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,9 +8,11 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Crown, Check } from "lucide-react";
 import { toast } from "sonner";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 
 const SignUp = () => {
-  const navigate = useNavigate();
+  const navigate = useRouter();
+  const supabase = useSupabaseClient();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     fullName: "",
@@ -24,7 +27,7 @@ const SignUp = () => {
     zipCode: "",
     agreeToTerms: false,
   });
-
+  const [loading, setLoading] = useState(false);
   // US States data
   const usStates = [
     { value: "AL", label: "Alabama" },
@@ -108,9 +111,84 @@ const SignUp = () => {
     setStep(3);
   };
 
-  const handleFinalSubmit = () => {
-    toast.success("Account created successfully!");
-    setTimeout(() => navigate("/dashboard"), 1500);
+  const handleFinalSubmit = async () => {
+    try {
+      setLoading(true);
+      if (formData.password !== formData.confirmPassword) {
+        toast.error("Passwords do not match");
+        setLoading(false);
+        return;
+      }
+      if ((formData.password || "").length < 8) {
+        toast.error("Password must be at least 8 characters");
+        setLoading(false);
+        return;
+      }
+      const email = formData.email.trim();
+      const password = formData.password;
+
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: formData.fullName,
+            phone: `${formData.phoneCountryCode}${formData.phoneNumber}`,
+            street_address: formData.streetAddress,
+            city: formData.city,
+            state: formData.state,
+            zip_code: formData.zipCode,
+          },
+        },
+      });
+
+      if (signUpError) {
+        toast.error(signUpError.message || "Failed to sign up");
+        setLoading(false);
+        return;
+      }
+
+      // If a session exists (email confirmation not required), upsert profile server-side
+      if (signUpData.session) {
+        const resp = await fetch("/api/profiles/upsert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            full_name: formData.fullName,
+            phone: `${formData.phoneCountryCode}${formData.phoneNumber}`,
+            street_address: formData.streetAddress,
+            city: formData.city,
+            state: formData.state,
+            zip_code: formData.zipCode,
+          }),
+        });
+
+        if (!resp.ok) {
+          let msg = "Failed to create profile record";
+          try {
+            const data = await resp.json();
+            if (data?.error) msg = data.error;
+          } catch {}
+          toast.error(msg);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // If no session (email confirmation required), skip profile insert until login
+      if (signUpData.session) {
+        toast.success("Account created! Redirecting...");
+        setTimeout(() => navigate.replace("/dashboard"), 1000);
+      } else {
+        toast.success("Account created! Please check your email to confirm.");
+        setTimeout(() => navigate.replace("/login"), 1500);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Unexpected error during signup");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -337,11 +415,11 @@ const SignUp = () => {
                   />
                   <span className="text-sm text-muted-foreground">
                     I agree to the{" "}
-                    <Link to="/terms" className="text-accent hover:underline">
+                    <Link href="/terms" className="text-accent hover:underline">
                       Terms & Conditions
-                    </Link>{" "}
+                    </Link>
                     and{" "}
-                    <Link to="/privacy" className="text-accent hover:underline">
+                    <Link href="/privacy" className="text-accent hover:underline">
                       Privacy Policy
                     </Link>
                   </span>
@@ -413,8 +491,9 @@ const SignUp = () => {
                   onClick={handleFinalSubmit}
                   className="w-full bg-accent text-background hover:glow-blue-lg"
                   size="lg"
+                  disabled={loading}
                 >
-                  Create Account & Pay Fee
+                  {loading ? "Creating account..." : "Create Account & Pay Fee"}
                 </Button>
               </div>
             </div>
@@ -424,8 +503,8 @@ const SignUp = () => {
         {/* Login Link */}
         <p className="text-center text-sm text-muted-foreground mt-6">
           Already have an account?{" "}
-          <Link to="/login" className="text-accent hover:underline font-medium">
-            Login
+          <Link href="/login" className="text-accent hover:underline font-medium">
+            Back to Login
           </Link>
         </p>
       </Card>
