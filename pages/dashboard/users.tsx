@@ -36,32 +36,67 @@ export default function UsersPage() {
     async function load() {
       setLoading(true);
       const { data, error } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, phone, city, state, zip_code, street_address, created_at")
+        .from("member")
+        .select("auth_user_id, email, name, phone, city, state, zip_code, street_address, created_at")
         .order("created_at", { ascending: false });
       if (error) {
         console.error(error);
       } else if (mounted) {
-        setProfiles(data || []);
+        const mapped = (data || []).map((row: any) => ({
+          id: row.auth_user_id,
+          email: row.email,
+          full_name: row.name ?? null,
+          phone: row.phone ?? null,
+          city: row.city ?? null,
+          state: row.state ?? null,
+          zip_code: row.zip_code ?? null,
+          street_address: row.street_address ?? null,
+          created_at: row.created_at ?? null,
+        }));
+        setProfiles(mapped);
       }
       setLoading(false);
     }
     load();
 
     const channel = supabase
-      .channel("public:profiles")
+      .channel("public:member")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "profiles" },
+        { event: "INSERT", schema: "public", table: "member" },
         (payload: any) => {
-          setProfiles((prev) => [payload.new as Profile, ...prev]);
+          const row = payload.new;
+          const mapped: Profile = {
+            id: row.auth_user_id,
+            email: row.email,
+            full_name: row.name ?? null,
+            phone: row.phone ?? null,
+            city: row.city ?? null,
+            state: row.state ?? null,
+            zip_code: row.zip_code ?? null,
+            street_address: row.street_address ?? null,
+            created_at: row.created_at ?? null,
+          };
+          setProfiles((prev) => [mapped, ...prev]);
         }
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "profiles" },
+        { event: "UPDATE", schema: "public", table: "member" },
         (payload: any) => {
-          setProfiles((prev) => prev.map((p) => (p.id === payload.new.id ? (payload.new as Profile) : p)));
+          const row = payload.new;
+          const mapped: Profile = {
+            id: row.auth_user_id,
+            email: row.email,
+            full_name: row.name ?? null,
+            phone: row.phone ?? null,
+            city: row.city ?? null,
+            state: row.state ?? null,
+            zip_code: row.zip_code ?? null,
+            street_address: row.street_address ?? null,
+            created_at: row.created_at ?? null,
+          };
+          setProfiles((prev) => prev.map((p) => (p.id === mapped.id ? mapped : p)));
         }
       )
       .subscribe();

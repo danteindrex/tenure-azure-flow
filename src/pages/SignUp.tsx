@@ -114,6 +114,13 @@ const SignUp = () => {
   const handleFinalSubmit = async () => {
     try {
       setLoading(true);
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !supabaseKey) {
+        toast.error("Supabase env missing. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local");
+        setLoading(false);
+        return;
+      }
       if (formData.password !== formData.confirmPassword) {
         toast.error("Passwords do not match");
         setLoading(false);
@@ -139,6 +146,7 @@ const SignUp = () => {
             state: formData.state,
             zip_code: formData.zipCode,
           },
+          emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined,
         },
       });
 
