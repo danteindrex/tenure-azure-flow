@@ -108,40 +108,40 @@ const Login = () => {
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-2 text-accent">
             <Crown className="w-8 h-8" />
-            <span className="text-2xl font-bold">Tenure</span>
+            <span className="text-2xl font-bold text-foreground">Tenure</span>
           </div>
         </div>
 
         {/* Title */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">Welcome Back</h1>
+          <h1 className="text-3xl font-bold mb-2 text-foreground">Welcome Back</h1>
           <p className="text-muted-foreground">Sign in to your account</p>
         </div>
 
         {/* Form */}
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="text-foreground">Email</Label>
             <Input
               id="email"
               type="email"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="bg-background/50 border-border focus:border-accent transition-colors"
+              className="bg-background/50 border-border focus:border-accent transition-colors text-foreground placeholder:text-muted-foreground"
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password" className="text-foreground">Password</Label>
             <Input
               id="password"
               type="password"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="bg-background/50 border-border focus:border-accent transition-colors"
+              className="bg-background/50 border-border focus:border-accent transition-colors text-foreground placeholder:text-muted-foreground"
               required
             />
           </div>

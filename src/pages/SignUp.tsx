@@ -148,7 +148,7 @@ const SignUp = () => {
             city: formData.city,
             state: formData.state,
             zip_code: formData.zipCode,
-          },
+           },
           emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined,
         },
       });
@@ -418,6 +418,7 @@ const SignUp = () => {
                   required
                 />
               </div>
+
 
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
