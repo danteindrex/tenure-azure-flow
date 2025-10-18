@@ -37,19 +37,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const admin = createClient(url, serviceKey);
 
     const { error } = await admin
-      .from("profiles")
+      .from("member")
       .upsert(
         {
-          id: user.id,
+          auth_user_id: user.id,
           email,
-          full_name: full_name ?? null,
+          name: full_name ?? null,
           phone: phone ?? null,
           street_address: street_address ?? null,
           city: city ?? null,
           state: state ?? null,
           zip_code: zip_code ?? null,
         },
-        { onConflict: "id" }
+        { onConflict: "auth_user_id" }
       );
 
     if (error) {

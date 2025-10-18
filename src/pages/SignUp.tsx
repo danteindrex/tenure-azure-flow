@@ -149,6 +149,7 @@ const SignUp = () => {
             state: formData.state,
             zip_code: formData.zipCode,
           },
+          emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined,
         },
       });
 
