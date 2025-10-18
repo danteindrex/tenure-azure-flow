@@ -15,7 +15,8 @@ import {
   Bell,
   HelpCircle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Shield
 } from "lucide-react";
 
 interface SidebarProps {
@@ -37,6 +38,7 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
     { path: "/dashboard/settings", icon: Settings, label: "Settings", badge: null },
     { path: "/dashboard/help", icon: HelpCircle, label: "Help & Support", badge: null },
     { path: "/dashboard/users", icon: Users, label: "Users", badge: "Live" },
+    { path: "/dashboard/audit-logs", icon: Shield, label: "Audit Logs", badge: "Admin" },
   ];
 
   const isActive = (path: string) => {

@@ -3,24 +3,39 @@ import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LogOut, User } from "lucide-react";
+import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { logLogout } from "@/lib/audit";
 import Sidebar from "./Sidebar";
 
 const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
   const router = useRouter();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const supabase = useSupabaseClient();
+  const userData = useUser();
+  const user = userData?.user;
 
   // Mock user data
-  const userData = {
-    name: "John Doe",
+  const mockUserData = {
+    name: user?.user_metadata?.full_name || "User",
     memberId: "TRP-2024-001",
   };
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
-    } catch {}
-    router.replace("/login");
+      // Log logout before signing out
+      if (user?.id) {
+        await logLogout(user.id);
+      }
+      
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+      
+      router.replace("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+      router.replace("/login");
+    }
   };
 
   return (
@@ -43,7 +58,7 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
               {/* Page Title */}
               <div>
                 <h1 className="text-2xl font-bold">Dashboard</h1>
-                <p className="text-muted-foreground">Welcome back, {userData.name}</p>
+                <p className="text-muted-foreground">Welcome back, {mockUserData.name}</p>
               </div>
 
               {/* User Menu */}
@@ -56,7 +71,7 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
                   <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-accent/20 flex items-center justify-center">
                     <User className="w-3 h-3 sm:w-4 sm:h-4 text-accent" />
                   </div>
-                  <span className="hidden sm:inline text-sm sm:text-base">{userData.name}</span>
+                  <span className="hidden sm:inline text-sm sm:text-base">{mockUserData.name}</span>
                   <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-success pulse-glow" />
                 </Button>
 

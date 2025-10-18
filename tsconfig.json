@@ -1,13 +1,8 @@
 {
-  "files": [],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    },
-    {
-      "path": "./tsconfig.node.json"
-    }
+  "files": [
+    "next-env.d.ts"
   ],
+  "references": [],
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
