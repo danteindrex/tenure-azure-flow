@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,13 +14,38 @@ import {
   Target,
   Calendar,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Loader2
 } from "lucide-react";
+import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
 
 const Queue = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [queueData, setQueueData] = useState([]);
 
-  const queueData = [
+  const supabase = useSupabaseClient();
+  const user = useUser();
+
+  // Load queue data
+  useEffect(() => {
+    const loadQueueData = async () => {
+      try {
+        setLoading(true);
+        // TODO: Load real queue data from database
+        // For now, set empty array
+        setQueueData([]);
+      } catch (error) {
+        console.error('Error loading queue data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadQueueData();
+  }, []);
+
+  const mockQueueData = [
     { 
       rank: 1, 
       name: "Alice Johnson", 
@@ -128,6 +153,33 @@ const Queue = () => {
     member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     member.memberId.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-accent" />
+            <p className="text-muted-foreground">Loading queue data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (queueData.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold mb-2">No Queue Data Available</h3>
+            <p className="text-muted-foreground">Queue data will appear here once members are added to the system.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {

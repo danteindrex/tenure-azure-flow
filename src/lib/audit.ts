@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import SupabaseClientSingleton from './supabase';
 
 // Types for audit logging
 export interface AuditLogEntry {
@@ -32,20 +32,12 @@ export interface AuditLogFilters {
 }
 
 class AuditLogger {
-  private supabase: any;
+  private supabase: ReturnType<typeof SupabaseClientSingleton.getInstance>;
   private sessionId: string;
   private static instance: AuditLogger;
 
   constructor() {
-    // Use existing Supabase client from window if available to avoid multiple instances
-    if (typeof window !== 'undefined' && (window as any).__supabaseClient) {
-      this.supabase = (window as any).__supabaseClient;
-    } else {
-      this.supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-    }
+    this.supabase = SupabaseClientSingleton.getInstance();
     this.sessionId = this.generateSessionId();
   }
 

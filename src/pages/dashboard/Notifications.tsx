@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,66 +11,75 @@ import {
   AlertCircle,
   Info,
   CheckCircle,
-  DollarSign
+  DollarSign,
+  Loader2
 } from "lucide-react";
+import { toast } from "sonner";
+import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import NotificationService, { Notification, NotificationPreferences } from "@/lib/notifications";
+import { logError } from "@/lib/audit";
 
 const Notifications = () => {
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: "payment",
-      title: "Payment Successful",
-      message: "Your monthly membership fee of $25.00 has been processed successfully.",
-      timestamp: "2 hours ago",
-      read: false,
-      priority: "high"
-    },
-    {
-      id: 2,
-      type: "queue",
-      title: "Queue Position Update",
-      message: "You've moved up 2 positions in the tenure queue! You're now ranked #3.",
-      timestamp: "1 day ago",
-      read: false,
-      priority: "medium"
-    },
-    {
-      id: 3,
-      type: "milestone",
-      title: "Milestone Reached",
-      message: "Congratulations! The fund has reached $250,000. 2 winners will be selected soon.",
-      timestamp: "2 days ago",
-      read: true,
-      priority: "high"
-    },
-    {
-      id: 4,
-      type: "reminder",
-      title: "Payment Due Soon",
-      message: "Your next payment of $25.00 is due in 5 days. Don't forget to update your payment method.",
-      timestamp: "3 days ago",
-      read: true,
-      priority: "medium"
-    },
-    {
-      id: 5,
-      type: "system",
-      title: "System Maintenance",
-      message: "Scheduled maintenance will occur on Sunday from 2-4 AM EST. Some features may be unavailable.",
-      timestamp: "1 week ago",
-      read: true,
-      priority: "low"
-    },
-    {
-      id: 6,
-      type: "bonus",
-      title: "Referral Bonus",
-      message: "You've earned a $5.00 bonus for referring a new member!",
-      timestamp: "1 week ago",
-      read: true,
-      priority: "medium"
-    }
-  ]);
+  const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationCounts, setNotificationCounts] = useState({
+    total: 0,
+    unread: 0,
+    high_priority: 0,
+    by_type: {} as Record<string, number>
+  });
+  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
+
+  const supabase = useSupabaseClient();
+  const user = useUser();
+  
+  // Memoize the notification service to prevent recreation on every render
+  const notificationService = useMemo(() => new NotificationService(supabase), [supabase]);
+
+  // Load notifications data
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadNotifications = async () => {
+      if (!user) return;
+      
+      try {
+        if (isMounted) {
+          setLoading(true);
+        }
+        
+        // Load data in parallel
+        const [notificationsData, countsData, preferencesData] = await Promise.all([
+          notificationService.getNotifications(user.id),
+          notificationService.getNotificationCounts(user.id),
+          notificationService.getNotificationPreferences(user.id)
+        ]);
+
+        // Only update state if component is still mounted
+        if (isMounted) {
+          setNotifications(notificationsData);
+          setNotificationCounts(countsData);
+          setPreferences(preferencesData);
+          setLoading(false);
+        }
+
+      } catch (error) {
+        console.error('Error loading notifications:', error);
+        if (isMounted) {
+          await logError(`Error loading notifications: ${error.message}`, user.id);
+          toast.error("Failed to load notifications");
+          setLoading(false);
+        }
+      }
+    };
+
+    loadNotifications();
+    
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, notificationService]);
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -104,27 +113,113 @@ const Notifications = () => {
     }
   };
 
-  const markAsRead = (id: number) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id 
-          ? { ...notification, read: true }
-          : notification
-      )
+  const markAsRead = async (notificationId: string) => {
+    if (!user) return;
+    
+    try {
+      const success = await notificationService.markAsRead(notificationId, user.id);
+      
+      if (success) {
+        setNotifications(prev => 
+          prev.map(notification => 
+            notification.id === notificationId 
+              ? { ...notification, is_read: true, read_at: new Date().toISOString() }
+              : notification
+          )
+        );
+        
+        // Update counts
+        setNotificationCounts(prev => ({
+          ...prev,
+          unread: Math.max(0, prev.unread - 1)
+        }));
+        
+        toast.success("Notification marked as read");
+      } else {
+        throw new Error("Failed to mark notification as read");
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      await logError(`Error marking notification as read: ${error.message}`, user.id);
+      toast.error("Failed to mark notification as read");
+    }
+  };
+
+  const markAllAsRead = async () => {
+    if (!user) return;
+    
+    try {
+      const success = await notificationService.markAllAsRead(user.id);
+      
+      if (success) {
+        setNotifications(prev => 
+          prev.map(notification => ({ 
+            ...notification, 
+            is_read: true, 
+            read_at: new Date().toISOString() 
+          }))
+        );
+        
+        // Update counts
+        setNotificationCounts(prev => ({
+          ...prev,
+          unread: 0
+        }));
+        
+        toast.success("All notifications marked as read");
+      } else {
+        throw new Error("Failed to mark all notifications as read");
+      }
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      await logError(`Error marking all notifications as read: ${error.message}`, user.id);
+      toast.error("Failed to mark all notifications as read");
+    }
+  };
+
+  const deleteNotification = async (notificationId: string) => {
+    if (!user) return;
+    
+    try {
+      const success = await notificationService.deleteNotification(notificationId, user.id);
+      
+      if (success) {
+        const deletedNotification = notifications.find(n => n.id === notificationId);
+        setNotifications(prev => prev.filter(notification => notification.id !== notificationId));
+        
+        // Update counts
+        setNotificationCounts(prev => ({
+          ...prev,
+          total: prev.total - 1,
+          unread: deletedNotification?.is_read ? prev.unread : Math.max(0, prev.unread - 1),
+          high_priority: deletedNotification?.priority === 'high' || deletedNotification?.priority === 'urgent' 
+            ? Math.max(0, prev.high_priority - 1) 
+            : prev.high_priority
+        }));
+        
+        toast.success("Notification deleted");
+      } else {
+        throw new Error("Failed to delete notification");
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      await logError(`Error deleting notification: ${error.message}`, user.id);
+      toast.error("Failed to delete notification");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-accent" />
+            <p className="text-muted-foreground">Loading notifications...</p>
+          </div>
+        </div>
+      </div>
     );
-  };
-
-  const markAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(notification => ({ ...notification, read: true }))
-    );
-  };
-
-  const deleteNotification = (id: number) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
-  };
-
-  const unreadCount = notifications.filter(n => !n.read).length;
+  }
 
   return (
     <div className="space-y-6">
@@ -135,7 +230,7 @@ const Notifications = () => {
           <p className="text-muted-foreground">Stay updated with your account activity</p>
         </div>
         <div className="flex gap-2">
-          {unreadCount > 0 && (
+          {notificationCounts.unread > 0 && (
             <Button variant="outline" onClick={markAllAsRead}>
               <Check className="w-4 h-4 mr-2" />
               Mark All Read
@@ -154,7 +249,7 @@ const Notifications = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Unread</p>
-              <p className="text-2xl font-bold">{unreadCount}</p>
+              <p className="text-2xl font-bold">{notificationCounts.unread}</p>
             </div>
             <Bell className="w-8 h-8 text-accent" />
           </div>
@@ -163,7 +258,7 @@ const Notifications = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Total</p>
-              <p className="text-2xl font-bold">{notifications.length}</p>
+              <p className="text-2xl font-bold">{notificationCounts.total}</p>
             </div>
             <Info className="w-8 h-8 text-blue-500" />
           </div>
@@ -172,7 +267,7 @@ const Notifications = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">High Priority</p>
-              <p className="text-2xl font-bold">{notifications.filter(n => n.priority === "high").length}</p>
+              <p className="text-2xl font-bold">{notificationCounts.high_priority}</p>
             </div>
             <AlertCircle className="w-8 h-8 text-red-500" />
           </div>
@@ -185,13 +280,14 @@ const Notifications = () => {
           <Card className="p-8 text-center">
             <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">No notifications yet</p>
+            <p className="text-sm text-muted-foreground mt-2">You'll see important updates here</p>
           </Card>
         ) : (
           notifications.map((notification) => (
             <Card 
               key={notification.id} 
               className={`p-4 transition-all duration-200 ${
-                !notification.read 
+                !notification.is_read 
                   ? "bg-accent/5 border-accent/20 shadow-sm" 
                   : "bg-background/50"
               }`}
@@ -204,10 +300,10 @@ const Notifications = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className={`font-semibold ${!notification.read ? "text-foreground" : "text-muted-foreground"}`}>
+                        <h3 className={`font-semibold ${!notification.is_read ? "text-foreground" : "text-muted-foreground"}`}>
                           {notification.title}
                         </h3>
-                        {!notification.read && (
+                        {!notification.is_read && (
                           <div className="w-2 h-2 rounded-full bg-accent" />
                         )}
                       </div>
@@ -216,17 +312,23 @@ const Notifications = () => {
                       </p>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">
-                          {notification.timestamp}
+                          {new Date(notification.created_at || '').toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
                         </span>
                         {getPriorityBadge(notification.priority)}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 ml-4">
-                      {!notification.read && (
+                      {!notification.is_read && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => markAsRead(notification.id)}
+                          onClick={() => markAsRead(notification.id!)}
                           className="h-8 w-8 p-0"
                         >
                           <Check className="w-4 h-4" />
@@ -235,7 +337,7 @@ const Notifications = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => deleteNotification(notification.id)}
+                        onClick={() => deleteNotification(notification.id!)}
                         className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
                       >
                         <Trash2 className="w-4 h-4" />

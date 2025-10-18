@@ -74,6 +74,47 @@ All colors MUST be HSL.
     --shadow-glow-lg: 0 0 40px hsl(190 100% 42% / 0.3);
     --shadow-card: 0 8px 32px hsl(0 0% 0% / 0.1);
   }
+
+  .dark {
+    /* Dark Theme - Tenure Reward Program */
+    --background: 210 100% 6%;   /* #0a192f Deep Navy */
+    --foreground: 0 0% 98%;      /* #fafafa Light Gray */
+
+    --card: 210 100% 8%;         /* #0f1f3a Darker Navy Card */
+    --card-foreground: 0 0% 98%;
+
+    --popover: 210 100% 8%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 190 100% 42%;     /* #00bcd4 Cyan - Same accent color */
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 215 20% 15%;    /* #1e293b Dark Gray */
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 215 20% 12%;        /* #0f172a Very Dark Gray */
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 190 100% 42%;      /* #00bcd4 Cyan - Same accent color */
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84% 60%;    /* #ef4444 Red - Same destructive color */
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 215 20% 20%;       /* Darker border */
+    --input: 215 20% 15%;        /* Darker input background */
+    --ring: 190 100% 42%;        /* Same ring color */
+
+    /* Gradients for dark theme */
+    --gradient-primary: linear-gradient(135deg, hsl(210 100% 6%) 0%, hsl(210 100% 8%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(210 100% 8% / 0.9) 0%, hsl(210 100% 10% / 0.9) 100%);
+    --gradient-glow: radial-gradient(circle at center, hsl(190 100% 42% / 0.15) 0%, transparent 70%);
+    
+    /* Shadows with glow for dark theme */
+    --shadow-glow: 0 0 20px hsl(190 100% 42% / 0.3);
+    --shadow-glow-lg: 0 0 40px hsl(190 100% 42% / 0.4);
+    --shadow-card: 0 8px 32px hsl(0 0% 0% / 0.3);
+  }
 }
 
 @layer base {

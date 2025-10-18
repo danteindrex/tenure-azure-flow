@@ -1,12 +1,22 @@
-import { useState } from "react";
-import { Crown, Calendar, DollarSign, Users, Clock, TrendingUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Crown, Calendar, DollarSign, Users, Clock, TrendingUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useCounterAnimation } from "@/hooks/use-counter-animation";
 import { QueueRow } from "@/components/QueueRow";
+import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
 
 const Dashboard = () => {
+  const [loading, setLoading] = useState(true);
+  const [userData, setUserData] = useState({
+    memberId: "",
+    tenureStart: "",
+    nextPaymentDue: "",
+  });
+
+  const supabase = useSupabaseClient();
+  const user = useUser();
 
   // Animated counters
   const daysUntilPayment = useCounterAnimation(15, 1200, 100);
@@ -16,30 +26,61 @@ const Dashboard = () => {
   const paymentAmount = useCounterAnimation(25, 800, 150);
   const queueCounter = useCounterAnimation(1, 500, 0);
 
-  // Mock data
-  const userData = {
-    memberId: "TRP-2024-001",
-    tenureStart: "January 1, 2025",
-    nextPaymentDue: "February 1, 2025",
-  };
+  // Load user data
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        
+        const userInfo = {
+          memberId: user.user_metadata?.member_id || `TRP-${new Date().getFullYear()}-${String(user.id).slice(-3).toUpperCase()}`,
+          tenureStart: new Date(user.created_at).toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          }),
+          nextPaymentDue: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          }),
+        };
 
-  const queueData = [
-    { rank: 1, name: "Alice Johnson", tenureMonths: 24, status: "Active" },
-    { rank: 2, name: "Bob Smith", tenureMonths: 22, status: "Active" },
-    { rank: 3, name: "John Doe", tenureMonths: 18, status: "Active", isCurrentUser: true },
-    { rank: 4, name: "Emma Wilson", tenureMonths: 15, status: "Active" },
-    { rank: 5, name: "Michael Brown", tenureMonths: 12, status: "Active" },
-  ];
+        setUserData(userInfo);
+      } catch (error) {
+        console.error('Error loading user data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const activityFeed = [
-    { title: "Milestone Reached", message: "$250,000 collected — 2 winners funded!", timestamp: "2 hours ago" },
-    { title: "Payment Processed", message: "Your monthly payment of $25 was successful", timestamp: "1 day ago" },
-    { title: "Queue Update", message: "You moved up 2 positions in the tenure queue", timestamp: "3 days ago" },
-  ];
+    loadUserData();
+  }, [user]);
+
+  // Empty queue data - will be populated from database in future
+  const queueData = [];
+
+  // Empty activity feed - will be populated from database in future
+  const activityFeed = [];
 
   const fundData = {
     nextDrawDate: "March 15, 2025",
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-accent" />
+            <p className="text-muted-foreground">Loading dashboard...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

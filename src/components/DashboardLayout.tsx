@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { LogOut, User } from "lucide-react";
+import { LogOut, User, Moon, Sun, Monitor } from "lucide-react";
 import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
 import { logLogout } from "@/lib/audit";
+import { useTheme } from "@/contexts/ThemeContext";
 import Sidebar from "./Sidebar";
 
 const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
@@ -14,11 +15,12 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
   const supabase = useSupabaseClient();
   const userData = useUser();
   const user = userData?.user;
+  const { theme, setTheme, actualTheme } = useTheme();
 
-  // Mock user data
-  const mockUserData = {
-    name: user?.user_metadata?.full_name || "User",
-    memberId: "TRP-2024-001",
+  // Real user data
+  const displayUserData = {
+    name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "User",
+    memberId: user?.user_metadata?.member_id || `TRP-${new Date().getFullYear()}-${String(user?.id || '').slice(-3).toUpperCase()}`,
   };
 
   const handleLogout = async () => {
@@ -27,15 +29,32 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
       if (user?.id) {
         await logLogout(user.id);
       }
-      
+
       // Sign out from Supabase
       await supabase.auth.signOut();
-      
+
       router.replace("/login");
     } catch (error) {
       console.error("Logout error:", error);
       router.replace("/login");
     }
+  };
+
+  const toggleTheme = () => {
+    if (theme === 'light') {
+      setTheme('dark');
+    } else if (theme === 'dark') {
+      setTheme('system');
+    } else {
+      setTheme('light');
+    }
+  };
+
+  const getThemeIcon = () => {
+    if (theme === 'system') {
+      return <Monitor className="w-4 h-4" />;
+    }
+    return actualTheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />;
   };
 
   return (
@@ -58,8 +77,19 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
               {/* Page Title */}
               <div>
                 <h1 className="text-2xl font-bold">Dashboard</h1>
-                <p className="text-muted-foreground">Welcome back, {mockUserData.name}</p>
+                <p className="text-muted-foreground">Welcome back, {displayUserData.name}</p>
               </div>
+
+              {/* Theme Toggle */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleTheme}
+                className="hover:bg-accent/10 p-2"
+                title={`Current theme: ${theme} (${actualTheme})`}
+              >
+                {getThemeIcon()}
+              </Button>
 
               {/* User Menu */}
               <div className="relative">
@@ -71,7 +101,7 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
                   <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-accent/20 flex items-center justify-center">
                     <User className="w-3 h-3 sm:w-4 sm:h-4 text-accent" />
                   </div>
-                  <span className="hidden sm:inline text-sm sm:text-base">{mockUserData.name}</span>
+                  <span className="hidden sm:inline text-sm sm:text-base">{displayUserData.name}</span>
                   <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-success pulse-glow" />
                 </Button>
 
