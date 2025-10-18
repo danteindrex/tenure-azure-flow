@@ -36,7 +36,6 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
     { path: "/dashboard/notifications", icon: Bell, label: "Notifications", badge: "3" },
     { path: "/dashboard/settings", icon: Settings, label: "Settings", badge: null },
     { path: "/dashboard/help", icon: HelpCircle, label: "Help & Support", badge: null },
-    { path: "/dashboard/users", icon: Users, label: "Users", badge: "Live" },
   ];
 
   const isActive = (path: string) => {

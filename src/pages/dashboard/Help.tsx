@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,11 +17,18 @@ import {
   ChevronRight,
   Send,
   Clock,
-  CheckCircle
+  CheckCircle,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
+import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import HelpService, { SupportTicket, FAQCategory, FAQItem, KnowledgeBaseArticle } from "@/lib/help";
+import { logError } from "@/lib/audit";
 
 const Help = () => {
+  const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
+  const [submittingTicket, setSubmittingTicket] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [ticketForm, setTicketForm] = useState({
@@ -31,132 +38,173 @@ const Help = () => {
     description: ""
   });
 
-  const faqCategories = [
-    {
-      id: "account",
-      title: "Account & Profile",
-      icon: "👤",
-      questions: [
-        {
-          question: "How do I update my profile information?",
-          answer: "You can update your profile information by going to the Profile page in your dashboard. Click the 'Edit Profile' button to make changes to your personal details, contact information, and address."
-        },
-        {
-          question: "How do I change my password?",
-          answer: "To change your password, go to Settings > Security and click 'Change Password'. You'll need to enter your current password and then create a new one."
-        },
-        {
-          question: "Can I have multiple accounts?",
-          answer: "No, each person is only allowed one account. Having multiple accounts violates our terms of service and may result in account suspension."
-        }
-      ]
-    },
-    {
-      id: "payments",
-      title: "Payments & Billing",
-      icon: "💳",
-      questions: [
-        {
-          question: "How much does membership cost?",
-          answer: "The initial membership fee is $300, followed by monthly payments of $25. All fees are clearly displayed during the signup process."
-        },
-        {
-          question: "What payment methods do you accept?",
-          answer: "We accept credit cards, debit cards, and bank transfers. You can manage your payment methods in the Settings > Payment section."
-        },
-        {
-          question: "When is my payment due?",
-          answer: "Monthly payments are due on the same date each month as your initial signup. You'll receive reminders before the due date."
-        },
-        {
-          question: "What happens if I miss a payment?",
-          answer: "Missing a payment will result in immediate loss of your queue position. It's important to keep your payment method up to date and ensure sufficient funds."
-        }
-      ]
-    },
-    {
-      id: "queue",
-      title: "Tenure Queue",
-      icon: "👥",
-      questions: [
-        {
-          question: "How does the tenure queue work?",
-          answer: "Members are ranked by their tenure (time as a member). The longer you've been a member, the higher your position. When the fund reaches payout milestones, the top-ranked members receive rewards."
-        },
-        {
-          question: "Can I see my current position?",
-          answer: "Yes, your current position in the queue is displayed on your dashboard. You can also view the full queue on the Tenure Queue page."
-        },
-        {
-          question: "What happens when I move up in the queue?",
-          answer: "You'll receive a notification when your position changes. Moving up means you're closer to receiving a payout when the next milestone is reached."
-        }
-      ]
-    },
-    {
-      id: "payouts",
-      title: "Payouts & Rewards",
-      icon: "💰",
-      questions: [
-        {
-          question: "How often are payouts made?",
-          answer: "Payouts are made when the fund reaches certain milestones. Currently, we pay out to the top 2 members when the fund reaches $250,000."
-        },
-        {
-          question: "How much can I win?",
-          answer: "Payout amounts vary based on the fund size and your position. The top-ranked members receive the largest shares of the payout pool."
-        },
-        {
-          question: "How will I receive my payout?",
-          answer: "Payouts are typically sent via bank transfer or check, depending on your preference. You can update your payout preferences in Settings."
-        }
-      ]
-    }
-  ];
+  // Data state
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
+  const [faqCategories, setFaqCategories] = useState<FAQCategory[]>([]);
+  const [faqItems, setFaqItems] = useState<FAQItem[]>([]);
+  const [searchResults, setSearchResults] = useState<{
+    faqItems: FAQItem[];
+    articles: KnowledgeBaseArticle[];
+    totalResults: number;
+  }>({ faqItems: [], articles: [], totalResults: 0 });
 
-  const supportTickets = [
-    {
-      id: "TICKET-001",
-      subject: "Payment processing issue",
-      status: "open",
-      priority: "high",
-      created: "2 hours ago",
-      lastUpdate: "1 hour ago"
-    },
-    {
-      id: "TICKET-002",
-      subject: "Profile update not saving",
-      status: "resolved",
-      priority: "medium",
-      created: "1 day ago",
-      lastUpdate: "12 hours ago"
-    },
-    {
-      id: "TICKET-003",
-      subject: "Queue position question",
-      status: "in-progress",
-      priority: "low",
-      created: "3 days ago",
-      lastUpdate: "2 days ago"
-    }
-  ];
+  const supabase = useSupabaseClient();
+  const user = useUser();
+  
+  // Memoize the help service to prevent recreation on every render
+  const helpService = useMemo(() => new HelpService(supabase), [supabase]);
 
-  const handleSubmitTicket = (e: React.FormEvent) => {
+  // Load initial data
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadHelpData = async () => {
+      if (!user) return;
+      
+      try {
+        if (isMounted) {
+          setLoading(true);
+        }
+        
+        // Load data in parallel
+        const [tickets, categories, items] = await Promise.all([
+          helpService.getSupportTickets(user.id),
+          helpService.getFAQCategories(),
+          helpService.getFAQItems()
+        ]);
+
+        // Only update state if component is still mounted
+        if (isMounted) {
+          setSupportTickets(tickets);
+          setFaqCategories(categories);
+          setFaqItems(items);
+          setLoading(false);
+        }
+
+      } catch (error) {
+        console.error('Error loading help data:', error);
+        if (isMounted) {
+          await logError(`Error loading help data: ${error.message}`, user.id);
+          toast.error("Failed to load help data");
+          setLoading(false);
+        }
+      }
+    };
+
+    loadHelpData();
+    
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, helpService]); // Only depend on user.id and helpService
+
+  const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Support ticket submitted successfully!");
-    setTicketForm({ subject: "", category: "", priority: "medium", description: "" });
+    
+    if (!user) {
+      toast.error("You must be logged in to submit a ticket");
+      return;
+    }
+
+    try {
+      setSubmittingTicket(true);
+      
+      const ticket = await helpService.createSupportTicket({
+        user_id: user.id,
+        subject: ticketForm.subject,
+        description: ticketForm.description,
+        category: ticketForm.category as any,
+        priority: ticketForm.priority as any
+      });
+
+      if (ticket) {
+        toast.success("Support ticket submitted successfully!");
+        setTicketForm({ subject: "", category: "", priority: "medium", description: "" });
+        
+        // Refresh tickets list
+        const updatedTickets = await helpService.getSupportTickets(user.id);
+        setSupportTickets(updatedTickets);
+      } else {
+        throw new Error("Failed to create ticket");
+      }
+    } catch (error) {
+      console.error('Error submitting ticket:', error);
+      await logError(`Error submitting ticket: ${error.message}`, user.id);
+      toast.error("Failed to submit support ticket");
+    } finally {
+      setSubmittingTicket(false);
+    }
   };
 
-  const filteredFAQs = faqCategories.filter(category => 
-    selectedCategory === "all" || category.id === selectedCategory
-  ).filter(category => 
-    searchQuery === "" || 
-    category.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    category.questions.some(q => 
-      q.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      q.answer.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  );
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+
+    try {
+      setSearching(true);
+      
+      const results = await helpService.searchHelpContent(searchQuery, user?.id);
+      setSearchResults(results);
+      
+      if (results.totalResults === 0) {
+        toast.info("No results found for your search");
+      }
+    } catch (error) {
+      console.error('Error searching help content:', error);
+      await logError(`Error searching help content: ${error.message}`, user?.id);
+      toast.error("Search failed");
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  // Get filtered FAQ items based on search and category
+  const getFilteredFAQItems = () => {
+    if (searchResults.totalResults > 0) {
+      return searchResults.faqItems;
+    }
+    
+    let items = faqItems;
+    
+    if (selectedCategory !== "all") {
+      items = items.filter(item => item.category_id === selectedCategory);
+    }
+    
+    return items;
+  };
+
+  const filteredFAQItems = getFilteredFAQItems();
+
+  // Debug logging
+  console.log('Help component render:', { loading, user: user?.id, hasUser: !!user });
+
+  // If no user after initial load, show message
+  if (!user && !loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <HelpCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <p className="text-muted-foreground">Please log in to access help content</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-accent" />
+            <p className="text-muted-foreground">Loading help content...</p>
+            <p className="text-xs text-muted-foreground mt-2">User: {user?.id || 'Not loaded'}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -183,19 +231,33 @@ const Help = () => {
                 placeholder="Search for help..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 className="pl-10 bg-background/50"
               />
             </div>
+            <Button 
+              onClick={handleSearch} 
+              disabled={searching || !searchQuery.trim()}
+              className="w-full"
+            >
+              {searching ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Search className="w-4 h-4 mr-2" />
+              )}
+              {searching ? "Searching..." : "Search"}
+            </Button>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger className="bg-background/50">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="account">Account & Profile</SelectItem>
-                <SelectItem value="payments">Payments & Billing</SelectItem>
-                <SelectItem value="queue">Tenure Queue</SelectItem>
-                <SelectItem value="payouts">Payouts & Rewards</SelectItem>
+                {faqCategories.map((category) => (
+                  <SelectItem key={category.id} value={category.id || ''}>
+                    {category.icon} {category.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -262,33 +324,42 @@ const Help = () => {
           My Support Tickets
         </h3>
         <div className="space-y-3">
-          {supportTickets.map((ticket) => (
-            <div key={ticket.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-              <div className="flex items-center gap-4">
-                <div className="p-2 rounded-full bg-background/50">
-                  <MessageCircle className="w-4 h-4 text-accent" />
-                </div>
-                <div>
-                  <p className="font-medium">{ticket.subject}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {ticket.id} • Created {ticket.created}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge className={
-                  ticket.status === "resolved" ? "bg-green-100 text-green-800" :
-                  ticket.status === "in-progress" ? "bg-yellow-100 text-yellow-800" :
-                  "bg-red-100 text-red-800"
-                }>
-                  {ticket.status}
-                </Badge>
-                <Button variant="ghost" size="sm">
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
+          {supportTickets.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No support tickets yet</p>
+              <p className="text-sm">Submit a ticket below to get help</p>
             </div>
-          ))}
+          ) : (
+            supportTickets.map((ticket) => (
+              <div key={ticket.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 rounded-full bg-background/50">
+                    <MessageCircle className="w-4 h-4 text-accent" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{ticket.subject}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {ticket.ticket_number} • Created {new Date(ticket.created_at || '').toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={
+                    ticket.status === "resolved" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" :
+                    ticket.status === "in-progress" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" :
+                    ticket.status === "closed" ? "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200" :
+                    "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                  }>
+                    {ticket.status}
+                  </Badge>
+                  <Button variant="ghost" size="sm">
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </Card>
 
@@ -341,9 +412,17 @@ const Help = () => {
               required
             />
           </div>
-          <Button type="submit" className="bg-accent hover:bg-accent/90">
-            <Send className="w-4 h-4 mr-2" />
-            Submit Ticket
+          <Button 
+            type="submit" 
+            className="bg-accent hover:bg-accent/90"
+            disabled={submittingTicket}
+          >
+            {submittingTicket ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4 mr-2" />
+            )}
+            {submittingTicket ? "Submitting..." : "Submit Ticket"}
           </Button>
         </form>
       </Card>
@@ -351,28 +430,38 @@ const Help = () => {
       {/* FAQ */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Frequently Asked Questions</h3>
-        <Accordion type="single" collapsible className="space-y-2">
-          {filteredFAQs.map((category) => (
-            <AccordionItem key={category.id} value={category.id} className="border border-border rounded-lg">
-              <AccordionTrigger className="px-6 py-4 hover:no-underline">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{category.icon}</span>
-                  <span className="font-medium">{category.title}</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-6 pb-4">
-                <div className="space-y-4">
-                  {category.questions.map((faq, index) => (
-                    <div key={index} className="border-l-2 border-accent/20 pl-4">
-                      <h4 className="font-medium mb-2">{faq.question}</h4>
-                      <p className="text-sm text-muted-foreground">{faq.answer}</p>
-                    </div>
-                  ))}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
+        {filteredFAQItems.length === 0 ? (
+          <Card className="p-8 text-center">
+            <HelpCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <p className="text-muted-foreground">
+              {searchQuery ? "No FAQ items found for your search" : "No FAQ items available"}
+            </p>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {faqCategories.map((category) => {
+              const categoryItems = filteredFAQItems.filter(item => item.category_id === category.id);
+              if (categoryItems.length === 0) return null;
+              
+              return (
+                <Card key={category.id} className="p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-2xl">{category.icon}</span>
+                    <h4 className="text-lg font-semibold">{category.name}</h4>
+                  </div>
+                  <div className="space-y-4">
+                    {categoryItems.map((item, index) => (
+                      <div key={item.id || index} className="border-l-2 border-accent/20 pl-4">
+                        <h5 className="font-medium mb-2">{item.question}</h5>
+                        <p className="text-sm text-muted-foreground">{item.answer}</p>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

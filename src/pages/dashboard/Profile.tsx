@@ -1,36 +1,135 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { User, Mail, Phone, MapPin, Calendar, Shield, Edit3, Save, X } from "lucide-react";
+import { User, Mail, Phone, MapPin, Calendar, Shield, Edit3, Save, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { logProfileUpdate, logError } from "@/lib/audit";
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [profileData, setProfileData] = useState({
-    fullName: "John Doe",
-    email: "john.doe@example.com",
+    fullName: "",
+    email: "",
     phoneCountryCode: "+1",
-    phoneNumber: "(555) 123-4567",
-    streetAddress: "123 Main Street",
-    city: "New York",
-    state: "NY",
-    zipCode: "10001",
-    memberId: "TRP-2024-001",
-    joinDate: "January 1, 2025",
+    phoneNumber: "",
+    streetAddress: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    memberId: "",
+    joinDate: "",
     status: "Active",
-    bio: "Passionate about long-term investments and building wealth through tenure rewards.",
+    bio: "",
   });
+  const [originalData, setOriginalData] = useState({});
+  
+  const supabase = useSupabaseClient();
+  const user = useUser();
 
-  const handleSave = () => {
-    toast.success("Profile updated successfully!");
-    setIsEditing(false);
+  // Load user profile data
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        
+        // Get user data from auth
+        const userData = {
+          fullName: user.user_metadata?.full_name || "",
+          email: user.email || "",
+          phoneCountryCode: "+1",
+          phoneNumber: user.user_metadata?.phone || "",
+          streetAddress: user.user_metadata?.street_address || "",
+          city: user.user_metadata?.city || "",
+          state: user.user_metadata?.state || "",
+          zipCode: user.user_metadata?.zip_code || "",
+          memberId: user.user_metadata?.member_id || `TRP-${new Date().getFullYear()}-${String(user.id).slice(-3).toUpperCase()}`,
+          joinDate: new Date(user.created_at).toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          }),
+          status: "Active",
+          bio: user.user_metadata?.bio || "",
+        };
+
+        setProfileData(userData);
+        setOriginalData(userData);
+      } catch (error) {
+        console.error('Error loading profile:', error);
+        await logError(`Error loading profile: ${error.message}`, user.id);
+        toast.error("Failed to load profile data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!user) return;
+    
+    try {
+      setSaving(true);
+      
+      // Prepare update data
+      const updateData = {
+        full_name: profileData.fullName,
+        phone: profileData.phoneNumber,
+        street_address: profileData.streetAddress,
+        city: profileData.city,
+        state: profileData.state,
+        zip_code: profileData.zipCode,
+        bio: profileData.bio,
+      };
+
+      // Update user metadata
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: updateData
+      });
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Log profile update
+      const changes = Object.keys(updateData).filter(key => 
+        originalData[key] !== profileData[key]
+      ).reduce((acc, key) => {
+        acc[key] = {
+          from: originalData[key],
+          to: profileData[key]
+        };
+        return acc;
+      }, {});
+
+      if (Object.keys(changes).length > 0) {
+        await logProfileUpdate(user.id, changes);
+      }
+
+      setOriginalData(profileData);
+      toast.success("Profile updated successfully!");
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      await logError(`Error saving profile: ${error.message}`, user.id);
+      toast.error("Failed to update profile");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
+    setProfileData(originalData);
     setIsEditing(false);
   };
 
@@ -54,6 +153,19 @@ const Profile = () => {
     { value: "WI", label: "Wisconsin" }, { value: "WY", label: "Wyoming" },
   ];
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-accent" />
+            <p className="text-muted-foreground">Loading profile...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -65,11 +177,23 @@ const Profile = () => {
         <div className="flex gap-2">
           {isEditing ? (
             <>
-              <Button onClick={handleSave} className="bg-accent hover:bg-accent/90">
-                <Save className="w-4 h-4 mr-2" />
-                Save Changes
+              <Button 
+                onClick={handleSave} 
+                className="bg-accent hover:bg-accent/90"
+                disabled={saving}
+              >
+                {saving ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                {saving ? "Saving..." : "Save Changes"}
               </Button>
-              <Button variant="outline" onClick={handleCancel}>
+              <Button 
+                variant="outline" 
+                onClick={handleCancel}
+                disabled={saving}
+              >
                 <X className="w-4 h-4 mr-2" />
                 Cancel
               </Button>
@@ -92,8 +216,12 @@ const Profile = () => {
                 <User className="w-12 h-12 text-accent" />
               </div>
               <div>
-                <h3 className="text-xl font-bold">{profileData.fullName}</h3>
-                <p className="text-muted-foreground">{profileData.memberId}</p>
+                <h3 className="text-xl font-bold">
+                  {profileData.fullName || "No name provided"}
+                </h3>
+                <p className="text-muted-foreground">
+                  {profileData.memberId || "Generating member ID..."}
+                </p>
                 <div className="flex items-center justify-center gap-1 mt-2">
                   <Shield className="w-4 h-4 text-green-500" />
                   <span className="text-sm text-green-600 font-medium">{profileData.status}</span>
@@ -101,7 +229,9 @@ const Profile = () => {
               </div>
               <div className="pt-4 border-t border-border">
                 <p className="text-sm text-muted-foreground">Member since</p>
-                <p className="font-medium">{profileData.joinDate}</p>
+                <p className="font-medium">
+                  {profileData.joinDate || "Unknown"}
+                </p>
               </div>
             </div>
           </Card>
@@ -124,6 +254,7 @@ const Profile = () => {
                   onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
                   disabled={!isEditing}
                   className="bg-background/50"
+                  placeholder="Enter your full name"
                 />
               </div>
               <div className="space-y-2">
@@ -132,10 +263,13 @@ const Profile = () => {
                   id="email"
                   type="email"
                   value={profileData.email}
-                  onChange={(e) => setProfileData({...profileData, email: e.target.value})}
-                  disabled={!isEditing}
-                  className="bg-background/50"
+                  disabled={true}
+                  className="bg-muted/50 text-muted-foreground"
+                  placeholder="Email managed by authentication"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Email cannot be changed here. Use account settings to update email.
+                </p>
               </div>
             </div>
           </Card>
@@ -173,6 +307,7 @@ const Profile = () => {
                     onChange={(e) => setProfileData({...profileData, phoneNumber: e.target.value})}
                     disabled={!isEditing}
                     className="flex-1 bg-background/50"
+                    placeholder="Enter phone number"
                   />
                 </div>
               </div>
@@ -194,6 +329,7 @@ const Profile = () => {
                   onChange={(e) => setProfileData({...profileData, streetAddress: e.target.value})}
                   disabled={!isEditing}
                   className="bg-background/50"
+                  placeholder="Enter street address"
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -205,6 +341,7 @@ const Profile = () => {
                     onChange={(e) => setProfileData({...profileData, city: e.target.value})}
                     disabled={!isEditing}
                     className="bg-background/50"
+                    placeholder="Enter city"
                   />
                 </div>
                 <div className="space-y-2">
@@ -234,6 +371,7 @@ const Profile = () => {
                     onChange={(e) => setProfileData({...profileData, zipCode: e.target.value})}
                     disabled={!isEditing}
                     className="bg-background/50"
+                    placeholder="Enter ZIP code"
                   />
                 </div>
               </div>
@@ -254,7 +392,7 @@ const Profile = () => {
                 onChange={(e) => setProfileData({...profileData, bio: e.target.value})}
                 disabled={!isEditing}
                 className="bg-background/50 min-h-[100px]"
-                placeholder="Tell us about yourself..."
+                placeholder="Tell us about yourself, your interests, or anything you'd like to share..."
               />
             </div>
           </Card>
