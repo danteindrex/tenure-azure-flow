@@ -57,26 +57,35 @@ export class StripeService {
         });
       }
 
-      // Create price for recurring payment ($25/month)
-      const recurringPrice = await stripe.prices.create({
-        currency: config.pricing.currency,
-        unit_amount: Math.round(config.pricing.recurringAmount * 100), // $25
-        recurring: {
-          interval: 'month',
-        },
-        product_data: {
-          name: 'Home Solutions - Monthly Subscription',
-        },
-      });
-
-      // Create checkout session with subscription
+      // Create checkout session with both setup fee and subscription
       const session = await stripe.checkout.sessions.create({
         customer: customer.id,
         mode: 'subscription',
         payment_method_types: ['card'],
         line_items: [
+          // Setup fee (one-time)
           {
-            price: recurringPrice.id,
+            price_data: {
+              currency: config.pricing.currency,
+              unit_amount: Math.round((config.pricing.initialAmount - config.pricing.recurringAmount) * 100), // $275 setup fee
+              product_data: {
+                name: 'Tenure Membership Setup Fee',
+              },
+            },
+            quantity: 1,
+          },
+          // Monthly subscription
+          {
+            price_data: {
+              currency: config.pricing.currency,
+              unit_amount: Math.round(config.pricing.recurringAmount * 100), // $25
+              recurring: {
+                interval: 'month',
+              },
+              product_data: {
+                name: 'Tenure Monthly Subscription',
+              },
+            },
             quantity: 1,
           },
         ],
@@ -86,9 +95,10 @@ export class StripeService {
           },
         },
         success_url: successUrl || `${config.frontendUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: cancelUrl || `${config.frontendUrl}/subscription/cancel`,
+        cancel_url: cancelUrl || `${config.frontendUrl}/signup?canceled=true`,
         metadata: {
           memberId: memberId.toString(),
+          paymentType: 'subscription_with_setup_fee',
         },
         allow_promotion_codes: true,
       });
@@ -109,7 +119,7 @@ export class StripeService {
   }
 
   /**
-   * Handle successful checkout session
+   * Handle successful checkout session (initial payment + subscription setup)
    */
   static async handleCheckoutComplete(session: Stripe.Checkout.Session): Promise<void> {
     try {
@@ -119,22 +129,75 @@ export class StripeService {
       // Get subscription details from Stripe
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
+      // Update member status to Active
+      const updateMemberQuery = `
+        UPDATE member 
+        SET status = 'Active', updated_at = NOW() 
+        WHERE id = $1
+      `;
+      await pool.query(updateMemberQuery, [memberId]);
+
       // Create subscription record in database
-      const dbSubscription = await SubscriptionModel.create({
-        memberid: memberId,
-        stripe_subscription_id: subscription.id,
-        stripe_customer_id: subscription.customer as string,
-        status: subscription.status,
-        current_period_start: new Date(subscription.current_period_start * 1000),
-        current_period_end: new Date(subscription.current_period_end * 1000),
-      });
+      const subscriptionQuery = `
+        INSERT INTO financial_schedules (member_id, billing_cycle, next_billing_date, amount, currency, is_active, created_at)
+        VALUES ($1, 'MONTHLY', $2, $3, $4, true, NOW())
+        RETURNING id
+      `;
+      
+      const nextBillingDate = new Date(subscription.current_period_end * 1000);
+      await pool.query(subscriptionQuery, [
+        memberId,
+        nextBillingDate,
+        config.pricing.recurringAmount,
+        config.pricing.currency.toUpperCase()
+      ]);
 
-      // Update queue to mark subscription as active
-      await QueueModel.updateSubscriptionStatus(memberId, true);
+      // Store payment method info
+      const paymentMethodQuery = `
+        INSERT INTO payment_methods (member_id, method_type, source_token, is_default, metadata, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        RETURNING id
+      `;
+      
+      await pool.query(paymentMethodQuery, [
+        memberId,
+        'CREDIT_CARD',
+        subscription.id,
+        true,
+        JSON.stringify({
+          stripe_subscription_id: subscription.id,
+          stripe_customer_id: subscription.customer,
+          initial_amount: config.pricing.initialAmount,
+          recurring_amount: config.pricing.recurringAmount,
+          currency: config.pricing.currency,
+          status: subscription.status
+        })
+      ]);
 
-      logger.info(`Subscription created for member ${memberId}`, {
-        subscriptionId: dbSubscription.subscriptionid,
-        stripeSubId: subscription.id,
+      // Add member to queue
+      const queueQuery = `
+        INSERT INTO queue_entries (member_id, queue_position, joined_queue_at, is_eligible, created_at)
+        VALUES ($1, (SELECT COALESCE(MAX(queue_position), 0) + 1 FROM queue_entries), NOW(), true, NOW())
+        ON CONFLICT (member_id) DO NOTHING
+      `;
+      await pool.query(queueQuery, [memberId]);
+
+      // Create member agreement records
+      const agreementQuery = `
+        INSERT INTO member_agreements (member_id, agreement_type, version_number, agreed_at_ts, created_at)
+        VALUES 
+          ($1, 'TERMS_CONDITIONS', '1.0', NOW(), NOW()),
+          ($1, 'PAYMENT_AUTHORIZATION', '1.0', NOW(), NOW())
+        ON CONFLICT DO NOTHING
+      `;
+      await pool.query(agreementQuery, [memberId]);
+
+      logger.info(`Initial payment + subscription created for member ${memberId}`, {
+        subscriptionId: subscription.id,
+        initialPayment: config.pricing.initialAmount, // $300 (includes first month)
+        monthlyRecurring: config.pricing.recurringAmount, // $25
+        nextBilling: nextBillingDate,
+        setupFee: config.pricing.initialAmount - config.pricing.recurringAmount, // $275
       });
     } catch (error) {
       logger.error('Error handling checkout complete:', error);

@@ -22,7 +22,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    const { email, full_name, phone, street_address, city, state, zip_code } = req.body || {};
+    const { 
+      email, 
+      first_name, 
+      last_name, 
+      middle_name, 
+      date_of_birth,
+      phone, 
+      street_address, 
+      address_line_2,
+      city, 
+      state, 
+      zip_code,
+      country_code,
+      // Legacy support
+      full_name 
+    } = req.body || {};
 
     if (!email) {
       return res.status(400).json({ error: "Missing required field: email" });
@@ -42,12 +57,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         {
           auth_user_id: user.id,
           email,
-          name: full_name ?? null,
+          // Handle both new separate name fields and legacy full_name
+          first_name: first_name ?? null,
+          last_name: last_name ?? null,
+          middle_name: middle_name ?? null,
+          name: full_name ?? (first_name && last_name ? `${first_name} ${last_name}` : null),
+          date_of_birth: date_of_birth ?? null,
           phone: phone ?? null,
           street_address: street_address ?? null,
+          address_line_2: address_line_2 ?? null,
           city: city ?? null,
           state: state ?? null,
           zip_code: zip_code ?? null,
+          country_code: country_code ?? 'US',
         },
         { onConflict: "auth_user_id" }
       );
@@ -57,7 +79,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     return res.status(200).json({ ok: true });
-  } catch (err: any) {
-    return res.status(500).json({ error: err?.message || "Unexpected server error" });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : "Unexpected server error";
+    return res.status(500).json({ error: errorMessage });
   }
 }

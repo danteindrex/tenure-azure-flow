@@ -9,11 +9,44 @@ export const Members: CollectionConfig = {
     group: 'Member Management',
   },
   fields: [
+    // Legacy full name field (kept for backward compatibility)
     {
       name: 'name',
       type: 'text',
+      label: 'Full Name (Legacy)',
+      admin: {
+        description: 'Legacy field - use first_name/last_name for new records',
+        position: 'sidebar',
+      },
+    },
+    // New separate name fields
+    {
+      name: 'first_name',
+      type: 'text',
       required: true,
-      label: 'Full Name',
+      label: 'First Name',
+    },
+    {
+      name: 'last_name',
+      type: 'text',
+      required: true,
+      label: 'Last Name',
+    },
+    {
+      name: 'middle_name',
+      type: 'text',
+      label: 'Middle Name',
+      admin: {
+        description: 'Optional middle name',
+      },
+    },
+    {
+      name: 'date_of_birth',
+      type: 'date',
+      label: 'Date of Birth',
+      admin: {
+        description: 'Required for identity verification and compliance',
+      },
     },
     {
       name: 'email',
@@ -27,10 +60,19 @@ export const Members: CollectionConfig = {
       type: 'text',
       label: 'Phone Number',
     },
+    // Enhanced address fields
     {
       name: 'street_address',
       type: 'text',
       label: 'Street Address',
+    },
+    {
+      name: 'address_line_2',
+      type: 'text',
+      label: 'Address Line 2',
+      admin: {
+        description: 'Apartment, suite, unit, etc. (optional)',
+      },
     },
     {
       name: 'city',
@@ -40,15 +82,24 @@ export const Members: CollectionConfig = {
     {
       name: 'state',
       type: 'text',
-      label: 'State',
+      label: 'State/Province',
       admin: {
-        description: 'US State code (e.g., CA, NY)',
+        description: 'Administrative area (e.g., CA, NY, Ontario)',
       },
     },
     {
       name: 'zip_code',
       type: 'text',
-      label: 'ZIP Code',
+      label: 'ZIP/Postal Code',
+    },
+    {
+      name: 'country_code',
+      type: 'text',
+      label: 'Country Code',
+      defaultValue: 'US',
+      admin: {
+        description: 'ISO 2-letter country code (e.g., US, CA, GB)',
+      },
     },
     {
       name: 'join_date',
@@ -69,6 +120,21 @@ export const Members: CollectionConfig = {
         { label: 'Suspended', value: 'Suspended' },
         { label: 'Pending', value: 'Pending' },
       ],
+    },
+    {
+      name: 'verification_status',
+      type: 'select',
+      defaultValue: 'PENDING',
+      label: 'Verification Status',
+      options: [
+        { label: 'Pending', value: 'PENDING' },
+        { label: 'Verified', value: 'VERIFIED' },
+        { label: 'Failed', value: 'FAILED' },
+        { label: 'Skipped', value: 'SKIPPED' },
+      ],
+      admin: {
+        description: 'Identity verification status (for future use)',
+      },
     },
     {
       name: 'tenure',
