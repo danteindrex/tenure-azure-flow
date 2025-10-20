@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { LogOut, User, Moon, Sun, Monitor } from "lucide-react";
+import { LogOut, User, Sun } from "lucide-react";
 import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
 import { logLogout } from "@/lib/audit";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -40,21 +40,9 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
     }
   };
 
-  const toggleTheme = () => {
-    if (theme === 'light') {
-      setTheme('dark');
-    } else if (theme === 'dark') {
-      setTheme('system');
-    } else {
-      setTheme('light');
-    }
-  };
-
-  const getThemeIcon = () => {
-    if (theme === 'system') {
-      return <Monitor className="w-4 h-4" />;
-    }
-    return actualTheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />;
+  // Force light theme - no theme toggle
+  const forceLight = () => {
+    setTheme('light');
   };
 
   return (
@@ -80,16 +68,11 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
                 <p className="text-muted-foreground">Welcome back, {displayUserData.name}</p>
               </div>
 
-              {/* Theme Toggle */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleTheme}
-                className="hover:bg-accent/10 p-2"
-                title={`Current theme: ${theme} (${actualTheme})`}
-              >
-                {getThemeIcon()}
-              </Button>
+              {/* Light Theme Indicator */}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Sun className="w-4 h-4" />
+                <span className="hidden sm:inline">Light Mode</span>
+              </div>
 
               {/* User Menu */}
               <div className="relative">

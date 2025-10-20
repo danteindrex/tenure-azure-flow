@@ -39,6 +39,11 @@ class AuditLogger {
   constructor() {
     this.supabase = SupabaseClientSingleton.getInstance();
     this.sessionId = this.generateSessionId();
+    
+    // If we're on server side and supabase is null, skip initialization
+    if (typeof window === 'undefined' && !this.supabase) {
+      return;
+    }
   }
 
   static getInstance(): AuditLogger {
@@ -89,6 +94,12 @@ class AuditLogger {
 
   async log(entry: Omit<AuditLogEntry, 'user_agent' | 'ip_address' | 'location'>) {
     try {
+      // Skip logging if supabase is not available (server-side)
+      if (!this.supabase) {
+        console.warn('Supabase client not available, skipping audit log');
+        return;
+      }
+      
       // Get user's current session
       const { data: { session } } = await this.supabase.auth.getSession();
       
@@ -212,6 +223,11 @@ class AuditLogger {
   // Query audit logs
   async getAuditLogs(filters: AuditLogFilters = {}) {
     try {
+      if (!this.supabase) {
+        console.warn('Supabase client not available');
+        return { data: [], error: null };
+      }
+      
       let query = this.supabase
         .from('user_audit_logs')
         .select('*')
@@ -259,6 +275,11 @@ class AuditLogger {
   // Get audit statistics
   async getAuditStats(startDate?: string, endDate?: string) {
     try {
+      if (!this.supabase) {
+        console.warn('Supabase client not available');
+        return { data: null, error: null };
+      }
+      
       let query = this.supabase
         .from('user_audit_logs')
         .select('action, user_type, created_at');

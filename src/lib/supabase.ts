@@ -10,6 +10,12 @@ class SupabaseClientSingleton {
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
       if (!supabaseUrl || !supabaseKey) {
+        // Check if we're on the server side and environment variables are missing
+        if (typeof window === 'undefined') {
+          console.warn('Supabase environment variables not available on server side');
+          // Return a mock client for server-side rendering
+          return null as any;
+        }
         throw new Error('Missing Supabase environment variables');
       }
 
