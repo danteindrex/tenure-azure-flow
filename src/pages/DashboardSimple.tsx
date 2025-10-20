@@ -15,6 +15,8 @@ const DashboardSimple = () => {
   const [daysUntilPayment, setDaysUntilPayment] = useState<number>(0);
   const [daysUntilDraw, setDaysUntilDraw] = useState<number>(0);
   const [topQueue, setTopQueue] = useState<Array<{ rank: number; name: string; tenureMonths: number; status: string; isCurrentUser?: boolean }>>([]);
+  const BUSINESS_LAUNCH_DATE = process.env.NEXT_PUBLIC_BUSINESS_LAUNCH_DATE || ""; // ISO string fallback
+  const PRIZE_PER_WINNER = 100000; // BR-4
 
   // Compute next draw as days until the 15th of next month
   const computeDaysUntilNextDraw = () => {
@@ -56,7 +58,7 @@ const DashboardSimple = () => {
           }
         }
 
-        // Fetch queue ordered by position
+        // Fetch queue ordered by position (BR-5, BR-10: pre-sorted; deeper continuity ordering requires richer data)
         const { data: queue, error: queueError } = await supabase
           .from('queue')
           .select('memberid, queue_position, total_months_subscribed, subscription_active')
@@ -81,7 +83,7 @@ const DashboardSimple = () => {
           setTopQueue(preview);
         }
 
-        // Payment amount and days until payment for current user
+        // Payment amount and days until payment for current user (BR-2 monthly cycle best-effort)
         if (user?.id) {
           let memberIdForPayments: number | null = null;
           const { data: member2 } = await supabase
@@ -119,7 +121,27 @@ const DashboardSimple = () => {
           setDaysUntilPayment(0);
         }
 
-        setDaysUntilDraw(computeDaysUntilNextDraw());
+        // BR-3: Payout trigger 12 months after launch AND fund >= 100k
+        const launch = BUSINESS_LAUNCH_DATE ? new Date(BUSINESS_LAUNCH_DATE) : null;
+        if (launch) {
+          const twelveMonths = new Date(launch);
+          twelveMonths.setMonth(twelveMonths.getMonth() + 12);
+          // If at 12 months fund < 100k, continue until threshold is reached
+          const threshold = PRIZE_PER_WINNER; // 100k
+          if (Date.now() < twelveMonths.getTime()) {
+            const d = Math.ceil((twelveMonths.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            setDaysUntilDraw(Math.max(d, 0));
+          } else if (totalRevenue < threshold) {
+            // Time-based condition satisfied, but threshold not met; indicate 0 days but show progress in UI
+            setDaysUntilDraw(0);
+          } else {
+            // Trigger can occur immediately
+            setDaysUntilDraw(0);
+          }
+        } else {
+          // Fallback to mid-month draw cadence if launch date missing
+          setDaysUntilDraw(computeDaysUntilNextDraw());
+        }
       } catch {
         // Leave defaults on error
       }
