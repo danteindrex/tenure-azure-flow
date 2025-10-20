@@ -30,6 +30,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'Failed to fetch queue data' });
     }
 
+    // Fetch member data to enrich queue data
+    const memberIds = queueData?.map(q => q.memberid) || [];
+    const { data: members } = await supabase
+      .from('member')
+      .select('id, name, email, status, join_date')
+      .in('id', memberIds);
+
+    // Enrich queue data with member information
+    const enrichedQueueData = queueData?.map(item => {
+      const member = members?.find(m => m.id === item.memberid);
+      return {
+        ...item,
+        member: member || null
+      };
+    }) || [];
+
     // Calculate total revenue from payments
     const { data: payments, error: paymentsError } = await supabase
       .from('payment')
@@ -42,14 +58,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Calculate statistics
-    const activeMembers = queueData?.filter(member => member.subscription_active).length || 0;
-    const eligibleMembers = queueData?.filter(member => member.is_eligible).length || 0;
-    const totalMembers = queueData?.length || 0;
+    const activeMembers = enrichedQueueData?.filter(member => member.subscription_active).length || 0;
+    const eligibleMembers = enrichedQueueData?.filter(member => member.is_eligible).length || 0;
+    const totalMembers = enrichedQueueData?.length || 0;
 
     return res.status(200).json({
       success: true,
       data: {
-        queue: queueData || [],
+        queue: enrichedQueueData || [],
         statistics: {
           totalMembers,
           activeMembers,

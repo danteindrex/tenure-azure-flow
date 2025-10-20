@@ -65,7 +65,7 @@ const Queue = () => {
     try {
       setLoading(true);
       
-      // Fetch real queue data from database
+      // Fetch queue data first
       const { data: queueMembers, error: queueError } = await supabase
         .from('queue')
         .select('*')
@@ -77,31 +77,29 @@ const Queue = () => {
         return;
       }
 
-      // Transform data to include member details
-      const transformedData = await Promise.all(
-        queueMembers?.map(async (item) => {
-          // Try to get real member data
-          let memberData = null;
-          try {
-            const { data: member } = await supabase
-              .from('member')
-              .select('name, email, status, join_date')
-              .eq('member_id', item.memberid)
-              .single();
-            memberData = member;
-          } catch (err) {
-            // Member not found, use fallback data
-          }
+      // Fetch member data separately and join manually
+      const memberIds = queueMembers?.map(q => q.memberid) || [];
+      const { data: members, error: memberError } = await supabase
+        .from('member')
+        .select('id, name, email, status, join_date')
+        .in('id', memberIds);
 
-          return {
-            ...item,
-            member_name: memberData?.name || `Member ${item.memberid}`,
-            member_email: memberData?.email || `member${item.memberid}@example.com`,
-            member_status: memberData?.status || (item.subscription_active ? 'Active' : 'Inactive'),
-            member_join_date: memberData?.join_date || item.joined_at?.split('T')[0] || ''
-          };
-        }) || []
-      );
+      if (memberError) {
+        console.error('Error fetching member data:', memberError);
+      }
+
+      // Transform data to include member details
+      const transformedData = queueMembers?.map(item => {
+        const member = members?.find(m => m.id === item.memberid);
+        return {
+          ...item,
+          member: member || null,
+          member_name: member?.name || `Member ${item.memberid}`,
+          member_email: member?.email || '',
+          member_status: member?.status || 'Unknown',
+          member_join_date: member?.join_date || ''
+        };
+      }) || [];
 
       setQueueData(transformedData);
 
