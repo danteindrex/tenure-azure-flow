@@ -15,7 +15,8 @@ import {
   Bell,
   HelpCircle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Megaphone
 } from "lucide-react";
 
 interface SidebarProps {
@@ -31,6 +32,7 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
     { path: "/dashboard/profile", icon: User, label: "Profile", badge: null },
     { path: "/dashboard/transactions", icon: CreditCard, label: "Transactions", badge: null },
     { path: "/dashboard/queue", icon: Users, label: "Tenure Queue", badge: "Live" },
+    { path: "/dashboard/news", icon: Megaphone, label: "News & Updates", badge: "New" },
     { path: "/dashboard/analytics", icon: BarChart3, label: "Analytics", badge: null },
     { path: "/dashboard/history", icon: History, label: "History", badge: null },
     { path: "/dashboard/notifications", icon: Bell, label: "Notifications", badge: "3" },

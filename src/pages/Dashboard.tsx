@@ -6,6 +6,8 @@ import { Progress } from "@/components/ui/progress";
 import { useCounterAnimation } from "@/hooks/use-counter-animation";
 import { QueueRow } from "@/components/QueueRow";
 import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import PaymentNotificationBanner from "@/components/PaymentNotificationBanner";
+import BusinessLogicService, { BUSINESS_RULES } from "@/lib/business-logic";
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -13,57 +15,251 @@ const Dashboard = () => {
     memberId: "",
     tenureStart: "",
     nextPaymentDue: "",
+    lastPaymentDate: "",
+    paymentStatus: "",
+    queuePosition: 0,
+    totalPaid: 0,
+    subscriptionActive: false,
+  });
+  const [dashboardStats, setDashboardStats] = useState({
+    totalRevenue: 0,
+    potentialWinners: 0,
+    daysUntilDraw: 45,
+    daysUntilPayment: 0,
+    paymentAmount: 25,
+    fundReady: false,
+    timeReady: false,
+    payoutReady: false,
+    fundStatus: 'Loading...',
+    timeStatus: 'Loading...',
   });
 
   const supabase = useSupabaseClient();
   const user = useUser();
 
-  // Animated counters
-  const daysUntilPayment = useCounterAnimation(15, 1200, 100);
-  const totalRevenue = useCounterAnimation(250000, 1500, 200);
-  const potentialWinners = useCounterAnimation(2, 800, 300);
-  const daysUntilDraw = useCounterAnimation(45, 1000, 250);
-  const paymentAmount = useCounterAnimation(25, 800, 150);
-  const queueCounter = useCounterAnimation(1, 500, 0);
+  // Animated counters - will be updated with real data
+  const daysUntilPayment = useCounterAnimation(dashboardStats.daysUntilPayment, 1200, 100);
+  const totalRevenue = useCounterAnimation(dashboardStats.totalRevenue, 1500, 200);
+  const potentialWinners = useCounterAnimation(dashboardStats.potentialWinners, 800, 300);
+  const daysUntilDraw = useCounterAnimation(dashboardStats.daysUntilDraw, 1000, 250);
+  const paymentAmount = useCounterAnimation(dashboardStats.paymentAmount, 800, 150);
+  const queueCounter = useCounterAnimation(userData.queuePosition, 500, 0);
 
-  // Load user data
+  // Load user data and dashboard statistics
   useEffect(() => {
-    const loadUserData = async () => {
+    const loadDashboardData = async () => {
       if (!user) return;
       
       try {
         setLoading(true);
         
+        // Get member data
+        const { data: memberData, error: memberError } = await supabase
+          .from('member')
+          .select('*')
+          .eq('auth_user_id', user.id)
+          .single();
+
+        if (memberError) {
+          console.error('Error fetching member data:', memberError);
+        }
+
+        // Get queue position
+        const { data: queueData, error: queueError } = await supabase
+          .from('queue')
+          .select('queue_position, subscription_active, total_months_subscribed, last_payment_date, lifetime_payment_total')
+          .eq('memberid', memberData?.id)
+          .single();
+
+        if (queueError) {
+          console.error('Error fetching queue data:', queueError);
+        }
+
+        // Get latest payment
+        const { data: latestPayment, error: paymentError } = await supabase
+          .from('payment')
+          .select('payment_date, amount, status')
+          .eq('memberid', memberData?.id)
+          .order('payment_date', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (paymentError && paymentError.code !== 'PGRST116') {
+          console.error('Error fetching payment data:', paymentError);
+        }
+
+
+
+        // Initialize business logic service
+        const businessLogic = new BusinessLogicService(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        // Get payout status using correct business rules
+        const payoutStatus = await businessLogic.getPayoutStatus();
+        
+        // Get member payment status
+        const memberPaymentStatus = await businessLogic.getMemberPaymentStatus(memberData?.id);
+
+        // Calculate next payment due using business logic
+        let nextPaymentDue = '';
+        let daysUntilPayment = 0;
+        
+        if (memberPaymentStatus.nextPaymentDue) {
+          nextPaymentDue = memberPaymentStatus.nextPaymentDue.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          });
+          daysUntilPayment = Math.ceil(
+            (memberPaymentStatus.nextPaymentDue.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+          );
+        } else if (!memberPaymentStatus.hasJoiningFee) {
+          nextPaymentDue = 'Joining Fee Required ($300)';
+          daysUntilPayment = 0;
+        } else {
+          nextPaymentDue = 'Monthly Payment Required ($25)';
+          daysUntilPayment = 0;
+        }
+
+        // Get tenure start from business logic (BR-9)
+        const tenureStart = await businessLogic.getMemberTenureStart(memberData?.id);
+
+        // Set user data with correct business logic
         const userInfo = {
-          memberId: user.user_metadata?.member_id || `TRP-${new Date().getFullYear()}-${String(user.id).slice(-3).toUpperCase()}`,
-          tenureStart: new Date(user.created_at).toLocaleDateString('en-US', { 
+          memberId: memberData?.id ? `TRP-${memberData.id.toString().padStart(3, '0')}` : `TRP-${new Date().getFullYear()}-${String(user.id).slice(-3).toUpperCase()}`,
+          tenureStart: tenureStart ? tenureStart.toLocaleDateString('en-US', { 
             year: 'numeric', 
             month: 'long', 
             day: 'numeric' 
-          }),
-          nextPaymentDue: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { 
+          }) : (memberPaymentStatus.hasJoiningFee ? 'Joining fee paid' : 'Joining fee required'),
+          nextPaymentDue,
+          lastPaymentDate: memberPaymentStatus.lastMonthlyPayment ? memberPaymentStatus.lastMonthlyPayment.toLocaleDateString('en-US', { 
             year: 'numeric', 
             month: 'long', 
             day: 'numeric' 
-          }),
+          }) : (memberPaymentStatus.hasJoiningFee ? 'Joining fee only' : 'No payments yet'),
+          paymentStatus: memberPaymentStatus.isInDefault ? 'Default Risk' : (memberPaymentStatus.hasJoiningFee ? 'Active' : 'Pending'),
+          queuePosition: queueData?.queue_position || 0,
+          totalPaid: memberPaymentStatus.totalPaid,
+          subscriptionActive: !memberPaymentStatus.isInDefault && memberPaymentStatus.hasJoiningFee,
         };
 
+        // Set dashboard statistics with correct business rules
+        const stats = {
+          totalRevenue: payoutStatus.totalRevenue,
+          potentialWinners: payoutStatus.potentialWinners,
+          daysUntilDraw: payoutStatus.daysUntilEligible,
+          daysUntilPayment: Math.max(0, daysUntilPayment),
+          paymentAmount: memberPaymentStatus.hasJoiningFee ? BUSINESS_RULES.MONTHLY_FEE : BUSINESS_RULES.JOINING_FEE,
+          fundReady: payoutStatus.fundReady,
+          timeReady: payoutStatus.timeReady,
+          payoutReady: payoutStatus.payoutReady,
+          fundStatus: payoutStatus.fundStatus,
+          timeStatus: payoutStatus.timeStatus,
+        };
+
+        // Get winner order for queue display (BR-5, BR-6, BR-10)
+        const winnerOrder = await businessLogic.getWinnerOrder();
+        const queueDisplay = winnerOrder.slice(0, 10).map((member, index) => ({
+          rank: member.queuePosition,
+          name: member.memberName,
+          tenureMonths: Math.floor(
+            (Date.now() - member.tenureStart.getTime()) / (1000 * 60 * 60 * 24 * 30)
+          ),
+          status: member.isActive ? 'Active' : 'Inactive',
+          isCurrentUser: member.memberId === memberData?.id,
+          memberId: member.memberId
+        }));
+
+        // Generate activity feed based on business logic
+        const activities = [];
+        
+        // Payout eligibility activity
+        if (payoutStatus.payoutReady) {
+          activities.push({
+            title: "🎉 Payout Conditions Met!",
+            message: `Fund has reached $${payoutStatus.totalRevenue.toLocaleString()} with ${payoutStatus.potentialWinners} potential winners. Payout process can begin.`,
+            timestamp: "Now",
+            type: "success"
+          });
+        } else {
+          if (!payoutStatus.fundReady) {
+            activities.push({
+              title: "💰 Fund Building Progress",
+              message: `Current fund: $${payoutStatus.totalRevenue.toLocaleString()}. Need $${(BUSINESS_RULES.PAYOUT_THRESHOLD - payoutStatus.totalRevenue).toLocaleString()} more to reach minimum payout threshold.`,
+              timestamp: "Live",
+              type: "info"
+            });
+          }
+          if (!payoutStatus.timeReady) {
+            activities.push({
+              title: "⏰ Time Requirement Progress", 
+              message: `${payoutStatus.daysUntilEligible} days remaining until 12-month business launch requirement is met.`,
+              timestamp: "Live",
+              type: "info"
+            });
+          }
+        }
+
+        // Member status activity
+        if (memberPaymentStatus.isInDefault) {
+          activities.push({
+            title: "⚠️ Payment Default Risk",
+            message: `Your membership is at risk due to overdue payments. Pay immediately to maintain your queue position.`,
+            timestamp: "Critical",
+            type: "error"
+          });
+        } else if (memberPaymentStatus.hasJoiningFee) {
+          activities.push({
+            title: "✅ Active Membership",
+            message: `Your tenure is being tracked. Total paid: $${memberPaymentStatus.totalPaid}. Monthly payments: ${memberPaymentStatus.monthlyPaymentCount}.`,
+            timestamp: "Active",
+            type: "success"
+          });
+        } else {
+          activities.push({
+            title: "🚀 Complete Your Registration",
+            message: `Pay your $${BUSINESS_RULES.JOINING_FEE} joining fee to activate your membership and start tenure tracking.`,
+            timestamp: "Pending",
+            type: "warning"
+          });
+        }
+
+        // Queue position activity
+        if (userInfo.queuePosition > 0) {
+          const positionSuffix = userInfo.queuePosition === 1 ? 'st' : 
+                                userInfo.queuePosition === 2 ? 'nd' : 
+                                userInfo.queuePosition === 3 ? 'rd' : 'th';
+          activities.push({
+            title: `🏆 Queue Position: ${userInfo.queuePosition}${positionSuffix}`,
+            message: `You are currently ${userInfo.queuePosition}${positionSuffix} in line for payout based on your continuous tenure.`,
+            timestamp: "Current",
+            type: "info"
+          });
+        }
+
         setUserData(userInfo);
+        setDashboardStats(stats);
+        setQueueData(queueDisplay);
+        setActivityFeed(activities);
+        
       } catch (error) {
-        console.error('Error loading user data:', error);
+        console.error('Error loading dashboard data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    loadUserData();
-  }, [user]);
+    loadDashboardData();
+  }, [user, supabase]);
 
-  // Empty queue data - will be populated from database in future
-  const queueData = [];
+  // Queue data state
+  const [queueData, setQueueData] = useState([]);
 
-  // Empty activity feed - will be populated from database in future
-  const activityFeed = [];
+  // Activity feed state
+  const [activityFeed, setActivityFeed] = useState([]);
 
   const fundData = {
     nextDrawDate: "March 15, 2025",
@@ -84,6 +280,9 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+        {/* Payment Notification Banner */}
+        <PaymentNotificationBanner />
+        
         {/* Mobile Priority Section - Compact Vertical Layout */}
         <div className="lg:hidden space-y-3 mb-6">
           {/* Compact Payout Fund & Payment Row */}
@@ -95,7 +294,7 @@ const Dashboard = () => {
                 <p className="text-lg font-bold text-purple-400" ref={totalRevenue.ref}>
                   ${totalRevenue.count.toLocaleString()}
                 </p>
-                <p className="text-xs text-yellow-300 mt-1">{potentialWinners.count} Winners</p>
+                <p className="text-xs text-yellow-300 mt-1">{potentialWinners.count} x $100K Winners</p>
               </div>
             </Card>
 
@@ -112,18 +311,23 @@ const Dashboard = () => {
           </div>
 
           {/* Compact Countdown */}
-          <Card className="glass-card p-2 bg-red-900/50 border border-red-600 countdown-pulse">
+          <Card className={`glass-card p-2 border countdown-pulse ${dashboardStats.payoutReady ? 'bg-green-900/50 border-green-600' : 'bg-red-900/50 border-red-600'}`}>
             <div className="text-center">
-              <p className="text-xs text-red-300 font-medium">12 Month Payout Countdown</p>
-              <p className="text-lg font-bold text-red-400 tracking-wider" ref={daysUntilDraw.ref}>
-                {daysUntilDraw.count} DAYS
+              <p className="text-xs font-medium" style={{color: dashboardStats.payoutReady ? '#86efac' : '#fca5a5'}}>
+                {dashboardStats.payoutReady ? 'PAYOUT READY!' : 'Payout Eligibility'}
+              </p>
+              <p className="text-lg font-bold tracking-wider" style={{color: dashboardStats.payoutReady ? '#22c55e' : '#ef4444'}} ref={daysUntilDraw.ref}>
+                {dashboardStats.payoutReady ? 'ELIGIBLE' : `${daysUntilDraw.count} DAYS`}
               </p>
             </div>
           </Card>
 
           {/* Mobile Payment Button */}
           <Button className="w-full py-3 bg-green-500 hover:bg-green-600 text-gray-900 font-bold rounded-xl shadow-xl transition duration-150 transform hover:scale-[1.02] text-sm">
-            PROCESS $25.00 MONTHLY FEE NOW
+            {userData.subscriptionActive 
+              ? `PROCESS $${BUSINESS_RULES.MONTHLY_FEE}.00 MONTHLY FEE NOW`
+              : `PAY $${BUSINESS_RULES.JOINING_FEE}.00 JOINING FEE NOW`
+            }
           </Button>
         </div>
 
@@ -186,14 +390,24 @@ const Dashboard = () => {
                 </div>
               </Card>
 
-              <Card className="glass-card p-4 sm:p-6 hover-glow group border-red-600 sm:col-span-2 lg:col-span-1">
+              <Card className={`glass-card p-4 sm:p-6 hover-glow group sm:col-span-2 lg:col-span-1 ${userData.subscriptionActive ? 'border-red-600' : 'border-orange-600'}`}>
                 <div className="space-y-1 sm:space-y-2">
-                  <p className="text-xs sm:text-sm text-red-300 font-medium flex items-center gap-1 sm:gap-2">
+                  <p className={`text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2 ${userData.subscriptionActive ? 'text-red-300' : 'text-orange-300'}`}>
                     <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                    Next Payment Due (Critical)
+                    {userData.subscriptionActive ? 'Next Payment Due (Critical)' : 'Joining Fee Required'}
                   </p>
-                  <p className="text-base sm:text-lg font-bold text-red-400" ref={daysUntilPayment.ref}>{daysUntilPayment.count} days</p>
-                  <p className="text-xs text-red-400">Defaulting means instant loss of rank! ($25.00)</p>
+                  <p className={`text-base sm:text-lg font-bold ${userData.subscriptionActive ? 'text-red-400' : 'text-orange-400'}`} ref={daysUntilPayment.ref}>
+                    {userData.subscriptionActive 
+                      ? `${daysUntilPayment.count} days`
+                      : 'Immediate'
+                    }
+                  </p>
+                  <p className={`text-xs ${userData.subscriptionActive ? 'text-red-400' : 'text-orange-400'}`}>
+                    {userData.subscriptionActive 
+                      ? `Defaulting means instant loss of rank! ($${BUSINESS_RULES.MONTHLY_FEE}.00)`
+                      : `Required to start tenure tracking ($${BUSINESS_RULES.JOINING_FEE}.00)`
+                    }
+                  </p>
                 </div>
               </Card>
             </div>
@@ -205,22 +419,41 @@ const Dashboard = () => {
                 Activity Feed
               </h2>
               <div className="space-y-3">
-                {activityFeed.map((activity, index) => (
-                  <div
-                    key={index}
-                    className="p-4 rounded-lg bg-background/50 hover:bg-accent/5 transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold group-hover:text-accent transition-colors">
-                          {activity.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1">{activity.message}</p>
-                      </div>
-                      <span className="text-xs text-muted-foreground">{activity.timestamp}</span>
-                    </div>
+                {activityFeed.length === 0 ? (
+                  <div className="text-center py-8">
+                    <TrendingUp className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Loading activity feed...</p>
                   </div>
-                ))}
+                ) : (
+                  activityFeed.map((activity, index) => (
+                    <div
+                      key={index}
+                      className={`p-4 rounded-lg hover:bg-accent/5 transition-all cursor-pointer group border-l-4 ${
+                        activity.type === 'success' ? 'border-green-500 bg-green-50/50 dark:bg-green-950/20' :
+                        activity.type === 'error' ? 'border-red-500 bg-red-50/50 dark:bg-red-950/20' :
+                        activity.type === 'warning' ? 'border-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/20' :
+                        'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-semibold group-hover:text-accent transition-colors">
+                            {activity.title}
+                          </h3>
+                          <p className="text-sm text-muted-foreground mt-1">{activity.message}</p>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          activity.type === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                          activity.type === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                          activity.type === 'warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                          'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                        }`}>
+                          {activity.timestamp}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </Card>
           </div>
@@ -242,18 +475,33 @@ const Dashboard = () => {
                 </div>
 
                 <div className="p-3 sm:p-4 bg-yellow-900/50 rounded-lg border-2 border-yellow-500">
-                  <p className="text-xs sm:text-sm text-yellow-300 font-medium">Potential Winners Funded</p>
+                  <p className="text-xs sm:text-sm text-yellow-300 font-medium">Potential Winners ($100K Each)</p>
                   <p className="text-2xl sm:text-4xl font-bold text-yellow-400 mt-1" ref={potentialWinners.ref}>
                     {potentialWinners.count} Winners
                   </p>
-                  <p className="text-xs text-yellow-500 mt-1 hidden sm:block">The top {potentialWinners.count} tenured members' prizes are currently covered.</p>
+                  <p className="text-xs text-yellow-500 mt-1 hidden sm:block">
+                    {potentialWinners.count > 0 
+                      ? `${potentialWinners.count} member${potentialWinners.count > 1 ? 's' : ''} can win $100K each`
+                      : 'Need $100K minimum to fund first winner'
+                    }
+                  </p>
                 </div>
 
-                <div className="text-center p-2 sm:p-3 bg-red-900/50 rounded-lg border border-red-600 countdown-pulse">
-                  <p className="text-xs sm:text-sm text-red-300 font-medium">12 Month Payout Countdown:</p>
-                  <p className="text-xl sm:text-3xl font-bold text-red-400 tracking-wider" ref={daysUntilDraw.ref}>
-                    {daysUntilDraw.count} DAYS
+                <div className={`text-center p-2 sm:p-3 rounded-lg border countdown-pulse ${dashboardStats.payoutReady ? 'bg-green-900/50 border-green-600' : 'bg-red-900/50 border-red-600'}`}>
+                  <p className="text-xs sm:text-sm font-medium" style={{color: dashboardStats.payoutReady ? '#86efac' : '#fca5a5'}}>
+                    {dashboardStats.payoutReady ? 'PAYOUT CONDITIONS MET!' : 'Payout Eligibility:'}
                   </p>
+                  <p className="text-xl sm:text-3xl font-bold tracking-wider" style={{color: dashboardStats.payoutReady ? '#22c55e' : '#ef4444'}} ref={daysUntilDraw.ref}>
+                    {dashboardStats.payoutReady ? 'READY' : `${daysUntilDraw.count} DAYS`}
+                  </p>
+                  <div className="text-xs mt-2 space-y-1">
+                    <p style={{color: dashboardStats.fundReady ? '#22c55e' : '#ef4444'}}>
+                      Fund: {dashboardStats.fundStatus}
+                    </p>
+                    <p style={{color: dashboardStats.timeReady ? '#22c55e' : '#ef4444'}}>
+                      Time: {dashboardStats.timeStatus}
+                    </p>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -272,7 +520,10 @@ const Dashboard = () => {
                 </div>
 
                 <Button className="w-full py-3 sm:py-4 px-3 sm:px-4 bg-green-500 hover:bg-green-600 text-gray-900 font-bold sm:font-extrabold rounded-xl shadow-xl transition duration-150 transform hover:scale-[1.02] text-sm sm:text-base" size="lg">
-                  PROCESS $25.00 MONTHLY FEE NOW
+                  {userData.subscriptionActive 
+                    ? `PROCESS $${BUSINESS_RULES.MONTHLY_FEE}.00 MONTHLY FEE NOW`
+                    : `PAY $${BUSINESS_RULES.JOINING_FEE}.00 JOINING FEE NOW`
+                  }
                 </Button>
 
                 <p className="text-xs text-center text-muted-foreground">

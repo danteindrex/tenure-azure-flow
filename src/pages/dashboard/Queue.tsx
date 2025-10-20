@@ -418,9 +418,19 @@ const Queue = () => {
                       </td>
                       <td className="py-3 px-2">
                         <div>
-                          <p className="font-medium">{member.member_name}</p>
-                          <p className="text-xs text-muted-foreground">ID: {member.memberid}</p>
-                          <p className="text-xs text-muted-foreground">{member.member_email}</p>
+                          {isCurrentUser ? (
+                            <>
+                              <p className="font-medium text-accent">{member.member_name} (You)</p>
+                              <p className="text-xs text-muted-foreground">ID: {member.memberid}</p>
+                              <p className="text-xs text-muted-foreground">{member.member_email}</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-medium text-muted-foreground">Member #{member.queue_position}</p>
+                              <p className="text-xs text-muted-foreground">Anonymous Member</p>
+                              <p className="text-xs text-muted-foreground">Privacy Protected</p>
+                            </>
+                          )}
                         </div>
                       </td>
                       <td className="py-3 px-2">
