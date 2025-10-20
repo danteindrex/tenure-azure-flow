@@ -65,65 +65,7 @@ const Queue = () => {
     try {
       setLoading(true);
       
-      // First check if queue table exists
-      const { data: tableCheck, error: tableError } = await supabase
-        .from('information_schema.tables')
-        .select('table_name')
-        .eq('table_schema', 'public')
-        .eq('table_name', 'queue')
-        .single();
-
-      if (tableError || !tableCheck) {
-        console.log('Queue table does not exist, creating mock data for demonstration');
-        
-        // Create mock data for demonstration
-        const mockQueueData = [
-          {
-            id: 1,
-            memberid: 1,
-            queue_position: 1,
-            joined_at: new Date().toISOString(),
-            is_eligible: true,
-            subscription_active: true,
-            total_months_subscribed: 6,
-            last_payment_date: new Date().toISOString().split('T')[0],
-            lifetime_payment_total: 1500.00,
-            has_received_payout: false,
-            notes: 'Demo member',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            member_name: 'John Doe',
-            member_email: 'john@example.com',
-            member_status: 'Active',
-            member_join_date: new Date().toISOString().split('T')[0]
-          },
-          {
-            id: 2,
-            memberid: 2,
-            queue_position: 2,
-            joined_at: new Date(Date.now() - 86400000).toISOString(),
-            is_eligible: true,
-            subscription_active: true,
-            total_months_subscribed: 4,
-            last_payment_date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-            lifetime_payment_total: 1000.00,
-            has_received_payout: false,
-            notes: 'Demo member',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            member_name: 'Jane Smith',
-            member_email: 'jane@example.com',
-            member_status: 'Active',
-            member_join_date: new Date(Date.now() - 86400000).toISOString().split('T')[0]
-          }
-        ];
-        
-        setQueueData(mockQueueData);
-        setTotalRevenue(2500.00);
-        return;
-      }
-      
-      // Fetch queue data (without member join for now)
+      // Fetch real queue data from database
       const { data: queueMembers, error: queueError } = await supabase
         .from('queue')
         .select('*')
@@ -135,14 +77,31 @@ const Queue = () => {
         return;
       }
 
-      // Transform data to include member details (using memberid for now)
-      const transformedData = queueMembers?.map(item => ({
-        ...item,
-        member_name: `Member ${item.memberid}`,
-        member_email: `member${item.memberid}@example.com`,
-        member_status: 'Active',
-        member_join_date: item.joined_at?.split('T')[0] || ''
-      })) || [];
+      // Transform data to include member details
+      const transformedData = await Promise.all(
+        queueMembers?.map(async (item) => {
+          // Try to get real member data
+          let memberData = null;
+          try {
+            const { data: member } = await supabase
+              .from('member')
+              .select('name, email, status, join_date')
+              .eq('member_id', item.memberid)
+              .single();
+            memberData = member;
+          } catch (err) {
+            // Member not found, use fallback data
+          }
+
+          return {
+            ...item,
+            member_name: memberData?.name || `Member ${item.memberid}`,
+            member_email: memberData?.email || `member${item.memberid}@example.com`,
+            member_status: memberData?.status || (item.subscription_active ? 'Active' : 'Inactive'),
+            member_join_date: memberData?.join_date || item.joined_at?.split('T')[0] || ''
+          };
+        }) || []
+      );
 
       setQueueData(transformedData);
 
@@ -182,12 +141,12 @@ const Queue = () => {
     member.member?.id && user?.id && member.member.id.toString() === user.id
   );
 
-  // Calculate statistics
+  // Calculate statistics from real data
   const activeMembers = queueData.filter(member => member.subscription_active).length;
   const eligibleMembers = queueData.filter(member => member.is_eligible).length;
   const nextPayoutDate = "March 15, 2025"; // This could be calculated based on business rules
   const winnersCount = Math.min(2, eligibleMembers); // Top 2 eligible members
-  const potentialPayoutPerWinner = totalRevenue > 0 ? totalRevenue / winnersCount : 0;
+  const potentialPayoutPerWinner = totalRevenue > 0 ? totalRevenue / Math.max(winnersCount, 1) : 0;
 
   // Filter queue data based on search
   const filteredQueue = queueData.filter(member =>

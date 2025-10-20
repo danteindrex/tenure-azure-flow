@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Fetch queue data (without member join for now)
+    // Fetch real queue data from database
     const { data: queueData, error: queueError } = await supabase
       .from('queue')
       .select('*')
