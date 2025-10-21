@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Crown, Calendar, DollarSign, Users, Clock, TrendingUp, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,9 @@ const DashboardSimple = () => {
   const [daysUntilPayment, setDaysUntilPayment] = useState<number>(0);
   const [daysUntilDraw, setDaysUntilDraw] = useState<number>(0);
   const [topQueue, setTopQueue] = useState<Array<{ rank: number; name: string; tenureMonths: number; status: string; isCurrentUser?: boolean }>>([]);
+  const [currentUserIdState, setCurrentUserIdState] = useState<string | null>(null);
+  const [currentUserEntry, setCurrentUserEntry] = useState<{ rank: number; name: string; tenureMonths: number; status: string; isCurrentUser: boolean } | null>(null);
+  const pollRef = useRef<number | null>(null);
   const BUSINESS_LAUNCH_DATE = process.env.NEXT_PUBLIC_BUSINESS_LAUNCH_DATE || ""; // ISO string fallback
   const PRIZE_PER_WINNER = 100000; // BR-4
 
@@ -32,7 +35,7 @@ const DashboardSimple = () => {
   };
 
   useEffect(() => {
-    const load = async () => {
+    const fetchQueueAndUsers = async () => {
       try {
         // Total revenue from completed payments using normalized schema
         const { data: payments, error: paymentsError } = await supabase
@@ -66,10 +69,41 @@ const DashboardSimple = () => {
         if (!queueError && queue) {
           // Determine current user's position or fallback to first
           let pos: number | null = null;
+          // First try normalized mapping (users.id)
           if (currentUserId) {
+            setCurrentUserIdState(currentUserId);
             const mine = queue.find((q: any) => q.user_id === currentUserId);
             if (mine) pos = mine.queue_position;
+            if (mine) {
+              // populate current user entry (may not be in top preview)
+              setCurrentUserEntry({
+                rank: mine.queue_position,
+                name: `You`,
+                tenureMonths: mine.total_months_subscribed ?? 0,
+                status: mine.subscription_active ? 'Active' : 'Inactive',
+                isCurrentUser: true
+              });
+            } else {
+              setCurrentUserEntry(null);
+            }
           }
+
+          // If normalized mapping didn't find the user, try matching auth user id directly
+          if (pos === null && user?.id) {
+            const mineByAuth = queue.find((q: any) => q.user_id === user.id);
+            if (mineByAuth) {
+              pos = mineByAuth.queue_position;
+              setCurrentUserIdState(user.id);
+              setCurrentUserEntry({
+                rank: mineByAuth.queue_position,
+                name: `You`,
+                tenureMonths: mineByAuth.total_months_subscribed ?? 0,
+                status: mineByAuth.subscription_active ? 'Active' : 'Inactive',
+                isCurrentUser: true
+              });
+            }
+          }
+
           setQueuePosition(pos ?? (queue[0]?.queue_position ?? null));
 
           // Build top queue preview with user names
@@ -81,12 +115,13 @@ const DashboardSimple = () => {
 
           const preview = queue.slice(0, 5).map((q: any) => {
             const userInfo = users?.find((u: any) => u.id === q.user_id);
+            const isCurrent = (currentUserId && q.user_id === currentUserId) || (user?.id && q.user_id === user.id);
             return {
               rank: q.queue_position,
               name: userInfo?.email ? userInfo.email.split('@')[0] : `User ${q.user_id.slice(0, 8)}`,
               tenureMonths: q.total_months_subscribed ?? 0,
               status: q.subscription_active ? 'Active' : 'Inactive',
-              isCurrentUser: currentUserId ? q.user_id === currentUserId : false,
+              isCurrentUser: isCurrent,
             };
           }).sort((a, b) => a.rank - b.rank);
           setTopQueue(preview);
@@ -143,9 +178,49 @@ const DashboardSimple = () => {
         // Leave defaults on error
       }
     };
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, user?.id]);
+
+    // Initial fetch
+    fetchQueueAndUsers();
+
+    // Subscribe to realtime changes in membership_queue to update the UI live
+    let channel: any = null;
+    try {
+      if ((supabase as any)?.channel) {
+        channel = (supabase as any)
+          .channel('public:membership_queue')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'membership_queue' }, payload => {
+            // Re-fetch the preview and current user entry when changes happen
+            fetchQueueAndUsers();
+          })
+          .subscribe();
+      } else if ((supabase as any)?.from) {
+        // older client real-time API
+        (supabase as any)
+          .from('membership_queue')
+          .on('*', () => fetchQueueAndUsers())
+          .subscribe();
+      }
+    } catch (e) {
+      // If realtime isn't available or subscription failed, fallback to polling
+      console.warn('Realtime subscription failed, falling back to polling:', e);
+      pollRef.current = window.setInterval(() => fetchQueueAndUsers(), 5000);
+    }
+
+    return () => {
+      // cleanup realtime subscription or polling
+      try {
+        if (channel && typeof channel.unsubscribe === 'function') {
+          channel.unsubscribe();
+        }
+      } catch (e) {
+        // ignore
+      }
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [supabase, user?.id, BUSINESS_LAUNCH_DATE, totalRevenue]);
 
   const userData = {
     memberId: queuePosition ? `#${queuePosition.toString().padStart(3, '0')}` : "—",
@@ -231,7 +306,46 @@ const DashboardSimple = () => {
           <p className="text-xs text-muted-foreground">50% complete - Need $250,000 more for next payout</p>
         </div>
       </Card>
-
+      
+      {/* Highlight current user's position if not in top 3 */}
+      {/* Always show the Your Position panel (prominent) */}
+      {currentUserEntry ? (
+        <Card className="p-6">
+          <h4 className="text-sm text-muted-foreground mb-2">Your Position</h4>
+          <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-indigo-50 to-indigo-25 border-2 border-indigo-300 shadow-lg">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center font-bold text-white bg-indigo-600">
+                {currentUserEntry.rank}
+              </div>
+              <div>
+                <p className="font-semibold text-lg">{currentUserEntry.name}</p>
+                <p className="text-sm text-muted-foreground">{currentUserEntry.tenureMonths} months</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-medium">{currentUserEntry.status}</p>
+              <p className="text-xs text-indigo-600">Your current position</p>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <Card className="p-6">
+          <h4 className="text-sm text-muted-foreground mb-2">Your Position</h4>
+          <div className="flex items-center justify-between p-4 rounded-lg bg-background/50 border border-border">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold bg-gray-200 text-gray-700">—</div>
+              <div>
+                <p className="font-semibold">Not in queue</p>
+                <p className="text-sm text-muted-foreground">Join to get a position</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-medium">—</p>
+              <p className="text-xs text-muted-foreground">—</p>
+            </div>
+          </div>
+        </Card>
+      )}
       {/* Queue Status */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -242,8 +356,8 @@ const DashboardSimple = () => {
           {topQueue.slice(0, 3).map((member) => (
             <div
               key={member.rank}
-              className={`flex items-center justify-between p-3 rounded-lg ${
-                member.isCurrentUser ? 'bg-accent/10 border border-accent/20' : 'bg-background/50'
+              className={`flex items-center justify-between p-3 rounded-lg transition-shadow ${
+                member.isCurrentUser ? 'bg-indigo-50 border-2 border-indigo-200 shadow-md' : 'bg-background/50 border'
               }`}
             >
               <div className="flex items-center gap-3">
@@ -260,7 +374,7 @@ const DashboardSimple = () => {
               <div className="text-right">
                 <p className="text-sm font-medium">{member.status}</p>
                 {member.isCurrentUser && (
-                  <p className="text-xs text-accent">You are here</p>
+                  <p className="text-xs text-indigo-600 font-semibold">You are here</p>
                 )}
               </div>
             </div>

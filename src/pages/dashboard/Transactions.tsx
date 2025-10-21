@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useUser, useSupabaseClient } from "@supabase/auth-helpers-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
+import HistoryService from "@/lib/history";
 import { 
   CreditCard, 
   Search, 
@@ -20,62 +23,127 @@ import {
  
 
 const Transactions = () => {
+  const user = useUser();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
- 
-  const transactions = [
-    {
-      id: "TXN-001",
-      type: "payment",
-      amount: 25.00,
-      status: "completed",
-      date: "2025-01-15",
-      description: "Monthly membership fee",
-      method: "Credit Card",
-      reference: "****1234"
-    },
-    {
-      id: "TXN-002",
-      type: "payment",
-      amount: 300.00,
-      status: "completed",
-      date: "2025-01-01",
-      description: "Initial membership fee",
-      method: "Bank Transfer",
-      reference: "ACH-789456"
-    },
-    {
-      id: "TXN-003",
-      type: "refund",
-      amount: 25.00,
-      status: "pending",
-      date: "2025-01-10",
-      description: "Payment refund - system error",
-      method: "Credit Card",
-      reference: "****1234"
-    },
-    {
-      id: "TXN-004",
-      type: "payment",
-      amount: 25.00,
-      status: "failed",
-      date: "2025-01-05",
-      description: "Monthly membership fee",
-      method: "Credit Card",
-      reference: "****5678"
-    },
-    {
-      id: "TXN-005",
-      type: "bonus",
-      amount: 5.00,
-      status: "completed",
-      date: "2025-01-12",
-      description: "Referral bonus",
-      method: "System Credit",
-      reference: "BONUS-001"
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [monthlyTotal, setMonthlyTotal] = useState(0);
+  const supabase = useSupabaseClient();
+  // Memoize service so it doesn't trigger useEffect re-runs
+  const historyServiceRef = useRef<InstanceType<typeof HistoryService> | null>(null);
+  if (!historyServiceRef.current) historyServiceRef.current = new HistoryService();
+  const historyService = historyServiceRef.current;
+  const pollRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let subscription: any = null;
+    const fetchAndSubscribe = async () => {
+      // fetchTransactions returns the normalized user id used in tables (if any)
+      const normalizedUserId = await fetchTransactions();
+
+      // subscribe to realtime changes for this user's transactions (use normalized id when possible)
+      const targetUserId = normalizedUserId || user?.id;
+      if (!targetUserId) return;
+      try {
+        if ((supabase as any)?.channel) {
+          subscription = (supabase as any)
+            .channel(`public:transaction_history:user=${targetUserId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'transaction_history', filter: `user_id=eq.${targetUserId}` }, () => {
+              fetchTransactions();
+            })
+            .subscribe();
+        } else if ((supabase as any)?.from) {
+          subscription = (supabase as any)
+            .from(`transaction_history:user_id=eq.${targetUserId}`)
+            .on('*', () => fetchTransactions())
+            .subscribe();
+        } else {
+          // fallback to polling every 10s
+          pollRef.current = window.setInterval(() => fetchTransactions(), 10000);
+        }
+      } catch (e) {
+        console.warn('Realtime subscription failed for transactions, falling back to polling', e);
+        pollRef.current = window.setInterval(() => fetchTransactions(), 10000);
+      }
+    };
+
+    if (user) fetchAndSubscribe();
+
+    return () => {
+      try {
+        if (subscription && typeof subscription.unsubscribe === 'function') subscription.unsubscribe();
+      } catch (e) {
+        // ignore
+      }
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const fetchTransactions = async () => {
+    if (!user) return null;
+    try {
+      setLoading(true);
+      // Map auth user -> normalized users.id if exists
+      let normalizedUserId: string | null = null;
+      try {
+        const { data: uData, error: uErr } = await supabase
+          .from('users')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .maybeSingle();
+        if (!uErr && uData?.id) normalizedUserId = uData.id;
+      } catch (e) {
+        // ignore mapping failure and fallback to auth user id
+      }
+
+      const queryUserId = normalizedUserId || user.id;
+      const data = await historyService.getTransactionHistory(queryUserId, { limit: 100 });
+      setTransactions(data.map(transaction => ({
+        id: transaction.id,
+        type: transaction.transaction_type,
+        amount: transaction.amount,
+        status: transaction.status,
+        date: new Date(transaction.created_at).toISOString().split('T')[0],
+        description: transaction.description,
+        method: transaction.payment_method || 'Unknown',
+        reference: transaction.payment_reference || 'N/A'
+      })));
+
+      // Calculate monthly total
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      const monthlyTransactions = data.filter(t => {
+        const date = new Date(t.created_at);
+        return date.getMonth() === currentMonth && 
+               date.getFullYear() === currentYear &&
+               t.status === 'completed';
+      });
+      
+      setMonthlyTotal(monthlyTransactions.reduce((sum, t) => 
+        sum + (t.transaction_type === 'payment' ? t.amount : -t.amount), 0
+      ));
+      return normalizedUserId;
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load transactions. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
+    return null;
+  };
+
+  
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -117,8 +185,15 @@ const Transactions = () => {
   };
 
   const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchFields = [
+      transaction.description,
+      transaction.id,
+      transaction.method,
+      transaction.reference
+    ].map(field => (field || '').toLowerCase());
+    
+    const matchesSearch = searchTerm === '' || 
+      searchFields.some(field => field.includes(searchTerm.toLowerCase()));
     const matchesStatus = statusFilter === "all" || transaction.status === statusFilter;
     const matchesType = typeFilter === "all" || transaction.type === typeFilter;
     
@@ -137,7 +212,35 @@ const Transactions = () => {
           <h1 className="text-2xl font-bold">Transactions</h1>
           <p className="text-muted-foreground">View and manage your payment history</p>
         </div>
-        <Button className="bg-accent hover:bg-accent/90">
+        <Button 
+          className="bg-accent hover:bg-accent/90"
+          onClick={() => {
+            const csv = filteredTransactions
+              .map(t => [
+                t.date,
+                t.id,
+                t.type,
+                t.description,
+                t.method,
+                t.reference,
+                t.status,
+                `${t.type === 'payment' ? '-' : '+'}${t.amount.toFixed(2)}`
+              ].join(','))
+              .join('\n');
+            
+            const blob = new Blob([`Date,ID,Type,Description,Method,Reference,Status,Amount\n${csv}`], 
+              { type: 'text/csv' }
+            );
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `transactions-${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }}
+        >
           <Download className="w-4 h-4 mr-2" />
           Export
         </Button>
@@ -149,7 +252,13 @@ const Transactions = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Total Paid</p>
-              <p className="text-2xl font-bold">${Math.abs(totalAmount).toFixed(2)}</p>
+              <p className="text-2xl font-bold">
+                {loading ? (
+                  <span className="animate-pulse">...</span>
+                ) : (
+                  `$${Math.abs(totalAmount).toFixed(2)}`
+                )}
+              </p>
             </div>
             <DollarSign className="w-8 h-8 text-accent" />
           </div>
@@ -158,7 +267,13 @@ const Transactions = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">This Month</p>
-              <p className="text-2xl font-bold">$25.00</p>
+              <p className="text-2xl font-bold">
+                {loading ? (
+                  <span className="animate-pulse">...</span>
+                ) : (
+                  `$${Math.abs(monthlyTotal).toFixed(2)}`
+                )}
+              </p>
             </div>
             <Calendar className="w-8 h-8 text-green-500" />
           </div>
@@ -167,7 +282,13 @@ const Transactions = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Completed</p>
-              <p className="text-2xl font-bold">{transactions.filter(t => t.status === "completed").length}</p>
+              <p className="text-2xl font-bold">
+                {loading ? (
+                  <span className="animate-pulse">...</span>
+                ) : (
+                  transactions.filter(t => t.status === "completed").length
+                )}
+              </p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-500" />
           </div>
@@ -176,7 +297,13 @@ const Transactions = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Pending</p>
-              <p className="text-2xl font-bold">{transactions.filter(t => t.status === "pending").length}</p>
+              <p className="text-2xl font-bold">
+                {loading ? (
+                  <span className="animate-pulse">...</span>
+                ) : (
+                  transactions.filter(t => t.status === "pending").length
+                )}
+              </p>
             </div>
             <Clock className="w-8 h-8 text-yellow-500" />
           </div>
@@ -225,7 +352,25 @@ const Transactions = () => {
       {/* Transactions List */}
       <Card className="p-6">
         <div className="space-y-4">
-          {filteredTransactions.length === 0 ? (
+          {loading ? (
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center justify-between p-4 border border-border rounded-lg animate-pulse">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-accent/10"></div>
+                    <div className="space-y-2">
+                      <div className="h-4 w-48 bg-accent/10 rounded"></div>
+                      <div className="h-3 w-32 bg-accent/10 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="h-4 w-24 bg-accent/10 rounded mb-2"></div>
+                    <div className="h-3 w-16 bg-accent/10 rounded"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredTransactions.length === 0 ? (
             <div className="text-center py-8">
               <CreditCard className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No transactions found</p>

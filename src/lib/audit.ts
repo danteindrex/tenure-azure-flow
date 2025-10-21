@@ -94,36 +94,69 @@ class AuditLogger {
 
   async log(entry: Omit<AuditLogEntry, 'user_agent' | 'ip_address' | 'location'>) {
     try {
-      // Skip logging if supabase is not available (server-side)
+      // Don't throw when audit can't be recorded. Logging should be best-effort only.
       if (!this.supabase) {
+        // If supabase is not initialized (likely server-side during build), just skip.
         console.warn('Supabase client not available, skipping audit log');
         return;
       }
-      
-      // Get user's current session
-      const { data: { session } } = await this.supabase.auth.getSession();
-      
+
+      // Safely attempt to get session, but don't fail hard if auth is unavailable.
+      let userIdFromSession: string | undefined = undefined;
+      try {
+        // Some environments may not have auth configured; guard against unexpected shapes.
+        const sessionResp: any = await this.supabase?.auth?.getSession?.();
+        userIdFromSession = sessionResp?.data?.session?.user?.id;
+      } catch (e) {
+        // Non-fatal: continue with provided entry.user_id if available
+        console.warn('Could not retrieve session for audit log:', e);
+      }
+
       const auditData = {
         ...entry,
         session_id: this.sessionId,
-        user_id: session?.user?.id || entry.user_id,
-        user_type: session?.user ? 'authenticated' : entry.user_type || 'guest'
+        user_id: userIdFromSession || entry.user_id,
+        user_type: userIdFromSession ? 'authenticated' : entry.user_type || 'guest'
       };
 
-      // Use server-side API for better IP tracking
-      const response = await fetch('/api/audit/log', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(auditData),
-      });
+      // Fire-and-forget POST to the API route. We intentionally do not rethrow errors
+      // so client code (page navigation, etc.) is not disrupted by logging failures.
+      try {
+        // Use a small timeout helper to avoid hangs in environments where fetch may stall.
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const signal = controller ? controller.signal : undefined;
+        if (controller) {
+          // Abort after 3 seconds
+          setTimeout(() => controller.abort(), 3000);
+        }
 
-      if (!response.ok) {
-        console.error('Failed to log audit entry via API');
+        // Note: do not await the fetch in a way that would allow exceptions to bubble
+        // into the caller stack — handle errors locally.
+        fetch('/api/audit/log', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(auditData),
+          signal
+        })
+        .then(res => {
+          if (!res.ok) {
+            // Log non-OK responses but don't throw
+            console.error('Failed to log audit entry via API, status:', res.status);
+          }
+        })
+        .catch(err => {
+          // Swallow network errors — best-effort logging only
+          console.warn('Audit log network error (ignored):', err?.message || err);
+        });
+      } catch (e) {
+        // Defensive: any unexpected error should not crash the app
+        console.warn('Audit log failed to send (ignored):', e);
       }
     } catch (error) {
-      console.error('Audit logging error:', error);
+      // Final catch to ensure no exceptions escape this method
+      console.warn('Unexpected error in audit logging (ignored):', error);
     }
   }
 
