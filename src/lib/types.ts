@@ -27,6 +27,7 @@ export interface QueueMember {
   totalPaid: number;
   lastPaymentDate: string;
   nextPaymentDue: string;
+  // subscription_active removed - all queue members have active subscriptions by definition
 }
 
 export interface MemberPaymentStatus {

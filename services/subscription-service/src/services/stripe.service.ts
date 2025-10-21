@@ -182,9 +182,9 @@ export class StripeService {
 
       // Add member to queue
       const queueQuery = `
-        INSERT INTO queue_entries (member_id, queue_position, joined_queue_at, is_eligible, created_at)
-        VALUES ($1, (SELECT COALESCE(MAX(queue_position), 0) + 1 FROM queue_entries), NOW(), true, NOW())
-        ON CONFLICT (member_id) DO NOTHING
+        INSERT INTO membership_queue (user_id, queue_position, joined_queue_at, is_eligible, created_at)
+        VALUES ($1, (SELECT COALESCE(MAX(queue_position), 0) + 1 FROM membership_queue), NOW(), true, NOW())
+        ON CONFLICT (user_id) DO NOTHING
       `;
       await pool.query(queueQuery, [userId]);
 
@@ -230,7 +230,7 @@ export class StripeService {
       // Create payment record
       const payment = await PaymentModel.create({
         memberid: parseInt(dbSubscription.user_id),
-        subscription_id: dbSubscription.id,
+        subscriptionid: parseInt(dbSubscription.id),
         stripe_payment_intent_id: invoice.payment_intent as string,
         stripe_invoice_id: invoice.id,
         stripe_charge_id: invoice.charge as string,
@@ -287,9 +287,12 @@ export class StripeService {
         canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : undefined,
       } as any);
 
-      // Update queue subscription status
+      // Remove user from queue if subscription becomes inactive (they lose their position permanently)
       const isActive = ['active', 'trialing'].includes(subscription.status);
-      await QueueModel.updateSubscriptionStatus(parseInt(dbSubscription.user_id), isActive);
+      if (!isActive) {
+        await QueueModel.removeFromQueue(parseInt(dbSubscription.user_id));
+        logger.info(`User ${dbSubscription.user_id} removed from queue due to inactive subscription`);
+      }
 
       logger.info(`Subscription updated for member ${dbSubscription.user_id}`, {
         status: subscription.status,
@@ -315,8 +318,9 @@ export class StripeService {
       // Update subscription status
       await SubscriptionModel.cancelSubscription(dbSubscription.id);
 
-      // Update queue subscription status to inactive
-      await QueueModel.updateSubscriptionStatus(parseInt(dbSubscription.user_id), false);
+      // Remove user from queue permanently when subscription is canceled
+      await QueueModel.removeFromQueue(parseInt(dbSubscription.user_id));
+      logger.info(`User ${dbSubscription.user_id} permanently removed from queue due to subscription cancellation`);
 
       logger.info(`Subscription canceled for member ${dbSubscription.user_id}`);
     } catch (error) {

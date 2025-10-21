@@ -8,16 +8,34 @@ export class QueueModel {
     return result.rows[0] || null;
   }
 
-  static async updateSubscriptionStatus(memberId: number, isActive: boolean): Promise<Queue> {
-    const query = `
-      UPDATE queue
-      SET subscription_active = $2, updated_at = NOW()
-      WHERE memberid = $1
-      RETURNING *
+  static async removeFromQueue(userId: number): Promise<void> {
+    // First, get the position of the user being removed
+    const getPositionQuery = `
+      SELECT queue_position FROM membership_queue WHERE user_id = $1
     `;
-
-    const result = await pool.query<Queue>(query, [memberId, isActive]);
-    return result.rows[0];
+    const positionResult = await pool.query(getPositionQuery, [userId.toString()]);
+    
+    if (positionResult.rows.length === 0) {
+      return; // User not in queue
+    }
+    
+    const removedPosition = positionResult.rows[0].queue_position;
+    
+    // Remove the user from queue
+    const deleteQuery = `
+      DELETE FROM membership_queue WHERE user_id = $1
+    `;
+    await pool.query(deleteQuery, [userId.toString()]);
+    
+    // Move everyone behind them up one position
+    if (removedPosition) {
+      const reorderQuery = `
+        UPDATE membership_queue 
+        SET queue_position = queue_position - 1
+        WHERE queue_position > $1
+      `;
+      await pool.query(reorderQuery, [removedPosition]);
+    }
   }
 
   static async updatePaymentStats(

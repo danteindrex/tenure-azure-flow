@@ -2,7 +2,7 @@
 /* DO NOT MODIFY IT BECAUSE IT COULD BE REWRITTEN AT ANY TIME. */
 import config from '@payload-config'
 import '@payloadcms/next/css'
-import type { ServerFunctionClient } from 'payload'
+import type { Payload } from 'payload'
 import { handleServerFunctions, RootLayout } from '@payloadcms/next/layouts'
 import React from 'react'
 
@@ -13,7 +13,7 @@ type Args = {
   children: React.ReactNode
 }
 
-const serverFunction: ServerFunctionClient = async function (args) {
+const serverFunction = async function (args: any) {
   'use server'
   return handleServerFunctions({
     ...args,

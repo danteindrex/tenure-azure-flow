@@ -4,7 +4,7 @@ import { logger } from '../config/logger';
 import { z } from 'zod';
 
 const CreateCheckoutSchema = z.object({
-  userId: z.string().uuid().optional(),
+  userId: z.string().uuid(),
   successUrl: z.string().url().optional(),
   cancelUrl: z.string().url().optional(),
 });

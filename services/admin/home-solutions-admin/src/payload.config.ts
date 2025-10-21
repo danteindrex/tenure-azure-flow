@@ -9,7 +9,6 @@ import sharp from 'sharp'
 
 import { Admin } from './collections/Admin'
 import { AuditLog } from './collections/AuditLog'
-import { Company } from './collections/Company'
 import { FinancialSchedules } from './collections/FinancialSchedules'
 import { MemberAgreements } from './collections/MemberAgreements'
 import { Members } from './collections/Members'
@@ -17,10 +16,10 @@ import { NewsFeedPost } from './collections/NewsFeedPost'
 import { Payment } from './collections/Payment'
 import { PaymentMethods } from './collections/PaymentMethods'
 import { Queue } from './collections/Queue'
-import { QueueEntries } from './collections/QueueEntries'
+import QueueEntries from './collections/QueueEntries'
 import { Subscription } from './collections/Subscription'
 import { UserAddresses } from './collections/UserAddresses'
-import { UserAuditLogs } from './collections/UserAuditLogs'
+import UserAuditLogs from './collections/UserAuditLogs'
 import { UserContacts } from './collections/UserContacts'
 import { UserMemberships } from './collections/UserMemberships'
 import { UserProfiles } from './collections/UserProfiles'
@@ -31,28 +30,24 @@ const dirname = path.dirname(filename)
 export default buildConfig({
   admin: {
     user: Admin.slug,
-    importMap: {
-      baseDir: path.resolve(dirname),
-    },
   },
   collections: [
     Admin,
     AuditLog,
-    Company,
     FinancialSchedules,
     MemberAgreements,
-    Members, // Now points to 'users' table
+    Members, // Points to 'users' table
     NewsFeedPost,
-    Payment, // Now points to 'user_payments' table
-    PaymentMethods, // Now points to 'user_payment_methods' table
+    Payment, // Points to 'user_payments' table
+    PaymentMethods, // Points to 'user_payment_methods' table
     Queue,
-    QueueEntries, // Now points to 'membership_queue' table
-    Subscription, // Now points to 'user_subscriptions' table
-    UserAddresses,
-    UserAuditLogs, // Now points to 'system_audit_logs' table
-    UserContacts,
-    UserMemberships,
-    UserProfiles,
+    QueueEntries, // Points to 'membership_queue' table
+    Subscription, // Points to 'user_subscriptions' table
+    UserAddresses, // Points to 'user_addresses' table
+    UserAuditLogs, // Points to 'user_audit_logs' table (renamed from system_audit_logs)
+    UserContacts, // Points to 'user_contacts' table
+    UserMemberships, // Points to 'user_memberships' table
+    UserProfiles, // Points to 'user_profiles' table
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
@@ -66,6 +61,7 @@ export default buildConfig({
         rejectUnauthorized: false,
       },
     },
+    push: false, // Disable automatic schema push to avoid conflicts
   }),
   sharp,
   plugins: [

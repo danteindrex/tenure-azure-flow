@@ -258,7 +258,8 @@ class QueueServiceAdapter {
         .eq('status', 'Completed');
 
       const totalRevenue = payments?.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0) || 0;
-      const activeMembers = enrichedData.filter((member: any) => member.subscription_active).length;
+      // All members in queue have active subscriptions (inactive ones are removed)
+      const activeMembers = enrichedData.length;
       const eligibleMembers = enrichedData.filter((member: any) => member.is_eligible).length;
 
       const statistics: QueueStatistics = {

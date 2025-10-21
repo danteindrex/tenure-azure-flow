@@ -74,7 +74,7 @@ async function fallbackToDirectAccess(supabase: any, res: NextApiResponse) {
   try {
     // Fetch real queue data from database
     const { data: queueData, error: queueError } = await supabase
-      .from('queue')
+      .from('membership_queue')
       .select('*')
       .order('queue_position', { ascending: true });
 

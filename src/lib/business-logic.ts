@@ -387,17 +387,17 @@ class BusinessLogicService {
           if (!updateError) {
             updated++;
 
-            // Remove from queue
+            // Remove from queue permanently (they lose their position forever)
             const { error: queueError } = await this.supabase
-              .from('queue')
+              .from('membership_queue')
               .delete()
-              .eq('memberid', member.id);
+              .eq('user_id', member.id);
 
             if (!queueError) {
               removed++;
             }
 
-            console.log(`Member ${member.name} (ID: ${member.id}) marked inactive due to payment default`);
+            console.log(`Member ${member.name} (ID: ${member.id}) permanently removed from queue due to payment default - they lose their position forever`);
           }
         }
       }

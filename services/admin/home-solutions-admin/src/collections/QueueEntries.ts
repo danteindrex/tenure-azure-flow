@@ -1,116 +1,99 @@
-import type { CollectionConfig } from 'payload'
+import { CollectionConfig } from 'payload/types'
 
-interface User {
-  id: string | number
-  role?: string
-}
-
-export const QueueEntries: CollectionConfig = {
+const QueueEntries: CollectionConfig = {
   slug: 'membership_queue',
   admin: {
-    useAsTitle: 'queue_position',
-    defaultColumns: ['user_id', 'queue_position', 'is_eligible', 'subscription_active'],
-    description: 'Manages membership queue positions and eligibility',
-    group: 'Member Management',
+    useAsTitle: 'user_id',
+    defaultColumns: ['user_id', 'queue_position', 'is_eligible'],
   },
   access: {
-    create: ({ req: { user } }: { req: { user: User | null } }) => !!user,
-    read: ({ req: { user } }: { req: { user: User | null } }) => !!user,
-    update: ({ req: { user } }: { req: { user: User | null } }) => !!user,
-    delete: ({ req: { user } }: { req: { user: User | null } }) => user?.role === 'Super Admin',
+    read: () => true,
+    create: () => true,
+    update: () => true,
+    delete: () => true,
   },
   fields: [
-    {
-      name: 'id',
-      type: 'text',
-      admin: {
-        readOnly: true,
-        position: 'sidebar',
-      },
-    },
     {
       name: 'user_id',
       type: 'text',
       required: true,
-      label: 'User ID',
+      unique: true,
       admin: {
-        description: 'Reference to users table',
+        description: 'User ID in the queue',
       },
     },
     {
       name: 'queue_position',
       type: 'number',
-      label: 'Queue Position',
+      required: true,
       admin: {
-        description: 'Current position in the queue',
+        description: 'Position in the queue (1 = first)',
       },
     },
     {
       name: 'joined_queue_at',
       type: 'date',
-      label: 'Joined Queue At',
+      required: true,
       admin: {
-        date: {
-          pickerAppearance: 'dayAndTime',
-        },
-        description: 'When the member joined the queue',
+        description: 'When the user joined the queue',
       },
     },
     {
       name: 'is_eligible',
       type: 'checkbox',
+      required: true,
       defaultValue: true,
-      label: 'Is Eligible',
       admin: {
-        description: 'Whether the member is eligible for queue benefits',
+        description: 'Whether the user is eligible for payout',
       },
     },
-    {
-      name: 'priority_score',
-      type: 'number',
-      defaultValue: 0,
-      label: 'Priority Score',
-      admin: {
-        description: 'Priority score for queue ordering',
-      },
-    },
-    {
-      name: 'subscription_active',
-      type: 'checkbox',
-      defaultValue: false,
-      label: 'Subscription Active',
-    },
+    // subscription_active removed - determined by joining with user_subscriptions table
     {
       name: 'total_months_subscribed',
       type: 'number',
+      required: true,
       defaultValue: 0,
-      label: 'Total Months Subscribed',
+      admin: {
+        description: 'Total months the user has been subscribed',
+      },
     },
     {
       name: 'last_payment_date',
       type: 'date',
-      label: 'Last Payment Date',
+      required: false,
+      admin: {
+        description: 'Date of last payment',
+      },
     },
     {
       name: 'lifetime_payment_total',
       type: 'number',
-      label: 'Lifetime Payment Total',
+      required: true,
+      defaultValue: 0,
       admin: {
-        description: 'Total amount paid over lifetime',
-        step: 0.01,
+        description: 'Total amount paid by the user',
       },
     },
     {
       name: 'has_received_payout',
       type: 'checkbox',
+      required: true,
       defaultValue: false,
-      label: 'Has Received Payout',
+      admin: {
+        description: 'Whether the user has received a payout',
+      },
     },
     {
       name: 'notes',
       type: 'textarea',
-      label: 'Notes',
+      required: false,
+      admin: {
+        description: 'Additional notes about the queue entry',
+      },
     },
   ],
   timestamps: true,
 }
+
+export { QueueEntries }
+export default QueueEntries

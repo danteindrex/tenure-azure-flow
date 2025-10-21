@@ -68,9 +68,21 @@ export interface Config {
   blocks: {};
   collections: {
     admin: Admin;
-    member: Member;
-    queue: Queue;
+    auditlog: Auditlog;
+    user_billing_schedules: UserBillingSchedule;
+    user_agreements: UserAgreement;
+    users: User;
     newsfeedpost: Newsfeedpost;
+    user_payments: UserPayment;
+    user_payment_methods: UserPaymentMethod;
+    queue: Queue;
+    membership_queue: MembershipQueue;
+    user_subscriptions: UserSubscription;
+    user_addresses: UserAddress;
+    user_audit_logs: UserAuditLog;
+    user_contacts: UserContact;
+    user_memberships: UserMembership;
+    user_profiles: UserProfile;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -78,9 +90,21 @@ export interface Config {
   collectionsJoins: {};
   collectionsSelect: {
     admin: AdminSelect<false> | AdminSelect<true>;
-    member: MemberSelect<false> | MemberSelect<true>;
-    queue: QueueSelect<false> | QueueSelect<true>;
+    auditlog: AuditlogSelect<false> | AuditlogSelect<true>;
+    user_billing_schedules: UserBillingSchedulesSelect<false> | UserBillingSchedulesSelect<true>;
+    user_agreements: UserAgreementsSelect<false> | UserAgreementsSelect<true>;
+    users: UsersSelect<false> | UsersSelect<true>;
     newsfeedpost: NewsfeedpostSelect<false> | NewsfeedpostSelect<true>;
+    user_payments: UserPaymentsSelect<false> | UserPaymentsSelect<true>;
+    user_payment_methods: UserPaymentMethodsSelect<false> | UserPaymentMethodsSelect<true>;
+    queue: QueueSelect<false> | QueueSelect<true>;
+    membership_queue: MembershipQueueSelect<false> | MembershipQueueSelect<true>;
+    user_subscriptions: UserSubscriptionsSelect<false> | UserSubscriptionsSelect<true>;
+    user_addresses: UserAddressesSelect<false> | UserAddressesSelect<true>;
+    user_audit_logs: UserAuditLogsSelect<false> | UserAuditLogsSelect<true>;
+    user_contacts: UserContactsSelect<false> | UserContactsSelect<true>;
+    user_memberships: UserMembershipsSelect<false> | UserMembershipsSelect<true>;
+    user_profiles: UserProfilesSelect<false> | UserProfilesSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -143,64 +167,133 @@ export interface Admin {
   password?: string | null;
 }
 /**
- * Program members who sign up via the frontend
+ * System audit log tracking all administrative actions
  *
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "member".
+ * via the `definition` "auditlog".
  */
-export interface Member {
+export interface Auditlog {
   id: number;
-  name: string;
-  email: string;
-  phone?: string | null;
-  street_address?: string | null;
-  city?: string | null;
   /**
-   * US State code (e.g., CA, NY)
+   * Admin user who performed this action
    */
-  state?: string | null;
-  zip_code?: string | null;
-  join_date: string;
-  status: 'Active' | 'Inactive' | 'Suspended' | 'Pending';
+  admin_i_d_id: number | Admin;
   /**
-   * Current tenure duration in months
+   * Type of entity that was changed (e.g., Member, Payment, NewsFeedPost)
    */
-  tenure?: number | null;
+  entity_changed: string;
   /**
-   * Administrator managing this member
+   * ID of the entity that was changed
    */
-  admin_i_d_id?: (number | null) | Admin;
+  entity_id?: number | null;
   /**
-   * Supabase auth user ID (auto-populated on signup)
+   * Type of action performed
    */
-  auth_user_id?: string | null;
+  change_type: 'INSERT' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'VIEW' | 'EXPORT';
+  /**
+   * When this action occurred
+   */
+  timestamp: string;
+  /**
+   * Detailed information about the change (JSON format)
+   */
+  change_details?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
 /**
- * Member tenure queue management
+ * Manages billing cycles and payment schedules
  *
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "queue".
+ * via the `definition` "user_billing_schedules".
  */
-export interface Queue {
-  id: number;
-  memberid: number;
+export interface UserBillingSchedule {
+  id: string;
   /**
-   * Current position in the tenure queue
+   * Reference to users table
    */
-  queue_position: number;
-  subscription_active?: boolean | null;
-  joined_at?: string | null;
-  is_eligible?: boolean | null;
-  total_months_subscribed?: number | null;
-  last_payment_date?: string | null;
+  user_id: string;
   /**
-   * Total amount paid over lifetime
+   * Reference to user_subscriptions table
    */
-  lifetime_payment_total?: number | null;
-  has_received_payout?: boolean | null;
-  notes?: string | null;
+  subscription_id?: string | null;
+  billing_cycle?: ('MONTHLY' | 'QUARTERLY' | 'YEARLY') | null;
+  /**
+   * Date of the next scheduled billing
+   */
+  next_billing_date?: string | null;
+  /**
+   * Billing amount (decimal with 2 places)
+   */
+  amount?: number | null;
+  /**
+   * 3-letter currency code (e.g., USD, EUR)
+   */
+  currency?: string | null;
+  is_active?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Tracks user agreements to terms and conditions
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_agreements".
+ */
+export interface UserAgreement {
+  id: string;
+  /**
+   * Reference to users table
+   */
+  user_id: string;
+  agreement_type: 'TERMS_CONDITIONS' | 'PAYMENT_AUTHORIZATION';
+  /**
+   * Version of the agreement (e.g., 1.0, 2.1)
+   */
+  version_number: string;
+  /**
+   * When the user agreed to this version
+   */
+  agreed_at?: string | null;
+  /**
+   * URL to the agreement document
+   */
+  document_url?: string | null;
+  is_active?: boolean | null;
+  /**
+   * IP address when agreement was made
+   */
+  ip_address?: string | null;
+  /**
+   * Browser user agent when agreement was made
+   */
+  user_agent?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Core user accounts and authentication
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "users".
+ */
+export interface User {
+  id: string;
+  /**
+   * Supabase auth user ID
+   */
+  auth_user_id?: string | null;
+  email: string;
+  email_verified?: boolean | null;
+  status: 'Active' | 'Inactive' | 'Suspended' | 'Pending';
   updatedAt: string;
   createdAt: string;
 }
@@ -251,6 +344,354 @@ export interface Newsfeedpost {
   createdAt: string;
 }
 /**
+ * Tracks all payment transactions and their status
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_payments".
+ */
+export interface UserPayment {
+  id: string;
+  /**
+   * Reference to users table
+   */
+  user_id: string;
+  /**
+   * Reference to user_subscriptions table (optional)
+   */
+  subscription_id?: string | null;
+  /**
+   * Reference to user_payment_methods table (optional)
+   */
+  payment_method_id?: string | null;
+  provider?: ('stripe' | 'paypal' | 'bank') | null;
+  provider_payment_id?: string | null;
+  provider_invoice_id?: string | null;
+  provider_charge_id?: string | null;
+  /**
+   * Payment amount (decimal with 2 places)
+   */
+  amount: number;
+  /**
+   * 3-letter currency code (e.g., USD, EUR)
+   */
+  currency?: string | null;
+  payment_type: 'initial' | 'recurring' | 'one_time';
+  payment_date: string;
+  status: 'succeeded' | 'pending' | 'failed' | 'refunded' | 'canceled';
+  is_first_payment?: boolean | null;
+  /**
+   * Reason for payment failure (if applicable)
+   */
+  failure_reason?: string | null;
+  /**
+   * URL to payment receipt
+   */
+  receipt_url?: string | null;
+  /**
+   * Additional payment metadata (JSON format)
+   */
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Stores user payment method preferences and tokens
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_payment_methods".
+ */
+export interface UserPaymentMethod {
+  id: string;
+  /**
+   * Reference to users table
+   */
+  user_id: string;
+  provider?: ('stripe' | 'paypal' | 'bank') | null;
+  method_type: 'card' | 'bank_account' | 'digital_wallet';
+  method_subtype?: ('apple_pay' | 'google_pay' | 'cash_app') | null;
+  /**
+   * Provider payment method identifier
+   */
+  provider_payment_method_id?: string | null;
+  last_four?: string | null;
+  /**
+   * Card brand (visa, mastercard, etc.)
+   */
+  brand?: string | null;
+  expires_month?: number | null;
+  expires_year?: number | null;
+  is_default?: boolean | null;
+  is_active?: boolean | null;
+  /**
+   * Additional payment method metadata (JSON format)
+   */
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Member tenure queue management
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "queue".
+ */
+export interface Queue {
+  id: number;
+  memberid: number;
+  /**
+   * Current position in the tenure queue
+   */
+  queue_position: number;
+  subscription_active?: boolean | null;
+  joined_at?: string | null;
+  is_eligible?: boolean | null;
+  total_months_subscribed?: number | null;
+  last_payment_date?: string | null;
+  /**
+   * Total amount paid over lifetime
+   */
+  lifetime_payment_total?: number | null;
+  has_received_payout?: boolean | null;
+  notes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "membership_queue".
+ */
+export interface MembershipQueue {
+  id: number;
+  /**
+   * User ID in the queue
+   */
+  user_id: string;
+  /**
+   * Position in the queue (1 = first)
+   */
+  queue_position: number;
+  /**
+   * When the user joined the queue
+   */
+  joined_queue_at: string;
+  /**
+   * Whether the user is eligible for payout
+   */
+  is_eligible: boolean;
+  /**
+   * Total months the user has been subscribed
+   */
+  total_months_subscribed: number;
+  /**
+   * Date of last payment
+   */
+  last_payment_date?: string | null;
+  /**
+   * Total amount paid by the user
+   */
+  lifetime_payment_total: number;
+  /**
+   * Whether the user has received a payout
+   */
+  has_received_payout: boolean;
+  /**
+   * Additional notes about the queue entry
+   */
+  notes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Stores Stripe subscription information for members
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_subscriptions".
+ */
+export interface UserSubscription {
+  id: string;
+  /**
+   * Reference to users table
+   */
+  user_id: string;
+  provider?: ('stripe' | 'paypal') | null;
+  /**
+   * Unique provider subscription identifier
+   */
+  provider_subscription_id: string;
+  /**
+   * Provider customer identifier
+   */
+  provider_customer_id: string;
+  status: 'active' | 'past_due' | 'canceled' | 'incomplete' | 'trialing' | 'unpaid';
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at_period_end?: boolean | null;
+  canceled_at?: string | null;
+  trial_end?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Address information for users
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_addresses".
+ */
+export interface UserAddress {
+  id: string;
+  /**
+   * Reference to users table
+   */
+  user_id: string;
+  address_type?: ('primary' | 'billing' | 'shipping') | null;
+  street_address?: string | null;
+  /**
+   * Apartment, suite, unit, etc. (optional)
+   */
+  address_line_2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  /**
+   * ISO 2-letter country code
+   */
+  country_code?: string | null;
+  is_primary?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_audit_logs".
+ */
+export interface UserAuditLog {
+  id: number;
+  /**
+   * User ID associated with this audit log entry
+   */
+  user_id?: string | null;
+  /**
+   * Type of action performed
+   */
+  action: 'login' | 'logout' | 'profile_update' | 'payment' | 'subscription' | 'queue_update' | 'system';
+  /**
+   * Whether the action was successful
+   */
+  success: boolean;
+  /**
+   * Error message if action failed
+   */
+  error_message?: string | null;
+  /**
+   * Additional metadata about the action
+   */
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * IP address of the user
+   */
+  ip_address?: string | null;
+  /**
+   * User agent string
+   */
+  user_agent?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Contact information for users (phone, email, etc.)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_contacts".
+ */
+export interface UserContact {
+  id: string;
+  /**
+   * Reference to users table
+   */
+  user_id: string;
+  contact_type: 'phone' | 'email' | 'emergency';
+  /**
+   * Phone number, email address, etc.
+   */
+  contact_value: string;
+  is_primary?: boolean | null;
+  is_verified?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Membership-specific business data
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_memberships".
+ */
+export interface UserMembership {
+  id: string;
+  /**
+   * Reference to users table
+   */
+  user_id: string;
+  join_date: string;
+  /**
+   * Current tenure duration in months
+   */
+  tenure?: number | null;
+  verification_status?: ('PENDING' | 'VERIFIED' | 'FAILED' | 'SKIPPED') | null;
+  /**
+   * Administrator managing this member
+   */
+  assigned_admin_id?: (number | null) | Admin;
+  notes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Personal profile information for users
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_profiles".
+ */
+export interface UserProfile {
+  id: string;
+  /**
+   * Reference to users table
+   */
+  user_id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  middle_name?: string | null;
+  /**
+   * Required for identity verification and compliance
+   */
+  date_of_birth?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-locked-documents".
  */
@@ -262,16 +703,64 @@ export interface PayloadLockedDocument {
         value: number | Admin;
       } | null)
     | ({
-        relationTo: 'member';
-        value: number | Member;
+        relationTo: 'auditlog';
+        value: number | Auditlog;
+      } | null)
+    | ({
+        relationTo: 'user_billing_schedules';
+        value: string | UserBillingSchedule;
+      } | null)
+    | ({
+        relationTo: 'user_agreements';
+        value: string | UserAgreement;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'newsfeedpost';
+        value: number | Newsfeedpost;
+      } | null)
+    | ({
+        relationTo: 'user_payments';
+        value: string | UserPayment;
+      } | null)
+    | ({
+        relationTo: 'user_payment_methods';
+        value: string | UserPaymentMethod;
       } | null)
     | ({
         relationTo: 'queue';
         value: number | Queue;
       } | null)
     | ({
-        relationTo: 'newsfeedpost';
-        value: number | Newsfeedpost;
+        relationTo: 'membership_queue';
+        value: number | MembershipQueue;
+      } | null)
+    | ({
+        relationTo: 'user_subscriptions';
+        value: string | UserSubscription;
+      } | null)
+    | ({
+        relationTo: 'user_addresses';
+        value: string | UserAddress;
+      } | null)
+    | ({
+        relationTo: 'user_audit_logs';
+        value: number | UserAuditLog;
+      } | null)
+    | ({
+        relationTo: 'user_contacts';
+        value: string | UserContact;
+      } | null)
+    | ({
+        relationTo: 'user_memberships';
+        value: string | UserMembership;
+      } | null)
+    | ({
+        relationTo: 'user_profiles';
+        value: string | UserProfile;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -340,21 +829,121 @@ export interface AdminSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "member_select".
+ * via the `definition` "auditlog_select".
  */
-export interface MemberSelect<T extends boolean = true> {
-  name?: T;
-  email?: T;
-  phone?: T;
-  street_address?: T;
-  city?: T;
-  state?: T;
-  zip_code?: T;
-  join_date?: T;
-  status?: T;
-  tenure?: T;
+export interface AuditlogSelect<T extends boolean = true> {
   admin_i_d_id?: T;
+  entity_changed?: T;
+  entity_id?: T;
+  change_type?: T;
+  timestamp?: T;
+  change_details?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_billing_schedules_select".
+ */
+export interface UserBillingSchedulesSelect<T extends boolean = true> {
+  id?: T;
+  user_id?: T;
+  subscription_id?: T;
+  billing_cycle?: T;
+  next_billing_date?: T;
+  amount?: T;
+  currency?: T;
+  is_active?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_agreements_select".
+ */
+export interface UserAgreementsSelect<T extends boolean = true> {
+  id?: T;
+  user_id?: T;
+  agreement_type?: T;
+  version_number?: T;
+  agreed_at?: T;
+  document_url?: T;
+  is_active?: T;
+  ip_address?: T;
+  user_agent?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "users_select".
+ */
+export interface UsersSelect<T extends boolean = true> {
+  id?: T;
   auth_user_id?: T;
+  email?: T;
+  email_verified?: T;
+  status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "newsfeedpost_select".
+ */
+export interface NewsfeedpostSelect<T extends boolean = true> {
+  title?: T;
+  content?: T;
+  admin_i_d_id?: T;
+  publish_date?: T;
+  status?: T;
+  priority?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_payments_select".
+ */
+export interface UserPaymentsSelect<T extends boolean = true> {
+  id?: T;
+  user_id?: T;
+  subscription_id?: T;
+  payment_method_id?: T;
+  provider?: T;
+  provider_payment_id?: T;
+  provider_invoice_id?: T;
+  provider_charge_id?: T;
+  amount?: T;
+  currency?: T;
+  payment_type?: T;
+  payment_date?: T;
+  status?: T;
+  is_first_payment?: T;
+  failure_reason?: T;
+  receipt_url?: T;
+  metadata?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_payment_methods_select".
+ */
+export interface UserPaymentMethodsSelect<T extends boolean = true> {
+  id?: T;
+  user_id?: T;
+  provider?: T;
+  method_type?: T;
+  method_subtype?: T;
+  provider_payment_method_id?: T;
+  last_four?: T;
+  brand?: T;
+  expires_month?: T;
+  expires_year?: T;
+  is_default?: T;
+  is_active?: T;
+  metadata?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -378,15 +967,113 @@ export interface QueueSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "newsfeedpost_select".
+ * via the `definition` "membership_queue_select".
  */
-export interface NewsfeedpostSelect<T extends boolean = true> {
-  title?: T;
-  content?: T;
-  admin_i_d_id?: T;
-  publish_date?: T;
+export interface MembershipQueueSelect<T extends boolean = true> {
+  user_id?: T;
+  queue_position?: T;
+  joined_queue_at?: T;
+  is_eligible?: T;
+  total_months_subscribed?: T;
+  last_payment_date?: T;
+  lifetime_payment_total?: T;
+  has_received_payout?: T;
+  notes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_subscriptions_select".
+ */
+export interface UserSubscriptionsSelect<T extends boolean = true> {
+  id?: T;
+  user_id?: T;
+  provider?: T;
+  provider_subscription_id?: T;
+  provider_customer_id?: T;
   status?: T;
-  priority?: T;
+  current_period_start?: T;
+  current_period_end?: T;
+  cancel_at_period_end?: T;
+  canceled_at?: T;
+  trial_end?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_addresses_select".
+ */
+export interface UserAddressesSelect<T extends boolean = true> {
+  id?: T;
+  user_id?: T;
+  address_type?: T;
+  street_address?: T;
+  address_line_2?: T;
+  city?: T;
+  state?: T;
+  postal_code?: T;
+  country_code?: T;
+  is_primary?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_audit_logs_select".
+ */
+export interface UserAuditLogsSelect<T extends boolean = true> {
+  user_id?: T;
+  action?: T;
+  success?: T;
+  error_message?: T;
+  metadata?: T;
+  ip_address?: T;
+  user_agent?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_contacts_select".
+ */
+export interface UserContactsSelect<T extends boolean = true> {
+  id?: T;
+  user_id?: T;
+  contact_type?: T;
+  contact_value?: T;
+  is_primary?: T;
+  is_verified?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_memberships_select".
+ */
+export interface UserMembershipsSelect<T extends boolean = true> {
+  id?: T;
+  user_id?: T;
+  join_date?: T;
+  tenure?: T;
+  verification_status?: T;
+  assigned_admin_id?: T;
+  notes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "user_profiles_select".
+ */
+export interface UserProfilesSelect<T extends boolean = true> {
+  id?: T;
+  user_id?: T;
+  first_name?: T;
+  last_name?: T;
+  middle_name?: T;
+  date_of_birth?: T;
   updatedAt?: T;
   createdAt?: T;
 }
