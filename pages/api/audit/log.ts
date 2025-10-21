@@ -50,11 +50,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .from("system_audit_logs")
       .insert({
         user_id: user?.id || null,
-        user_type,
+        entity_type: resource_type || 'user_action',
+        entity_id: resource_id || null,
         action,
-        resource_type: resource_type || null,
-        resource_id: resource_id || null,
-        details: details || null,
+        success: true,
+        metadata: {
+          user_type,
+          details: details || null,
+        },
         ip_address: ip,
         user_agent: userAgent,
       });

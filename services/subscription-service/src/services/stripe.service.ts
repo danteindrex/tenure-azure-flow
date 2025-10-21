@@ -68,6 +68,8 @@ export class StripeService {
         customer: customer.id,
         mode: 'subscription',
         payment_method_types: ['card'],
+        // Apple Pay and Google Pay are automatically enabled with 'card' type
+        // They will show up based on user's device and browser capabilities
         line_items: [
           // Setup fee (one-time)
           {
@@ -135,17 +137,17 @@ export class StripeService {
       // Get subscription details from Stripe
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
-      // Update member status to Active
-      const updateMemberQuery = `
-        UPDATE member 
+      // Update user status to Active
+      const updateUserQuery = `
+        UPDATE users 
         SET status = 'Active', updated_at = NOW() 
         WHERE id = $1
       `;
-      await pool.query(updateMemberQuery, [userId]);
+      await pool.query(updateUserQuery, [userId]);
 
       // Create subscription record in database
       const subscriptionQuery = `
-        INSERT INTO financial_schedules (member_id, billing_cycle, next_billing_date, amount, currency, is_active, created_at)
+        INSERT INTO user_billing_schedules (user_id, billing_cycle, next_billing_date, amount, currency, is_active, created_at)
         VALUES ($1, 'MONTHLY', $2, $3, $4, true, NOW())
         RETURNING id
       `;
@@ -160,14 +162,14 @@ export class StripeService {
 
       // Store payment method info
       const paymentMethodQuery = `
-        INSERT INTO payment_methods (member_id, method_type, source_token, is_default, metadata, created_at)
+        INSERT INTO user_payment_methods (user_id, method_type, provider_payment_method_id, is_default, metadata, created_at)
         VALUES ($1, $2, $3, $4, $5, NOW())
         RETURNING id
       `;
       
       await pool.query(paymentMethodQuery, [
         userId,
-        'CREDIT_CARD',
+        'card',
         subscription.id,
         true,
         JSON.stringify({
@@ -188,13 +190,13 @@ export class StripeService {
       `;
       await pool.query(queueQuery, [userId]);
 
-      // Create member agreement records
+      // Create user agreement records
       const agreementQuery = `
-        INSERT INTO member_agreements (member_id, agreement_type, version_number, agreed_at_ts, created_at)
+        INSERT INTO user_agreements (user_id, agreement_type, version_number, agreed_at, created_at)
         VALUES 
-          ($1, 'TERMS_CONDITIONS', '1.0', NOW(), NOW()),
-          ($1, 'PAYMENT_AUTHORIZATION', '1.0', NOW(), NOW())
-        ON CONFLICT DO NOTHING
+          ($1, 'terms_of_service', '1.0', NOW(), NOW()),
+          ($1, 'payment_authorization', '1.0', NOW(), NOW())
+        ON CONFLICT (user_id, agreement_type, version_number) DO NOTHING
       `;
       await pool.query(agreementQuery, [userId]);
 

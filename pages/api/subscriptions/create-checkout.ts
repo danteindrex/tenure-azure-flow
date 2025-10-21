@@ -21,20 +21,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    // Get user ID from normalized database
-    const { data: userData, error: userDataError } = await supabaseAuth
+    // Get user ID from normalized database, create if doesn't exist
+    const userQuery = await supabaseAuth
       .from('users')
       .select('id')
       .eq('auth_user_id', user.id)
       .single();
 
-    if (userDataError || !userData) {
-      return res.status(404).json({ error: 'User record not found' });
+    let userData = userQuery.data;
+
+    // If user record doesn't exist, create it
+    if (userQuery.error || !userData) {
+      console.log('User record not found, creating new record for:', user.email);
+
+      const { data: newUserData, error: createError } = await supabaseAuth
+        .from('users')
+        .insert({
+          auth_user_id: user.id,
+          email: user.email,
+          email_verified: true,
+          status: 'Pending'
+        })
+        .select('id')
+        .single();
+
+      if (createError || !newUserData) {
+        console.error('Failed to create user record:', createError);
+        return res.status(500).json({ error: 'Failed to create user record' });
+      }
+
+      userData = newUserData;
     }
 
     // Call subscription service to create Stripe checkout session
     const subscriptionServiceUrl = process.env.SUBSCRIPTION_SERVICE_URL || 'http://localhost:3001';
-    
+
     const checkoutResponse = await fetch(`${subscriptionServiceUrl}/api/subscriptions/checkout`, {
       method: 'POST',
       headers: {
@@ -49,14 +70,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!checkoutResponse.ok) {
       const errorData = await checkoutResponse.json();
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Failed to create checkout session',
-        details: errorData.message 
+        details: errorData.message
       });
     }
 
     const checkoutData = await checkoutResponse.json();
-    
+
     return res.status(200).json({
       success: true,
       checkoutUrl: checkoutData.data?.url,
@@ -66,7 +87,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (err: unknown) {
     console.error('Checkout creation error:', err);
     const errorMessage = err instanceof Error ? err.message : 'Unexpected error';
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Internal server error',
       message: errorMessage
     });
