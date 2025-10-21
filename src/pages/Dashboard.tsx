@@ -48,7 +48,45 @@ const Dashboard = () => {
   // Load user data and dashboard statistics
   useEffect(() => {
     const loadDashboardData = async () => {
-      if (!user) return;
+      if (!user) {
+        // Show default data even without user
+        setDashboardStats({
+          totalRevenue: 0,
+          potentialWinners: 0,
+          daysUntilDraw: 45,
+          daysUntilPayment: 0,
+          paymentAmount: 300, // Joining fee for new users
+          fundReady: false,
+          timeReady: true, // Since we're past 12 months from 2024-01-01
+          payoutReady: false,
+          fundStatus: 'Need $100,000 to reach minimum payout threshold',
+          timeStatus: 'Time Requirement Met (12+ months since launch)',
+        });
+        
+        setActivityFeed([
+          {
+            title: "💰 Fund Building Progress",
+            message: "Current fund: $0. Need $100,000 more to reach minimum payout threshold.",
+            timestamp: "Live",
+            type: "info"
+          },
+          {
+            title: "⏰ Time Requirement Met",
+            message: "12+ months have passed since business launch (Jan 1, 2024). Time requirement satisfied.",
+            timestamp: "Active",
+            type: "success"
+          },
+          {
+            title: "🚀 Join the Fund",
+            message: "Complete your $300 joining fee to start contributing to the payout fund and secure your queue position.",
+            timestamp: "Available",
+            type: "warning"
+          }
+        ]);
+        
+        setLoading(false);
+        return;
+      }
       
       try {
         setLoading(true);
@@ -247,6 +285,35 @@ const Dashboard = () => {
         
       } catch (error) {
         console.error('Error loading dashboard data:', error);
+        
+        // Set default data even on error to show payout components
+        setDashboardStats({
+          totalRevenue: 0,
+          potentialWinners: 0,
+          daysUntilDraw: 45,
+          daysUntilPayment: 0,
+          paymentAmount: 25,
+          fundReady: false,
+          timeReady: true, // Since we're past 12 months from 2024-01-01
+          payoutReady: false,
+          fundStatus: 'Need $100,000 to reach minimum payout threshold',
+          timeStatus: 'Time Requirement Met (12+ months since launch)',
+        });
+        
+        setActivityFeed([
+          {
+            title: "💰 Fund Building Progress",
+            message: "Current fund: $0. Need $100,000 more to reach minimum payout threshold.",
+            timestamp: "Live",
+            type: "info"
+          },
+          {
+            title: "⏰ Time Requirement Met",
+            message: "12+ months have passed since business launch. Time requirement satisfied.",
+            timestamp: "Active",
+            type: "success"
+          }
+        ]);
       } finally {
         setLoading(false);
       }

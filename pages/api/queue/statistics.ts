@@ -29,15 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Forward request to queue microservice
     const queueServiceUrl = process.env.QUEUE_SERVICE_URL || 'http://localhost:3001';
-    const { search, limit, offset } = req.query;
-    
-    const searchParams = new URLSearchParams();
-    if (search) searchParams.append('search', search as string);
-    if (limit) searchParams.append('limit', limit as string);
-    if (offset) searchParams.append('offset', offset as string);
-
-    const queryString = searchParams.toString();
-    const microserviceUrl = `${queueServiceUrl}/api/queue${queryString ? `?${queryString}` : ''}`;
+    const microserviceUrl = `${queueServiceUrl}/api/queue/statistics`;
 
     const response = await fetch(microserviceUrl, {
       headers: {
@@ -56,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json(data);
 
   } catch (error) {
-    console.error('Queue API error:', error);
+    console.error('Queue statistics API error:', error);
     
     // Fallback to direct database access on any error
     try {
@@ -72,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 // Fallback function for direct database access
 async function fallbackToDirectAccess(supabase: any, res: NextApiResponse) {
   try {
-    // Fetch real queue data from database
+    // Fetch queue data from database
     const { data: queueData, error: queueError } = await supabase
       .from('queue')
       .select('*')
@@ -81,26 +73,6 @@ async function fallbackToDirectAccess(supabase: any, res: NextApiResponse) {
     if (queueError) {
       throw queueError;
     }
-
-    // Fetch member data to enrich queue data
-    const memberIds = queueData?.map(q => q.memberid) || [];
-    const { data: members } = await supabase
-      .from('member')
-      .select('id, name, email, status, join_date')
-      .in('id', memberIds);
-
-    // Enrich queue data with member information
-    const enrichedQueueData = queueData?.map(item => {
-      const member = members?.find(m => m.id === item.memberid);
-      return {
-        ...item,
-        member: member || null,
-        member_name: member?.name || `Member ${item.memberid}`,
-        member_email: member?.email || '',
-        member_status: member?.status || 'Unknown',
-        member_join_date: member?.join_date || ''
-      };
-    }) || [];
 
     // Calculate total revenue from payments
     const { data: payments, error: paymentsError } = await supabase
@@ -114,27 +86,24 @@ async function fallbackToDirectAccess(supabase: any, res: NextApiResponse) {
     }
 
     // Calculate statistics
-    const activeMembers = enrichedQueueData?.filter(member => member.subscription_active).length || 0;
-    const eligibleMembers = enrichedQueueData?.filter(member => member.is_eligible).length || 0;
-    const totalMembers = enrichedQueueData?.length || 0;
+    const activeMembers = queueData?.filter(member => member.subscription_active).length || 0;
+    const eligibleMembers = queueData?.filter(member => member.is_eligible).length || 0;
+    const totalMembers = queueData?.length || 0;
 
     return res.status(200).json({
       success: true,
       data: {
-        queue: enrichedQueueData || [],
-        statistics: {
-          totalMembers,
-          activeMembers,
-          eligibleMembers,
-          totalRevenue,
-          potentialWinners: Math.min(2, eligibleMembers),
-          payoutThreshold: 500000,
-          receivedPayouts: enrichedQueueData?.filter(m => m.has_received_payout).length || 0
-        },
+        totalMembers,
+        activeMembers,
+        eligibleMembers,
+        totalRevenue,
+        potentialWinners: Math.min(2, eligibleMembers),
+        payoutThreshold: 500000,
+        receivedPayouts: queueData?.filter(m => m.has_received_payout).length || 0
       },
     });
   } catch (error) {
-    console.error('Fallback database access failed:', error);
-    return res.status(500).json({ error: 'Failed to fetch queue data' });
+    console.error('Fallback statistics calculation failed:', error);
+    return res.status(500).json({ error: 'Failed to fetch queue statistics' });
   }
 }

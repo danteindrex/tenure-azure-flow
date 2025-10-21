@@ -58,7 +58,7 @@ const CompleteProfile = () => {
   // Log page visit and pre-fill from Google data
   useEffect(() => {
     logPageVisit('/signup/complete-profile');
-    
+
     if (user) {
       // Parse Google user data
       const fullName = user.user_metadata?.full_name || user.user_metadata?.name || "";
@@ -83,7 +83,7 @@ const CompleteProfile = () => {
 
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.firstName.trim() || !formData.lastName.trim()) {
       toast.error("First and last name are required");
       return;
@@ -100,7 +100,7 @@ const CompleteProfile = () => {
       toast.error("All required address fields must be completed");
       return;
     }
-    
+
     setStep(2);
   };
 
@@ -109,10 +109,10 @@ const CompleteProfile = () => {
       toast.error("Please agree to Terms & Conditions and payment authorization");
       return;
     }
-    
+
     try {
       setLoading(true);
-      
+
       if (!user) {
         toast.error("Authentication required");
         return;
@@ -143,7 +143,7 @@ const CompleteProfile = () => {
         try {
           const data = await resp.json();
           if (data?.error) msg = data.error;
-        } catch {}
+        } catch { }
         await logError(`Profile creation failed: ${msg}`, user.id, { email: formData.email.trim() });
         toast.error(msg);
         return;
@@ -160,13 +160,13 @@ const CompleteProfile = () => {
         try {
           const data = await checkoutResp.json();
           if (data?.error) msg = data.error;
-        } catch {}
+        } catch { }
         toast.error(msg);
         return;
       }
 
       const checkoutData = await checkoutResp.json();
-      
+
       if (checkoutData.success && checkoutData.checkoutUrl) {
         toast.success("Profile completed! Redirecting to payment...");
         // Redirect to Stripe checkout
@@ -174,10 +174,10 @@ const CompleteProfile = () => {
       } else {
         toast.error("Failed to initialize payment. Please try again.");
       }
-      
+
     } catch (err: any) {
-      await logError(`Profile completion error: ${err?.message}`, user?.id, { 
-        email: formData.email.trim() 
+      await logError(`Profile completion error: ${err?.message}`, user?.id, {
+        email: formData.email.trim()
       });
       toast.error(err?.message || "Unexpected error");
     } finally {
@@ -205,7 +205,7 @@ const CompleteProfile = () => {
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
       {/* Background Glow Effect */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
-      
+
       <Card className="glass-card w-full max-w-lg p-8 hover-float relative z-10">
         {/* Logo */}
         <div className="flex justify-center mb-6">
@@ -220,19 +220,17 @@ const CompleteProfile = () => {
           {[1, 2].map((i) => (
             <div key={i} className="flex items-center">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ${
-                  step >= i
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ${step >= i
                     ? "bg-accent text-background"
                     : "bg-card border border-border text-muted-foreground"
-                }`}
+                  }`}
               >
                 {step > i ? <Check className="w-5 h-5" /> : i}
               </div>
               {i < 2 && (
                 <div
-                  className={`w-12 h-1 mx-1 transition-all duration-300 ${
-                    step > i ? "bg-accent" : "bg-border"
-                  }`}
+                  className={`w-12 h-1 mx-1 transition-all duration-300 ${step > i ? "bg-accent" : "bg-border"
+                    }`}
                 />
               )}
             </div>
@@ -483,9 +481,9 @@ const CompleteProfile = () => {
                 >
                   Back
                 </Button>
-                <Button 
-                  onClick={handlePaymentStep} 
-                  className="w-full bg-primary hover:glow-blue-lg" 
+                <Button
+                  onClick={handlePaymentStep}
+                  className="w-full bg-primary hover:glow-blue-lg"
                   size="lg"
                   disabled={!formData.agreeToTerms || loading}
                 >

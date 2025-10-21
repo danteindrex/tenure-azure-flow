@@ -11,7 +11,6 @@ import {
   Clock,
   TrendingUp,
   Award,
-  Target,
   Calendar,
   AlertCircle,
   CheckCircle,
@@ -19,8 +18,9 @@ import {
   DollarSign,
   RefreshCw
 } from "lucide-react";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { useUser } from "@supabase/auth-helpers-react";
 import { toast } from "sonner";
+import { useQueueService } from "@/lib/queueService";
 
 interface QueueMember {
   id: number;
@@ -54,64 +54,39 @@ const Queue = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [queueData, setQueueData] = useState<QueueMember[]>([]);
-  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [statistics, setStatistics] = useState({
+    totalMembers: 0,
+    activeMembers: 0,
+    eligibleMembers: 0,
+    totalRevenue: 0,
+    potentialWinners: 0,
+    payoutThreshold: 500000,
+    receivedPayouts: 0
+  });
   const [refreshing, setRefreshing] = useState(false);
 
-  const supabase = useSupabaseClient();
+  const queueService = useQueueService();
   const user = useUser();
 
-  // Load queue data from database
+  // Load queue data from microservice
   const loadQueueData = async () => {
+    if (!user) {
+      console.log('No user authenticated, skipping queue data load');
+      return;
+    }
+
     try {
       setLoading(true);
       
-      // Fetch queue data first
-      const { data: queueMembers, error: queueError } = await supabase
-        .from('queue')
-        .select('*')
-        .order('queue_position', { ascending: true });
+      const response = await queueService.getQueueData({
+        search: searchTerm || undefined
+      });
 
-      if (queueError) {
-        console.error('Error fetching queue data:', queueError);
-        toast.error('Failed to load queue data');
-        return;
-      }
-
-      // Fetch member data separately and join manually
-      const memberIds = queueMembers?.map(q => q.memberid) || [];
-      const { data: members, error: memberError } = await supabase
-        .from('member')
-        .select('id, name, email, status, join_date')
-        .in('id', memberIds);
-
-      if (memberError) {
-        console.error('Error fetching member data:', memberError);
-      }
-
-      // Transform data to include member details
-      const transformedData = queueMembers?.map(item => {
-        const member = members?.find(m => m.id === item.memberid);
-        return {
-          ...item,
-          member: member || null,
-          member_name: member?.name || `Member ${item.memberid}`,
-          member_email: member?.email || '',
-          member_status: member?.status || 'Unknown',
-          member_join_date: member?.join_date || ''
-        };
-      }) || [];
-
-      setQueueData(transformedData);
-
-      // Calculate total revenue from payments
-      const { data: payments, error: paymentsError } = await supabase
-        .from('payment')
-        .select('amount')
-        .eq('status', 'Completed');
-
-      if (!paymentsError && payments) {
-        const total = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
-        setTotalRevenue(total);
+      if (response.success) {
+        setQueueData(response.data.queue);
+        setStatistics(response.data.statistics);
+      } else {
+        throw new Error(response.error || 'Failed to load queue data');
       }
 
     } catch (error) {
@@ -131,19 +106,20 @@ const Queue = () => {
   };
 
   useEffect(() => {
-    loadQueueData();
-  }, [supabase]);
+    if (user) {
+      loadQueueData();
+    }
+  }, [user, queueService]);
 
   // Find current user in queue
   const currentUserMember = queueData.find(member => 
     member.member?.id && user?.id && member.member.id.toString() === user.id
   );
 
-  // Calculate statistics from real data
-  const activeMembers = queueData.filter(member => member.subscription_active).length;
-  const eligibleMembers = queueData.filter(member => member.is_eligible).length;
+  // Use statistics from microservice
+  const { activeMembers, eligibleMembers, totalRevenue, potentialWinners } = statistics;
   const nextPayoutDate = "March 15, 2025"; // This could be calculated based on business rules
-  const winnersCount = Math.min(2, eligibleMembers); // Top 2 eligible members
+  const winnersCount = potentialWinners;
   const potentialPayoutPerWinner = totalRevenue > 0 ? totalRevenue / Math.max(winnersCount, 1) : 0;
 
   // Filter queue data based on search
@@ -292,7 +268,7 @@ const Queue = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Total Members</p>
-              <p className="text-2xl font-bold">{queueData.length}</p>
+              <p className="text-2xl font-bold">{statistics.totalMembers}</p>
             </div>
             <Users className="w-8 h-8 text-accent" />
           </div>
@@ -344,13 +320,13 @@ const Queue = () => {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Fund Progress</span>
-            <span className="text-sm font-medium">{formatCurrency(totalRevenue)} / $500,000</span>
+            <span className="text-sm font-medium">{formatCurrency(totalRevenue)} / {formatCurrency(statistics.payoutThreshold)}</span>
           </div>
-          <Progress value={Math.min((totalRevenue / 500000) * 100, 100)} className="h-2" />
+          <Progress value={Math.min((totalRevenue / statistics.payoutThreshold) * 100, 100)} className="h-2" />
           <p className="text-xs text-muted-foreground">
-            {totalRevenue >= 500000 
+            {totalRevenue >= statistics.payoutThreshold 
               ? 'Payout threshold reached!' 
-              : `Need ${formatCurrency(500000 - totalRevenue)} more for next payout`
+              : `Need ${formatCurrency(statistics.payoutThreshold - totalRevenue)} more for next payout`
             }
           </p>
         </div>
@@ -501,7 +477,7 @@ const Queue = () => {
               </div>
               <div>
                 <p className="text-muted-foreground">Received Payouts</p>
-                <p className="font-semibold">{queueData.filter(m => m.has_received_payout).length} members</p>
+                <p className="font-semibold">{statistics.receivedPayouts} members</p>
               </div>
             </div>
           </div>
