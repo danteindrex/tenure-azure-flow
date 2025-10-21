@@ -20,9 +20,9 @@ class QueueService {
   // Get all queue members with enriched data
   async getAllQueueMembers() {
     try {
-      // Fetch queue data first
+      // Fetch queue data first using normalized schema
       const { data: queueMembers, error: queueError } = await this.supabase
-        .from('queue')
+        .from('membership_queue')
         .select('*')
         .order('queue_position', { ascending: true });
 
@@ -30,32 +30,32 @@ class QueueService {
         throw new Error(`Failed to fetch queue data: ${queueError.message}`);
       }
 
-      // Fetch member data separately and join manually
-      const memberIds = queueMembers?.map(q => q.memberid) || [];
+      // Fetch user data separately and join manually
+      const userIds = queueMembers?.map(q => q.user_id) || [];
       
-      if (memberIds.length === 0) {
+      if (userIds.length === 0) {
         return [];
       }
 
-      const { data: members, error: memberError } = await this.supabase
-        .from('member')
-        .select('id, name, email, status, join_date')
-        .in('id', memberIds);
+      const { data: users, error: userError } = await this.supabase
+        .from('users')
+        .select('id, email, status, created_at')
+        .in('id', userIds);
 
-      if (memberError) {
-        console.warn('Error fetching member data:', memberError);
+      if (userError) {
+        console.warn('Error fetching user data:', userError);
       }
 
-      // Transform data to include member details
+      // Transform data to include user details
       return queueMembers?.map(item => {
-        const member = members?.find(m => m.id === item.memberid);
+        const user = users?.find(u => u.id === item.user_id);
         return {
           ...item,
-          member: member || null,
-          member_name: member?.name || `Member ${item.memberid}`,
-          member_email: member?.email || '',
-          member_status: member?.status || 'Unknown',
-          member_join_date: member?.join_date || ''
+          user: user || null,
+          user_name: user?.email ? user.email.split('@')[0] : `User ${item.user_id.slice(0, 8)}`,
+          user_email: user?.email || '',
+          user_status: user?.status || 'Unknown',
+          user_join_date: user?.created_at || ''
         };
       }) || [];
 
@@ -68,20 +68,20 @@ class QueueService {
   // Get queue statistics
   async getQueueStatistics() {
     try {
-      // Get queue data for statistics
+      // Get queue data for statistics using normalized schema
       const { data: queueData, error: queueError } = await this.supabase
-        .from('queue')
+        .from('membership_queue')
         .select('subscription_active, is_eligible, lifetime_payment_total');
 
       if (queueError) {
         throw new Error(`Failed to fetch queue statistics: ${queueError.message}`);
       }
 
-      // Calculate total revenue from payments
+      // Calculate total revenue from payments using normalized schema
       const { data: payments, error: paymentsError } = await this.supabase
-        .from('payment')
+        .from('user_payments')
         .select('amount')
-        .eq('status', 'Completed');
+        .eq('status', 'succeeded');
 
       let totalRevenue = 0;
       if (!paymentsError && payments) {

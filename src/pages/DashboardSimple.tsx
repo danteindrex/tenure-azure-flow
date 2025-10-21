@@ -34,84 +34,81 @@ const DashboardSimple = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        // Total revenue from completed payments
+        // Total revenue from completed payments using normalized schema
         const { data: payments, error: paymentsError } = await supabase
-          .from('payment')
-          .select('amount, payment_date, member_id, status')
-          .eq('status', 'Completed');
+          .from('user_payments')
+          .select('amount, payment_date, user_id, status')
+          .eq('status', 'succeeded');
         if (!paymentsError && payments) {
           const sum = payments.reduce((s, p: any) => s + (p.amount || 0), 0);
           setTotalRevenue(sum);
         }
 
-        // Queue position (best effort): try to map current user -> member -> queue
-        let currentMemberId: number | null = null;
+        // Queue position: try to map current user -> membership_queue
+        let currentUserId: string | null = null;
         if (user?.id) {
-          // Find member by auth_user_id
-          const { data: member, error: memberError } = await supabase
-            .from('member')
-            .select('member_id')
+          // Find user by auth_user_id in normalized users table
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('id')
             .eq('auth_user_id', user.id)
             .maybeSingle();
-          if (!memberError && member?.member_id) {
-            currentMemberId = member.member_id as number;
+          if (!userError && userData?.id) {
+            currentUserId = userData.id;
           }
         }
 
-        // Fetch queue ordered by position (BR-5, BR-10: pre-sorted; deeper continuity ordering requires richer data)
+        // Fetch queue ordered by position using normalized schema
         const { data: queue, error: queueError } = await supabase
-          .from('queue')
-          .select('memberid, queue_position, total_months_subscribed, subscription_active')
+          .from('membership_queue')
+          .select('user_id, queue_position, total_months_subscribed, subscription_active')
           .order('queue_position', { ascending: true });
         if (!queueError && queue) {
           // Determine current user's position or fallback to first
           let pos: number | null = null;
-          if (currentMemberId) {
-            const mine = queue.find((q: any) => q.memberid === currentMemberId);
+          if (currentUserId) {
+            const mine = queue.find((q: any) => q.user_id === currentUserId);
             if (mine) pos = mine.queue_position;
           }
           setQueuePosition(pos ?? (queue[0]?.queue_position ?? null));
 
-          // Build top queue preview (names are best-effort placeholders unless member join is available)
-          const preview = queue.slice(0, 5).map((q: any, idx: number) => ({
-            rank: q.queue_position,
-            name: `Member ${q.memberid}`,
-            tenureMonths: q.total_months_subscribed ?? 0,
-            status: q.subscription_active ? 'Active' : 'Inactive',
-            isCurrentUser: currentMemberId ? q.memberid === currentMemberId : false,
-          })).sort((a, b) => a.rank - b.rank);
+          // Build top queue preview with user names
+          const userIds = queue.slice(0, 5).map((q: any) => q.user_id);
+          const { data: users } = await supabase
+            .from('users')
+            .select('id, email')
+            .in('id', userIds);
+
+          const preview = queue.slice(0, 5).map((q: any) => {
+            const userInfo = users?.find((u: any) => u.id === q.user_id);
+            return {
+              rank: q.queue_position,
+              name: userInfo?.email ? userInfo.email.split('@')[0] : `User ${q.user_id.slice(0, 8)}`,
+              tenureMonths: q.total_months_subscribed ?? 0,
+              status: q.subscription_active ? 'Active' : 'Inactive',
+              isCurrentUser: currentUserId ? q.user_id === currentUserId : false,
+            };
+          }).sort((a, b) => a.rank - b.rank);
           setTopQueue(preview);
         }
 
         // Payment amount and days until payment for current user (BR-2 monthly cycle best-effort)
-        if (user?.id) {
-          let memberIdForPayments: number | null = null;
-          const { data: member2 } = await supabase
-            .from('member')
-            .select('member_id')
-            .eq('auth_user_id', user.id)
-            .maybeSingle();
-          if (member2?.member_id) memberIdForPayments = member2.member_id as number;
-
-          if (memberIdForPayments) {
-            const { data: myPayments } = await supabase
-              .from('payment')
-              .select('amount, payment_date, status')
-              .eq('member_id', memberIdForPayments)
-              .order('payment_date', { ascending: false })
-              .limit(1);
-            if (myPayments && myPayments.length > 0) {
-              setPaymentAmount(myPayments[0].amount || 0);
-              // Assume monthly cycle; compute days until 30 days after last payment
-              const last = new Date(myPayments[0].payment_date || new Date());
-              const next = new Date(last);
-              next.setDate(last.getDate() + 30);
-              const diff = Math.ceil((next.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-              setDaysUntilPayment(Math.max(diff, 0));
-            } else {
-              setPaymentAmount(0);
-              setDaysUntilPayment(0);
-            }
+        if (user?.id && currentUserId) {
+          const { data: myPayments } = await supabase
+            .from('user_payments')
+            .select('amount, payment_date, status')
+            .eq('user_id', currentUserId)
+            .eq('status', 'succeeded')
+            .order('payment_date', { ascending: false })
+            .limit(1);
+          if (myPayments && myPayments.length > 0) {
+            setPaymentAmount(myPayments[0].amount || 0);
+            // Assume monthly cycle; compute days until 30 days after last payment
+            const last = new Date(myPayments[0].payment_date || new Date());
+            const next = new Date(last);
+            next.setDate(last.getDate() + 30);
+            const diff = Math.ceil((next.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            setDaysUntilPayment(Math.max(diff, 0));
           } else {
             setPaymentAmount(0);
             setDaysUntilPayment(0);

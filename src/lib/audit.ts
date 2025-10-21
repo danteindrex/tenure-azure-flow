@@ -229,7 +229,7 @@ class AuditLogger {
       }
       
       let query = this.supabase
-        .from('user_audit_logs')
+        .from('system_audit_logs')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -281,7 +281,7 @@ class AuditLogger {
       }
       
       let query = this.supabase
-        .from('user_audit_logs')
+        .from('system_audit_logs')
         .select('action, user_type, created_at');
 
       if (startDate) {

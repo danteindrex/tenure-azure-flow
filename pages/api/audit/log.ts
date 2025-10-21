@@ -47,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Insert audit log
     const { error } = await admin
-      .from("user_audit_logs")
+      .from("system_audit_logs")
       .insert({
         user_id: user?.id || null,
         user_type,

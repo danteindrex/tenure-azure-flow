@@ -9,7 +9,7 @@ class AuthMiddleware {
   initializeSupabase() {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
+
     if (supabaseUrl && supabaseKey) {
       this.supabase = createClient(supabaseUrl, supabaseKey);
     }
@@ -19,7 +19,7 @@ class AuthMiddleware {
   async verifyToken(req, res, next) {
     try {
       const authHeader = req.headers.authorization;
-      
+
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Authorization token required' });
       }
@@ -81,13 +81,13 @@ class AuthMiddleware {
   async optionalAuth(req, res, next) {
     try {
       const authHeader = req.headers.authorization;
-      
+
       if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.substring(7);
-        
+
         if (this.supabase) {
           const { data: { user }, error } = await this.supabase.auth.getUser(token);
-          
+
           if (!error && user) {
             req.user = user;
           }
