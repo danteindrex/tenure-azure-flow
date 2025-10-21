@@ -69,7 +69,6 @@ const DashboardSimple = () => {
         if (!queueError && queue) {
           // Determine current user's position or fallback to first
           let pos: number | null = null;
-          // First try normalized mapping (users.id)
           if (currentUserId) {
             setCurrentUserIdState(currentUserId);
             const mine = queue.find((q: any) => q.user_id === currentUserId);
@@ -87,23 +86,6 @@ const DashboardSimple = () => {
               setCurrentUserEntry(null);
             }
           }
-
-          // If normalized mapping didn't find the user, try matching auth user id directly
-          if (pos === null && user?.id) {
-            const mineByAuth = queue.find((q: any) => q.user_id === user.id);
-            if (mineByAuth) {
-              pos = mineByAuth.queue_position;
-              setCurrentUserIdState(user.id);
-              setCurrentUserEntry({
-                rank: mineByAuth.queue_position,
-                name: `You`,
-                tenureMonths: mineByAuth.total_months_subscribed ?? 0,
-                status: mineByAuth.subscription_active ? 'Active' : 'Inactive',
-                isCurrentUser: true
-              });
-            }
-          }
-
           setQueuePosition(pos ?? (queue[0]?.queue_position ?? null));
 
           // Build top queue preview with user names
@@ -115,13 +97,12 @@ const DashboardSimple = () => {
 
           const preview = queue.slice(0, 5).map((q: any) => {
             const userInfo = users?.find((u: any) => u.id === q.user_id);
-            const isCurrent = (currentUserId && q.user_id === currentUserId) || (user?.id && q.user_id === user.id);
             return {
               rank: q.queue_position,
               name: userInfo?.email ? userInfo.email.split('@')[0] : `User ${q.user_id.slice(0, 8)}`,
               tenureMonths: q.total_months_subscribed ?? 0,
               status: q.subscription_active ? 'Active' : 'Inactive',
-              isCurrentUser: isCurrent,
+              isCurrentUser: currentUserId ? q.user_id === currentUserId : false,
             };
           }).sort((a, b) => a.rank - b.rank);
           setTopQueue(preview);
@@ -307,45 +288,7 @@ const DashboardSimple = () => {
         </div>
       </Card>
       
-      {/* Highlight current user's position if not in top 3 */}
-      {/* Always show the Your Position panel (prominent) */}
-      {currentUserEntry ? (
-        <Card className="p-6">
-          <h4 className="text-sm text-muted-foreground mb-2">Your Position</h4>
-          <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-indigo-50 to-indigo-25 border-2 border-indigo-300 shadow-lg">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full flex items-center justify-center font-bold text-white bg-indigo-600">
-                {currentUserEntry.rank}
-              </div>
-              <div>
-                <p className="font-semibold text-lg">{currentUserEntry.name}</p>
-                <p className="text-sm text-muted-foreground">{currentUserEntry.tenureMonths} months</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-medium">{currentUserEntry.status}</p>
-              <p className="text-xs text-indigo-600">Your current position</p>
-            </div>
-          </div>
-        </Card>
-      ) : (
-        <Card className="p-6">
-          <h4 className="text-sm text-muted-foreground mb-2">Your Position</h4>
-          <div className="flex items-center justify-between p-4 rounded-lg bg-background/50 border border-border">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold bg-gray-200 text-gray-700">—</div>
-              <div>
-                <p className="font-semibold">Not in queue</p>
-                <p className="text-sm text-muted-foreground">Join to get a position</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-medium">—</p>
-              <p className="text-xs text-muted-foreground">—</p>
-            </div>
-          </div>
-        </Card>
-      )}
+      {/* Your Position is shown inline in the Queue Status list below */}
       {/* Queue Status */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -353,6 +296,7 @@ const DashboardSimple = () => {
           Your Queue Status
         </h3>
         <div className="space-y-3">
+          {/* Show top 3 positions */}
           {topQueue.slice(0, 3).map((member) => (
             <div
               key={member.rank}
@@ -379,6 +323,32 @@ const DashboardSimple = () => {
               </div>
             </div>
           ))}
+          
+          {/* Show ellipsis if current user is not in top 3 */}
+          {currentUserEntry && !topQueue.slice(0, 3).some(member => member.isCurrentUser) && (
+            <>
+              <div className="text-center py-2">
+                <div className="text-muted-foreground">•••</div>
+              </div>
+              <div
+                className="flex items-center justify-between p-3 rounded-lg transition-shadow bg-indigo-50 border-2 border-indigo-200 shadow-md"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold bg-blue-100 text-blue-800">
+                    {currentUserEntry.rank}
+                  </div>
+                  <div>
+                    <p className="font-medium">{currentUserEntry.name}</p>
+                    <p className="text-sm text-muted-foreground">{currentUserEntry.tenureMonths} months</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium">{currentUserEntry.status}</p>
+                  <p className="text-xs text-indigo-600 font-semibold">You are here</p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </Card>
 
