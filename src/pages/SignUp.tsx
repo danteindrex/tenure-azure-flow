@@ -34,6 +34,7 @@ const SignUp = () => {
     agreeToTerms: false,
   });
   const [loading, setLoading] = useState(false);
+  const [dateValidation, setDateValidation] = useState<{ isValid: boolean; message: string } | null>(null);
 
   // Log page visit
   useEffect(() => {
@@ -96,14 +97,60 @@ const SignUp = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Age validation helper function
+  const validateAge = (dateOfBirth: string): { isValid: boolean; message: string } => {
+    if (!dateOfBirth) {
+      return { isValid: false, message: "Date of birth is required" };
+    }
+
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+    
+    // Check if the date is in the future
+    if (birthDate > today) {
+      return { isValid: false, message: "Date of birth cannot be in the future" };
+    }
+
+    const age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    const dayDiff = today.getDate() - birthDate.getDate();
+    
+    // Calculate exact age considering month and day
+    const exactAge = age - (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0) ? 1 : 0);
+    
+    if (exactAge < 18) {
+      return { 
+        isValid: false, 
+        message: `You are ${exactAge} years old. You must be at least 18 years old to create an account.` 
+      };
+    }
+
+    return { isValid: true, message: "" };
+  };
+
+  // Handle date of birth change with validation
+  const handleDateOfBirthChange = (value: string) => {
+    handleInputChange("dateOfBirth", value);
+    
+    // Validate and set validation state
+    if (value) {
+      const validation = validateAge(value);
+      setDateValidation(validation);
+    } else {
+      setDateValidation(null);
+    }
+  };
+
   const handleStepOne = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.firstName.trim() || !formData.lastName.trim()) {
       toast.error("First and last name are required");
       return;
     }
-    if (!formData.dateOfBirth) {
-      toast.error("Date of birth is required");
+    // Validate age
+    const ageValidation = validateAge(formData.dateOfBirth);
+    if (!ageValidation.isValid) {
+      toast.error(ageValidation.message);
       return;
     }
     if (formData.password.length < 6) {
@@ -274,7 +321,7 @@ const SignUp = () => {
         password: formData.password,
         options: {
           data: {
-            full_name: formData.fullName,
+            full_name: `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim(),
             phone: `${formData.phoneCountryCode}${formData.phoneNumber}`,
             street_address: formData.streetAddress,
             city: formData.city,
@@ -306,7 +353,7 @@ const SignUp = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email,
-            full_name: formData.fullName,
+            full_name: `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim(),
             phone: `${formData.phoneCountryCode}${formData.phoneNumber}`,
             street_address: formData.streetAddress,
             city: formData.city,
@@ -481,10 +528,36 @@ const SignUp = () => {
                   id="dateOfBirth"
                   type="date"
                   value={formData.dateOfBirth}
-                  onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
-                  className="bg-background/50 border-border focus:border-accent transition-colors"
+                  onChange={(e) => handleDateOfBirthChange(e.target.value)}
+                  className={`bg-background/50 border-border focus:border-accent transition-colors ${
+                    dateValidation && !dateValidation.isValid 
+                      ? 'border-red-500 focus:border-red-500' 
+                      : dateValidation && dateValidation.isValid 
+                        ? 'border-green-500 focus:border-green-500' 
+                        : ''
+                  }`}
                   required
+                  max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
                 />
+                {dateValidation && !dateValidation.isValid ? (
+                  <p className="text-xs text-red-500 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {dateValidation.message}
+                  </p>
+                ) : dateValidation && dateValidation.isValid ? (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Age verified - you are eligible to create an account
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    You must be at least 18 years old to create an account
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">

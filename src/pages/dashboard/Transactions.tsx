@@ -17,12 +17,13 @@ import {
   CheckCircle,
   XCircle
 } from "lucide-react";
+ 
 
 const Transactions = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
-
+ 
   const transactions = [
     {
       id: "TXN-001",

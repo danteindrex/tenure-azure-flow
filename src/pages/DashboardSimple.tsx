@@ -1,36 +1,171 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Crown, Calendar, DollarSign, Users, Clock, TrendingUp, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
 
 const DashboardSimple = () => {
-  // Static data instead of animated counters
+  const supabase = useSupabaseClient();
+  const user = useUser();
+
+  const [totalRevenue, setTotalRevenue] = useState<number>(0);
+  const [queuePosition, setQueuePosition] = useState<number | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [daysUntilPayment, setDaysUntilPayment] = useState<number>(0);
+  const [daysUntilDraw, setDaysUntilDraw] = useState<number>(0);
+  const [topQueue, setTopQueue] = useState<Array<{ rank: number; name: string; tenureMonths: number; status: string; isCurrentUser?: boolean }>>([]);
+  const BUSINESS_LAUNCH_DATE = process.env.NEXT_PUBLIC_BUSINESS_LAUNCH_DATE || ""; // ISO string fallback
+  const PRIZE_PER_WINNER = 100000; // BR-4
+
+  // Compute next draw as days until the 15th of next month
+  const computeDaysUntilNextDraw = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const target = new Date(year, month, 15);
+    if (now > target) {
+      target.setMonth(month + 1);
+    }
+    const diffDays = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(diffDays, 0);
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        // Total revenue from completed payments
+        const { data: payments, error: paymentsError } = await supabase
+          .from('payment')
+          .select('amount, payment_date, member_id, status')
+          .eq('status', 'Completed');
+        if (!paymentsError && payments) {
+          const sum = payments.reduce((s, p: any) => s + (p.amount || 0), 0);
+          setTotalRevenue(sum);
+        }
+
+        // Queue position (best effort): try to map current user -> member -> queue
+        let currentMemberId: number | null = null;
+        if (user?.id) {
+          // Find member by auth_user_id
+          const { data: member, error: memberError } = await supabase
+            .from('member')
+            .select('member_id')
+            .eq('auth_user_id', user.id)
+            .maybeSingle();
+          if (!memberError && member?.member_id) {
+            currentMemberId = member.member_id as number;
+          }
+        }
+
+        // Fetch queue ordered by position (BR-5, BR-10: pre-sorted; deeper continuity ordering requires richer data)
+        const { data: queue, error: queueError } = await supabase
+          .from('queue')
+          .select('memberid, queue_position, total_months_subscribed, subscription_active')
+          .order('queue_position', { ascending: true });
+        if (!queueError && queue) {
+          // Determine current user's position or fallback to first
+          let pos: number | null = null;
+          if (currentMemberId) {
+            const mine = queue.find((q: any) => q.memberid === currentMemberId);
+            if (mine) pos = mine.queue_position;
+          }
+          setQueuePosition(pos ?? (queue[0]?.queue_position ?? null));
+
+          // Build top queue preview (names are best-effort placeholders unless member join is available)
+          const preview = queue.slice(0, 5).map((q: any, idx: number) => ({
+            rank: q.queue_position,
+            name: `Member ${q.memberid}`,
+            tenureMonths: q.total_months_subscribed ?? 0,
+            status: q.subscription_active ? 'Active' : 'Inactive',
+            isCurrentUser: currentMemberId ? q.memberid === currentMemberId : false,
+          })).sort((a, b) => a.rank - b.rank);
+          setTopQueue(preview);
+        }
+
+        // Payment amount and days until payment for current user (BR-2 monthly cycle best-effort)
+        if (user?.id) {
+          let memberIdForPayments: number | null = null;
+          const { data: member2 } = await supabase
+            .from('member')
+            .select('member_id')
+            .eq('auth_user_id', user.id)
+            .maybeSingle();
+          if (member2?.member_id) memberIdForPayments = member2.member_id as number;
+
+          if (memberIdForPayments) {
+            const { data: myPayments } = await supabase
+              .from('payment')
+              .select('amount, payment_date, status')
+              .eq('member_id', memberIdForPayments)
+              .order('payment_date', { ascending: false })
+              .limit(1);
+            if (myPayments && myPayments.length > 0) {
+              setPaymentAmount(myPayments[0].amount || 0);
+              // Assume monthly cycle; compute days until 30 days after last payment
+              const last = new Date(myPayments[0].payment_date || new Date());
+              const next = new Date(last);
+              next.setDate(last.getDate() + 30);
+              const diff = Math.ceil((next.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              setDaysUntilPayment(Math.max(diff, 0));
+            } else {
+              setPaymentAmount(0);
+              setDaysUntilPayment(0);
+            }
+          } else {
+            setPaymentAmount(0);
+            setDaysUntilPayment(0);
+          }
+        } else {
+          setPaymentAmount(0);
+          setDaysUntilPayment(0);
+        }
+
+        // BR-3: Payout trigger 12 months after launch AND fund >= 100k
+        const launch = BUSINESS_LAUNCH_DATE ? new Date(BUSINESS_LAUNCH_DATE) : null;
+        if (launch) {
+          const twelveMonths = new Date(launch);
+          twelveMonths.setMonth(twelveMonths.getMonth() + 12);
+          // If at 12 months fund < 100k, continue until threshold is reached
+          const threshold = PRIZE_PER_WINNER; // 100k
+          if (Date.now() < twelveMonths.getTime()) {
+            const d = Math.ceil((twelveMonths.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            setDaysUntilDraw(Math.max(d, 0));
+          } else if (totalRevenue < threshold) {
+            // Time-based condition satisfied, but threshold not met; indicate 0 days but show progress in UI
+            setDaysUntilDraw(0);
+          } else {
+            // Trigger can occur immediately
+            setDaysUntilDraw(0);
+          }
+        } else {
+          // Fallback to mid-month draw cadence if launch date missing
+          setDaysUntilDraw(computeDaysUntilNextDraw());
+        }
+      } catch {
+        // Leave defaults on error
+      }
+    };
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, user?.id]);
+
   const userData = {
-    memberId: "TRP-2024-001",
-    tenureStart: "January 1, 2025",
-    nextPaymentDue: "February 1, 2025",
+    memberId: queuePosition ? `#${queuePosition.toString().padStart(3, '0')}` : "—",
+    tenureStart: "", // Not available here
+    nextPaymentDue: daysUntilPayment > 0 ? `${daysUntilPayment} days` : "—",
   };
 
   const stats = {
-    daysUntilPayment: 15,
-    totalRevenue: 250000,
-    potentialWinners: 2,
-    daysUntilDraw: 45,
-    paymentAmount: 25,
-    queuePosition: 3
+    daysUntilPayment,
+    totalRevenue,
+    potentialWinners: Math.min(2, Math.max(topQueue.filter((q) => q.status === 'Active').length, 0)),
+    daysUntilDraw,
+    paymentAmount,
+    queuePosition: queuePosition ?? 0,
   };
-
-  const queueData = [
-    { rank: 1, name: "Alice Johnson", tenureMonths: 24, status: "Active" },
-    { rank: 2, name: "Bob Smith", tenureMonths: 22, status: "Active" },
-    { rank: 3, name: "John Doe", tenureMonths: 18, status: "Active", isCurrentUser: true },
-    { rank: 4, name: "Emma Wilson", tenureMonths: 15, status: "Active" },
-    { rank: 5, name: "Michael Brown", tenureMonths: 12, status: "Active" }
-  ];
-
   const fundData = {
-    nextDrawDate: "March 15, 2025",
+    nextDrawDate: `${daysUntilDraw} days`,
   };
 
   return (
@@ -107,7 +242,7 @@ const DashboardSimple = () => {
           Your Queue Status
         </h3>
         <div className="space-y-3">
-          {queueData.slice(0, 3).map((member) => (
+          {topQueue.slice(0, 3).map((member) => (
             <div
               key={member.rank}
               className={`flex items-center justify-between p-3 rounded-lg ${

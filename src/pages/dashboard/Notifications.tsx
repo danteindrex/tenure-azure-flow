@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Bell, 
   Check, 
-  X, 
   Trash2, 
   Settings,
   AlertCircle,

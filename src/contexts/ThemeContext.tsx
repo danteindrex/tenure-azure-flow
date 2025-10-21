@@ -30,20 +30,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return currentTheme;
   };
 
-  // Apply theme to document
+  // Apply theme to document - force light theme only
   const applyTheme = (newTheme: 'light' | 'dark') => {
     if (typeof window !== 'undefined') {
       const root = window.document.documentElement;
       root.classList.remove('light', 'dark');
-      root.classList.add(newTheme);
+      root.classList.add('light'); // Always apply light theme
       
-      // Also set data-theme attribute for better CSS targeting
-      root.setAttribute('data-theme', newTheme);
+      // Always set light theme attributes
+      root.setAttribute('data-theme', 'light');
       
-      // Update meta theme-color for mobile browsers
+      // Update meta theme-color for mobile browsers - always light
       const metaThemeColor = document.querySelector('meta[name="theme-color"]');
       if (metaThemeColor) {
-        metaThemeColor.setAttribute('content', newTheme === 'dark' ? '#0a192f' : '#ffffff');
+        metaThemeColor.setAttribute('content', '#ffffff');
       }
     }
   };
@@ -51,19 +51,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Load theme from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('theme') as Theme;
-      if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
-        setThemeState(savedTheme);
-        const resolved = resolveTheme(savedTheme);
-        setActualTheme(resolved);
-        applyTheme(resolved);
-      } else {
-        // Default to system preference
-        const systemTheme = getSystemTheme();
-        setThemeState('system');
-        setActualTheme(systemTheme);
-        applyTheme(systemTheme);
-      }
+      // Force light theme as default
+      setThemeState('light');
+      setActualTheme('light');
+      applyTheme('light');
+      
+      // Save light theme to localStorage
+      localStorage.setItem('theme', 'light');
+      
+      // Remove any existing dark class
+      const root = window.document.documentElement;
+      root.classList.remove('dark');
+      root.classList.add('light');
     }
   }, []);
 
@@ -83,14 +82,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [theme]);
 
   const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-    const resolved = resolveTheme(newTheme);
-    setActualTheme(resolved);
-    applyTheme(resolved);
+    // Force light theme only
+    setThemeState('light');
+    setActualTheme('light');
+    applyTheme('light');
     
-    // Save to localStorage
+    // Save light theme to localStorage
     if (typeof window !== 'undefined') {
-      localStorage.setItem('theme', newTheme);
+      localStorage.setItem('theme', 'light');
     }
   };
 

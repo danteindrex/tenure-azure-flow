@@ -124,8 +124,31 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    background: #ffffff;
+    background: #ffffff !important;
     min-height: 100vh;
+  }
+  
+  /* Force light theme */
+  html {
+    color-scheme: light !important;
+  }
+  
+  html.dark {
+    color-scheme: light !important;
+  }
+  
+  /* Override any dark theme classes */
+  .dark {
+    --background: 0 0% 100% !important;
+    --foreground: 210 100% 6% !important;
+    --card: 0 0% 98% !important;
+    --card-foreground: 210 100% 6% !important;
+  }
+  
+  /* Ensure body is always light */
+  body.dark {
+    background: #ffffff !important;
+    color: #0a192f !important;
   }
 }
 
