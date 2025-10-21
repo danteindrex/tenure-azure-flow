@@ -22,13 +22,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Get user ID from normalized database
-    const { data: userData, error: userError } = await supabaseAuth
+    const { data: userData, error: userDataError } = await supabaseAuth
       .from('users')
       .select('id')
       .eq('auth_user_id', user.id)
       .single();
 
-    if (userError || !userData) {
+    if (userDataError || !userData) {
       return res.status(404).json({ error: 'User record not found' });
     }
 

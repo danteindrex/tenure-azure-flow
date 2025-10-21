@@ -20,7 +20,7 @@ export class StripeService {
     data: CreateCheckoutSessionRequest
   ): Promise<CreateCheckoutSessionResponse> {
     try {
-      const { memberId, successUrl, cancelUrl } = data;
+      const { userId, successUrl, cancelUrl } = data;
 
       // Get user details from normalized schema
       const userQuery = `
@@ -30,7 +30,7 @@ export class StripeService {
         LEFT JOIN user_contacts c ON u.id = c.user_id AND c.contact_type = 'phone' AND c.is_primary = true
         WHERE u.id = $1
       `;
-      const userResult = await pool.query(userQuery, [memberId]);
+      const userResult = await pool.query(userQuery, [userId]);
 
       if (userResult.rows.length === 0) {
         throw new Error('User not found');
@@ -39,7 +39,7 @@ export class StripeService {
       const user = userResult.rows[0];
 
       // Check if user already has active subscription
-      const existingSub = await SubscriptionModel.findByUserId(memberId);
+      const existingSub = await SubscriptionModel.findByUserId(userId);
       if (existingSub && existingSub.status === 'active') {
         throw new Error('User already has an active subscription');
       }
@@ -55,10 +55,10 @@ export class StripeService {
         customer = existingCustomers.data[0];
       } else {
         customer = await stripe.customers.create({
-          email: member.email,
-          name: member.name,
+          email: user.email,
+          name: `${user.first_name} ${user.last_name}`.trim(),
           metadata: {
-            memberId: memberId.toString(),
+            userId: userId.toString(),
           },
         });
       }
@@ -97,19 +97,19 @@ export class StripeService {
         ],
         subscription_data: {
           metadata: {
-            memberId: memberId.toString(),
+            userId: userId.toString(),
           },
         },
         success_url: successUrl || `${config.frontendUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: cancelUrl || `${config.frontendUrl}/signup?canceled=true`,
         metadata: {
-          memberId: memberId.toString(),
+          userId: userId.toString(),
           paymentType: 'subscription_with_setup_fee',
         },
         allow_promotion_codes: true,
       });
 
-      logger.info(`Checkout session created for member ${memberId}`, {
+      logger.info(`Checkout session created for member ${userId}`, {
         sessionId: session.id,
         customerId: customer.id,
       });
@@ -129,7 +129,7 @@ export class StripeService {
    */
   static async handleCheckoutComplete(session: Stripe.Checkout.Session): Promise<void> {
     try {
-      const memberId = parseInt(session.metadata!.memberId);
+      const userId = parseInt(session.metadata!.userId);
       const subscriptionId = session.subscription as string;
 
       // Get subscription details from Stripe
@@ -141,7 +141,7 @@ export class StripeService {
         SET status = 'Active', updated_at = NOW() 
         WHERE id = $1
       `;
-      await pool.query(updateMemberQuery, [memberId]);
+      await pool.query(updateMemberQuery, [userId]);
 
       // Create subscription record in database
       const subscriptionQuery = `
@@ -152,7 +152,7 @@ export class StripeService {
       
       const nextBillingDate = new Date(subscription.current_period_end * 1000);
       await pool.query(subscriptionQuery, [
-        memberId,
+        userId,
         nextBillingDate,
         config.pricing.recurringAmount,
         config.pricing.currency.toUpperCase()
@@ -166,7 +166,7 @@ export class StripeService {
       `;
       
       await pool.query(paymentMethodQuery, [
-        memberId,
+        userId,
         'CREDIT_CARD',
         subscription.id,
         true,
@@ -186,7 +186,7 @@ export class StripeService {
         VALUES ($1, (SELECT COALESCE(MAX(queue_position), 0) + 1 FROM queue_entries), NOW(), true, NOW())
         ON CONFLICT (member_id) DO NOTHING
       `;
-      await pool.query(queueQuery, [memberId]);
+      await pool.query(queueQuery, [userId]);
 
       // Create member agreement records
       const agreementQuery = `
@@ -196,9 +196,9 @@ export class StripeService {
           ($1, 'PAYMENT_AUTHORIZATION', '1.0', NOW(), NOW())
         ON CONFLICT DO NOTHING
       `;
-      await pool.query(agreementQuery, [memberId]);
+      await pool.query(agreementQuery, [userId]);
 
-      logger.info(`Initial payment + subscription created for member ${memberId}`, {
+      logger.info(`Initial payment + subscription created for member ${userId}`, {
         subscriptionId: subscription.id,
         initialPayment: config.pricing.initialAmount, // $300 (includes first month)
         monthlyRecurring: config.pricing.recurringAmount, // $25
@@ -229,8 +229,8 @@ export class StripeService {
 
       // Create payment record
       const payment = await PaymentModel.create({
-        memberid: dbSubscription.memberid,
-        subscriptionid: dbSubscription.subscriptionid,
+        memberid: parseInt(dbSubscription.user_id),
+        subscription_id: dbSubscription.id,
         stripe_payment_intent_id: invoice.payment_intent as string,
         stripe_invoice_id: invoice.id,
         stripe_charge_id: invoice.charge as string,
@@ -243,20 +243,20 @@ export class StripeService {
       });
 
       // Calculate total months subscribed and lifetime total
-      const payments = await PaymentModel.findByMemberId(dbSubscription.memberid);
+      const payments = await PaymentModel.findByMemberId(parseInt(dbSubscription.user_id));
       const totalMonths = payments.filter(p => p.status === 'succeeded').length;
-      const lifetimeTotal = await PaymentModel.getTotalPaidByMember(dbSubscription.memberid);
+      const lifetimeTotal = await PaymentModel.getTotalPaidByMember(parseInt(dbSubscription.user_id));
 
       // Update queue stats
       await QueueModel.updatePaymentStats(
-        dbSubscription.memberid,
+        parseInt(dbSubscription.user_id),
         totalMonths,
         lifetimeTotal,
         new Date()
       );
 
-      logger.info(`Payment recorded for member ${dbSubscription.memberid}`, {
-        paymentId: payment.paymentid,
+      logger.info(`Payment recorded for member ${dbSubscription.user_id}`, {
+        paymentId: payment.id,
         amount,
         isFirstPayment,
       });
@@ -279,7 +279,7 @@ export class StripeService {
       }
 
       // Update subscription in database
-      await SubscriptionModel.update(dbSubscription.subscriptionid, {
+      await SubscriptionModel.update(dbSubscription.id, {
         status: subscription.status as any,
         current_period_start: new Date(subscription.current_period_start * 1000),
         current_period_end: new Date(subscription.current_period_end * 1000),
@@ -289,9 +289,9 @@ export class StripeService {
 
       // Update queue subscription status
       const isActive = ['active', 'trialing'].includes(subscription.status);
-      await QueueModel.updateSubscriptionStatus(dbSubscription.memberid, isActive);
+      await QueueModel.updateSubscriptionStatus(parseInt(dbSubscription.user_id), isActive);
 
-      logger.info(`Subscription updated for member ${dbSubscription.memberid}`, {
+      logger.info(`Subscription updated for member ${dbSubscription.user_id}`, {
         status: subscription.status,
       });
     } catch (error) {
@@ -313,12 +313,12 @@ export class StripeService {
       }
 
       // Update subscription status
-      await SubscriptionModel.cancelSubscription(dbSubscription.subscriptionid);
+      await SubscriptionModel.cancelSubscription(dbSubscription.id);
 
       // Update queue subscription status to inactive
-      await QueueModel.updateSubscriptionStatus(dbSubscription.memberid, false);
+      await QueueModel.updateSubscriptionStatus(parseInt(dbSubscription.user_id), false);
 
-      logger.info(`Subscription canceled for member ${dbSubscription.memberid}`);
+      logger.info(`Subscription canceled for member ${dbSubscription.user_id}`);
     } catch (error) {
       logger.error('Error handling subscription deleted:', error);
       throw error;
@@ -328,9 +328,9 @@ export class StripeService {
   /**
    * Cancel a subscription
    */
-  static async cancelSubscription(memberId: number, immediately: boolean = false): Promise<void> {
+  static async cancelSubscription(userId: number, immediately: boolean = false): Promise<void> {
     try {
-      const dbSubscription = await SubscriptionModel.findByMemberId(memberId);
+      const dbSubscription = await SubscriptionModel.findByUserId(userId.toString());
 
       if (!dbSubscription) {
         throw new Error('No active subscription found');
@@ -338,15 +338,15 @@ export class StripeService {
 
       if (immediately) {
         // Cancel immediately
-        await stripe.subscriptions.cancel(dbSubscription.stripe_subscription_id);
+        await stripe.subscriptions.cancel(dbSubscription.provider_subscription_id);
       } else {
         // Cancel at period end
-        await stripe.subscriptions.update(dbSubscription.stripe_subscription_id, {
+        await stripe.subscriptions.update(dbSubscription.provider_subscription_id, {
           cancel_at_period_end: true,
         });
       }
 
-      logger.info(`Subscription cancellation requested for member ${memberId}`, {
+      logger.info(`Subscription cancellation requested for member ${userId}`, {
         immediately,
       });
     } catch (error) {
@@ -358,9 +358,9 @@ export class StripeService {
   /**
    * Reactivate a subscription
    */
-  static async reactivateSubscription(memberId: number): Promise<void> {
+  static async reactivateSubscription(userId: number): Promise<void> {
     try {
-      const dbSubscription = await SubscriptionModel.findByMemberId(memberId);
+      const dbSubscription = await SubscriptionModel.findByUserId(userId.toString());
 
       if (!dbSubscription) {
         throw new Error('No subscription found');
@@ -371,11 +371,11 @@ export class StripeService {
       }
 
       // Update subscription to remove cancellation
-      await stripe.subscriptions.update(dbSubscription.stripe_subscription_id, {
+      await stripe.subscriptions.update(dbSubscription.provider_subscription_id, {
         cancel_at_period_end: false,
       });
 
-      logger.info(`Subscription reactivated for member ${memberId}`);
+      logger.info(`Subscription reactivated for member ${userId}`);
     } catch (error) {
       logger.error('Error reactivating subscription:', error);
       throw error;
@@ -385,15 +385,15 @@ export class StripeService {
   /**
    * Get subscription details
    */
-  static async getSubscription(memberId: number) {
-    const dbSubscription = await SubscriptionModel.findByMemberId(memberId);
+  static async getSubscription(userId: number) {
+    const dbSubscription = await SubscriptionModel.findByUserId(userId.toString());
 
     if (!dbSubscription) {
       return null;
     }
 
     const stripeSubscription = await stripe.subscriptions.retrieve(
-      dbSubscription.stripe_subscription_id
+      dbSubscription.provider_subscription_id
     );
 
     return {
@@ -405,8 +405,8 @@ export class StripeService {
   /**
    * Get payment history
    */
-  static async getPaymentHistory(memberId: number) {
-    return PaymentModel.findByMemberId(memberId);
+  static async getPaymentHistory(userId: number) {
+    return PaymentModel.findByMemberId(userId);
   }
 
   /**

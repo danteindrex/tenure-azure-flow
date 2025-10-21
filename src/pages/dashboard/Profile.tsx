@@ -28,7 +28,20 @@ const Profile = () => {
     status: "Active",
     bio: "",
   });
-  const [originalData, setOriginalData] = useState({});
+  const [originalData, setOriginalData] = useState({
+    fullName: "",
+    email: "",
+    phoneCountryCode: "+1",
+    phoneNumber: "",
+    streetAddress: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    userId: "",
+    joinDate: "",
+    status: "",
+    bio: "",
+  });
   
   const supabase = useSupabaseClient();
   const user = useUser();

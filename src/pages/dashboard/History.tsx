@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { 
-  History, 
+  History as HistoryIcon, 
   Search, 
   Filter, 
   Calendar,
@@ -130,9 +130,9 @@ const History = () => {
       case "bonus":
         return <DollarSign className="w-4 h-4 text-green-500" />;
       case "system":
-        return <History className="w-4 h-4 text-gray-500" />;
+        return <HistoryIcon className="w-4 h-4 text-gray-500" />;
       default:
-        return <History className="w-4 h-4 text-gray-500" />;
+        return <HistoryIcon className="w-4 h-4 text-gray-500" />;
     }
   };
 
@@ -179,7 +179,7 @@ const History = () => {
               <p className="text-sm text-muted-foreground">Total Activities</p>
               <p className="text-2xl font-bold">{historyData.length}</p>
             </div>
-            <History className="w-8 h-8 text-accent" />
+            <HistoryIcon className="w-8 h-8 text-accent" />
           </div>
         </Card>
         <Card className="p-4">
@@ -258,7 +258,7 @@ const History = () => {
         <div className="space-y-4">
           {filteredHistory.length === 0 ? (
             <div className="text-center py-8">
-              <History className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <HistoryIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No history found</p>
             </div>
           ) : (

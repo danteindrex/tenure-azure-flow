@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import BusinessLogicService from '@/src/lib/business-logic';
+import BusinessLogicService from '@/lib/business-logic';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -47,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       eligibleMembers: winnerOrder.length,
       topWinners: winnerOrder.slice(0, 5).map(w => ({
         position: w.queuePosition,
-        userId: w.userId,
+        userId: w.memberId,
         tenureStart: w.tenureStart,
         continuousTenure: w.continuousTenure
       }))

@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
-import { BUSINESS_RULES } from '@/src/lib/business-logic';
+import { BUSINESS_RULES } from '@/lib/business-logic';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {

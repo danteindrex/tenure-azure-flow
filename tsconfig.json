@@ -38,6 +38,10 @@
     "**/*.tsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "services/admin/**/*",
+    "services/frontend/**/*",
+    "services/subscription-service/**/*",
+    "services/Tenure-queue/**/*"
   ]
 }

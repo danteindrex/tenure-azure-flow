@@ -98,7 +98,7 @@ async function fallbackToDirectAccess(supabase: any, res: NextApiResponse) {
         user_name: user?.full_name || `User ${item.user_id}`,
         user_email: user?.email || '',
         user_status: user?.status || 'Unknown',
-        member_join_date: member?.join_date || ''
+        member_join_date: user?.join_date || ''
       };
     }) || [];
 

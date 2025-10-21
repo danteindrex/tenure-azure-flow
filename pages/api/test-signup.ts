@@ -50,11 +50,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .eq("email", email)
       .limit(1);
 
-    if (memberErr) {
-      return res.status(500).json({ email, error: memberErr.message });
+    if (userErr) {
+      return res.status(500).json({ email, error: userErr.message });
     }
 
-    const found = Array.isArray(members) && members.length > 0 ? members[0] : null;
+    const found = Array.isArray(users) && users.length > 0 ? users[0] : null;
     return res.status(200).json({
       email,
       signup_session: !!signUpData.session,

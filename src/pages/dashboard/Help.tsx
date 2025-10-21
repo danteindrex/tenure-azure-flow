@@ -115,7 +115,8 @@ const Help = () => {
         subject: ticketForm.subject,
         description: ticketForm.description,
         category: ticketForm.category as any,
-        priority: ticketForm.priority as any
+        priority: ticketForm.priority as any,
+        status: 'open'
       });
 
       if (ticket) {

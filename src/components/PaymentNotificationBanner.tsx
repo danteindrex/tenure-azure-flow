@@ -99,7 +99,7 @@ const PaymentNotificationBanner = () => {
             canDismiss: false
           });
         } else if (paymentStatus.nextPaymentDue) {
-          const daysUntilDue = Math.ceil((paymentStatus.nextPaymentDue.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+          const daysUntilDue = Math.ceil((new Date(paymentStatus.nextPaymentDue).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
           
           if (daysUntilDue <= 0) {
             // Payment is overdue but within grace period
@@ -108,7 +108,7 @@ const PaymentNotificationBanner = () => {
               title: 'Monthly Payment Overdue',
               message: `Your monthly payment of $${BUSINESS_RULES.MONTHLY_FEE} is ${Math.abs(daysUntilDue)} day${Math.abs(daysUntilDue) !== 1 ? 's' : ''} overdue. You have ${BUSINESS_RULES.PAYMENT_GRACE_DAYS - paymentStatus.daysSinceLastPayment} days remaining before default.`,
               amount: BUSINESS_RULES.MONTHLY_FEE,
-              dueDate: paymentStatus.nextPaymentDue.toLocaleDateString(),
+              dueDate: new Date(paymentStatus.nextPaymentDue).toLocaleDateString(),
               canDismiss: false
             });
           } else if (daysUntilDue <= 3) {
@@ -116,10 +116,10 @@ const PaymentNotificationBanner = () => {
             notifications.push({
               type: 'reminder',
               title: 'Monthly Payment Due Soon',
-              message: `Your monthly payment of $${BUSINESS_RULES.MONTHLY_FEE} is due in ${daysUntilDue} day${daysUntilDue !== 1 ? 's' : ''} (${paymentStatus.nextPaymentDue.toLocaleDateString()}). Ensure payment to maintain continuous tenure.`,
+              message: `Your monthly payment of $${BUSINESS_RULES.MONTHLY_FEE} is due in ${daysUntilDue} day${daysUntilDue !== 1 ? 's' : ''} (${new Date(paymentStatus.nextPaymentDue).toLocaleDateString()}). Ensure payment to maintain continuous tenure.`,
               daysUntilDue,
               amount: BUSINESS_RULES.MONTHLY_FEE,
-              dueDate: paymentStatus.nextPaymentDue.toLocaleDateString(),
+              dueDate: new Date(paymentStatus.nextPaymentDue).toLocaleDateString(),
               canDismiss: true
             });
           }

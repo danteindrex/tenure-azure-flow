@@ -145,13 +145,13 @@ const Dashboard = () => {
         let daysUntilPayment = 0;
         
         if (memberPaymentStatus.nextPaymentDue) {
-          nextPaymentDue = memberPaymentStatus.nextPaymentDue.toLocaleDateString('en-US', { 
+          nextPaymentDue = new Date(memberPaymentStatus.nextPaymentDue).toLocaleDateString('en-US', { 
             year: 'numeric', 
             month: 'long', 
             day: 'numeric' 
           });
           daysUntilPayment = Math.ceil(
-            (memberPaymentStatus.nextPaymentDue.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+            (new Date(memberPaymentStatus.nextPaymentDue).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
           );
         } else if (!memberPaymentStatus.hasJoiningFee) {
           nextPaymentDue = 'Joining Fee Required ($300)';

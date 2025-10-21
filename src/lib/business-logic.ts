@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { MemberTenure, MemberPaymentStatus } from './types';
 
 // Business Rules Constants (BR-1 through BR-10)
 export const BUSINESS_RULES = {
@@ -104,14 +105,24 @@ class BusinessLogicService {
 
       for (const member of members) {
         const tenureStart = new Date(member.payment[0].payment_date);
-        const continuousTenure = await this.checkContinuousTenure(member.id, tenureStart);
+        const hasContinuousTenure = await this.checkContinuousTenure(member.id, tenureStart);
+        
+        // Calculate tenure in months
+        const tenureMonths = Math.floor((Date.now() - tenureStart.getTime()) / (1000 * 60 * 60 * 24 * 30));
 
         memberTenures.push({
+          id: member.id,
+          name: member.name,
+          status: member.status,
+          joinDate: member.payment[0].payment_date,
+          continuousTenure: hasContinuousTenure ? tenureMonths : 0,
+          totalPaid: member.payment.reduce((sum: number, p: any) => sum + p.amount, 0),
+          lastPaymentDate: member.payment[member.payment.length - 1].payment_date,
+          position: 0, // Will be set after sorting
           memberId: member.id,
           memberName: member.name,
-          tenureStart,
-          continuousTenure,
           isActive: member.status === 'Active',
+          tenureStart,
           queuePosition: 0 // Will be set after sorting
         });
       }
@@ -310,26 +321,32 @@ class BusinessLogicService {
       const monthlyPaymentCount = monthlyPayments?.length || 0;
 
       return {
-        hasJoiningFee,
-        joiningFeeDate,
-        lastMonthlyPayment,
-        daysSinceLastPayment,
-        isInDefault,
-        nextPaymentDue,
+        memberId,
+        status: isInDefault ? 'overdue' : (hasJoiningFee ? 'current' : 'suspended'),
+        lastPaymentDate: lastMonthlyPayment?.toISOString() || '',
+        nextPaymentDue: nextPaymentDue?.toISOString() || '',
         totalPaid,
+        continuousTenure: monthlyPaymentCount,
+        hasJoiningFee,
+        isInDefault,
+        daysSinceLastPayment,
+        lastMonthlyPayment,
         monthlyPaymentCount
       };
 
     } catch (error) {
       console.error('Error getting member payment status:', error);
       return {
-        hasJoiningFee: false,
-        joiningFeeDate: null,
-        lastMonthlyPayment: null,
-        daysSinceLastPayment: 999,
-        isInDefault: true,
-        nextPaymentDue: null,
+        memberId,
+        status: 'suspended',
+        lastPaymentDate: '',
+        nextPaymentDue: '',
         totalPaid: 0,
+        continuousTenure: 0,
+        hasJoiningFee: false,
+        isInDefault: true,
+        daysSinceLastPayment: 999,
+        lastMonthlyPayment: null,
         monthlyPaymentCount: 0
       };
     }

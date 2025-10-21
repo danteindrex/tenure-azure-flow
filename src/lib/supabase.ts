@@ -37,3 +37,6 @@ class SupabaseClientSingleton {
 }
 
 export default SupabaseClientSingleton;
+
+// Named export for compatibility
+export const supabase = SupabaseClientSingleton.getInstance();

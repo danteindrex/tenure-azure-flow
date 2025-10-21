@@ -4,7 +4,7 @@ import { logger } from '../config/logger';
 import { z } from 'zod';
 
 const CreateCheckoutSchema = z.object({
-  userId: z.string().uuid(),
+  userId: z.string().uuid().optional(),
   successUrl: z.string().url().optional(),
   cancelUrl: z.string().url().optional(),
 });
@@ -54,7 +54,7 @@ export class SubscriptionController {
         return;
       }
 
-      const subscription = await StripeService.getSubscription(userId);
+      const subscription = await StripeService.getSubscription(parseInt(userId, 10));
 
       if (!subscription) {
         res.status(404).json({ error: 'Subscription not found' });
