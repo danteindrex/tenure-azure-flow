@@ -1,9 +1,9 @@
 // Queue Service Adapter - Seamless integration with the Queue microservice
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 
-interface QueueMember {
-  id: number;
-  memberid: number;
+interface QueueUser {
+  id: string;
+  user_id: string;
   queue_position: number;
   joined_at: string;
   is_eligible: boolean;

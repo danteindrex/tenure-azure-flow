@@ -47,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       eligibleMembers: winnerOrder.length,
       topWinners: winnerOrder.slice(0, 5).map(w => ({
         position: w.queuePosition,
-        memberId: w.memberId,
+        userId: w.userId,
         tenureStart: w.tenureStart,
         continuousTenure: w.continuousTenure
       }))

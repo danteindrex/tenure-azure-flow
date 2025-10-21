@@ -6,10 +6,10 @@ interface User {
 }
 
 export const UserAuditLogs: CollectionConfig = {
-  slug: 'user_audit_logs',
+  slug: 'system_audit_logs',
   admin: {
     useAsTitle: 'action',
-    defaultColumns: ['user_id', 'action', 'success', 'created_at'],
+    defaultColumns: ['user_id', 'entity_type', 'action', 'success', 'created_at'],
     description: 'Tracks user actions and system events for auditing purposes',
     group: 'System',
   },
@@ -48,13 +48,55 @@ export const UserAuditLogs: CollectionConfig = {
       },
     },
     {
+      name: 'admin_id',
+      type: 'number',
+      label: 'Admin ID',
+      admin: {
+        description: 'ID of the admin who performed the action',
+      },
+    },
+    {
+      name: 'entity_type',
+      type: 'text',
+      required: true,
+      maxLength: 50,
+      label: 'Entity Type',
+      admin: {
+        description: 'Type of entity affected (user, payment, subscription)',
+      },
+    },
+    {
+      name: 'entity_id',
+      type: 'text',
+      label: 'Entity ID',
+      admin: {
+        description: 'ID of the entity affected',
+      },
+    },
+    {
       name: 'action',
       type: 'text',
       required: true,
-      maxLength: 100,
+      maxLength: 50,
       label: 'Action',
       admin: {
         description: 'Action that was performed',
+      },
+    },
+    {
+      name: 'old_values',
+      type: 'json',
+      label: 'Old Values',
+      admin: {
+        description: 'Previous values before change',
+      },
+    },
+    {
+      name: 'new_values',
+      type: 'json',
+      label: 'New Values',
+      admin: {
+        description: 'New values after change',
       },
     },
     {

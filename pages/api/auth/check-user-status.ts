@@ -8,53 +8,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { email, password } = req.body;
+    const { email } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
     }
 
     const supabase = createPagesServerClient({ req, res });
 
-    // Try to sign in to check if user exists and get their status
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    if (authError) {
-      return res.status(401).json({ 
-        error: "Authentication failed",
-        message: authError.message 
-      });
-    }
-
-    if (!authData.user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    // Check member status in database
-    const { data: memberData, error: memberError } = await supabase
-      .from('member')
-      .select('status, id')
-      .eq('auth_user_id', authData.user.id)
+    // Check if user exists in normalized database by email
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, status, auth_user_id, email_verified')
+      .eq('email', email.trim())
       .single();
 
-    if (memberError) {
+    if (userError || !userData) {
       return res.status(404).json({ 
-        error: "Member record not found",
-        userExists: true,
-        needsProfile: true
+        error: "User not found",
+        userExists: false 
       });
     }
 
     return res.status(200).json({
       userExists: true,
-      userId: authData.user.id,
-      memberId: memberData.id,
-      status: memberData.status,
-      isActive: memberData.status === 'Active',
-      needsPayment: memberData.status === 'Pending',
+      userId: userData.id,
+      authUserId: userData.auth_user_id,
+      status: userData.status,
+      emailVerified: userData.email_verified,
+      isActive: userData.status === 'Active',
+      needsPayment: userData.status === 'Pending',
+      needsEmailVerification: !userData.email_verified,
     });
 
   } catch (err: any) {

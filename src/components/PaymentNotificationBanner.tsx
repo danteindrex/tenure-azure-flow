@@ -62,9 +62,9 @@ const PaymentNotificationBanner = () => {
 
         // Check for failed payments in last 24 hours
         const { data: recentFailedPayments, error: failedError } = await supabase
-          .from('payment')
+          .from('user_payments')
           .select('amount, failure_reason, created_at')
-          .eq('memberid', memberData.id)
+          .eq('user_id', memberData.id)
           .eq('status', 'Failed')
           .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 

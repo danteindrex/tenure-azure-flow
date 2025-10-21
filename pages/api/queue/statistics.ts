@@ -86,8 +86,8 @@ async function fallbackToDirectAccess(supabase: any, res: NextApiResponse) {
     }
 
     // Calculate statistics
-    const activeMembers = queueData?.filter(member => member.subscription_active).length || 0;
-    const eligibleMembers = queueData?.filter(member => member.is_eligible).length || 0;
+    const activeMembers = queueData?.filter(user => user.subscription_active).length || 0;
+    const eligibleMembers = queueData?.filter(user => user.is_eligible).length || 0;
     const totalMembers = queueData?.length || 0;
 
     return res.status(200).json({

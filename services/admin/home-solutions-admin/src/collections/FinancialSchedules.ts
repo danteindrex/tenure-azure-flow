@@ -6,10 +6,10 @@ interface User {
 }
 
 export const FinancialSchedules: CollectionConfig = {
-  slug: 'financial_schedules',
+  slug: 'user_billing_schedules',
   admin: {
     useAsTitle: 'billing_cycle',
-    defaultColumns: ['member_id', 'billing_cycle', 'next_billing_date', 'amount', 'is_active'],
+    defaultColumns: ['user_id', 'billing_cycle', 'next_billing_date', 'amount', 'is_active'],
     description: 'Manages billing cycles and payment schedules',
     group: 'Financial',
   },
@@ -29,12 +29,20 @@ export const FinancialSchedules: CollectionConfig = {
       },
     },
     {
-      name: 'member_id',
-      type: 'number',
+      name: 'user_id',
+      type: 'text',
       required: true,
-      label: 'Member ID',
+      label: 'User ID',
       admin: {
-        description: 'Reference to member table',
+        description: 'Reference to users table',
+      },
+    },
+    {
+      name: 'subscription_id',
+      type: 'text',
+      label: 'Subscription ID',
+      admin: {
+        description: 'Reference to user_subscriptions table',
       },
     },
     {

@@ -43,10 +43,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ email, signUpError: signUpError.message });
     }
 
-    // Check if member row exists after signup (trigger or server upsert)
-    const { data: members, error: memberErr } = await admin
-      .from("member")
-      .select("auth_user_id, email, name, phone, city, state, zip_code, street_address, created_at")
+    // Check if user row exists after signup (trigger or server upsert)
+    const { data: users, error: userErr } = await admin
+      .from("users_complete")
+      .select("auth_user_id, email, full_name, phone, city, state, postal_code, street_address, user_created_at")
       .eq("email", email)
       .limit(1);
 

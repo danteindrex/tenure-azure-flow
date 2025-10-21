@@ -4,7 +4,7 @@ import { logger } from '../config/logger';
 import { z } from 'zod';
 
 const CreateCheckoutSchema = z.object({
-  memberId: z.number().int().positive(),
+  userId: z.string().uuid(),
   successUrl: z.string().url().optional(),
   cancelUrl: z.string().url().optional(),
 });
@@ -42,19 +42,19 @@ export class SubscriptionController {
   }
 
   /**
-   * GET /api/subscriptions/:memberId
-   * Get subscription details for a member
+   * GET /api/subscriptions/:userId
+   * Get subscription details for a user
    */
   static async getSubscription(req: Request, res: Response): Promise<void> {
     try {
-      const memberId = parseInt(req.params.memberId);
+      const userId = req.params.userId;
 
-      if (isNaN(memberId)) {
-        res.status(400).json({ error: 'Invalid member ID' });
+      if (!userId) {
+        res.status(400).json({ error: 'Invalid user ID' });
         return;
       }
 
-      const subscription = await StripeService.getSubscription(memberId);
+      const subscription = await StripeService.getSubscription(userId);
 
       if (!subscription) {
         res.status(404).json({ error: 'Subscription not found' });

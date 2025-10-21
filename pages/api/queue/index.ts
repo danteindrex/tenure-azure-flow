@@ -82,22 +82,22 @@ async function fallbackToDirectAccess(supabase: any, res: NextApiResponse) {
       throw queueError;
     }
 
-    // Fetch member data to enrich queue data
-    const memberIds = queueData?.map(q => q.memberid) || [];
-    const { data: members } = await supabase
-      .from('member')
-      .select('id, name, email, status, join_date')
-      .in('id', memberIds);
+    // Fetch user data to enrich queue data using normalized schema
+    const userIds = queueData?.map(q => q.user_id) || [];
+    const { data: users } = await supabase
+      .from('users_complete')
+      .select('id, full_name, email, status, join_date')
+      .in('id', userIds);
 
-    // Enrich queue data with member information
+    // Enrich queue data with user information
     const enrichedQueueData = queueData?.map(item => {
-      const member = members?.find(m => m.id === item.memberid);
+      const user = users?.find(u => u.id === item.user_id);
       return {
         ...item,
-        member: member || null,
-        member_name: member?.name || `Member ${item.memberid}`,
-        member_email: member?.email || '',
-        member_status: member?.status || 'Unknown',
+        user: user || null,
+        user_name: user?.full_name || `User ${item.user_id}`,
+        user_email: user?.email || '',
+        user_status: user?.status || 'Unknown',
         member_join_date: member?.join_date || ''
       };
     }) || [];
@@ -114,8 +114,8 @@ async function fallbackToDirectAccess(supabase: any, res: NextApiResponse) {
     }
 
     // Calculate statistics
-    const activeMembers = enrichedQueueData?.filter(member => member.subscription_active).length || 0;
-    const eligibleMembers = enrichedQueueData?.filter(member => member.is_eligible).length || 0;
+    const activeMembers = enrichedQueueData?.filter(user => user.subscription_active).length || 0;
+    const eligibleMembers = enrichedQueueData?.filter(user => user.is_eligible).length || 0;
     const totalMembers = enrichedQueueData?.length || 0;
 
     return res.status(200).json({

@@ -23,7 +23,7 @@ const Profile = () => {
     city: "",
     state: "",
     zipCode: "",
-    memberId: "",
+    userId: "",
     joinDate: "",
     status: "Active",
     bio: "",
@@ -51,7 +51,7 @@ const Profile = () => {
           city: user.user_metadata?.city || "",
           state: user.user_metadata?.state || "",
           zipCode: user.user_metadata?.zip_code || "",
-          memberId: user.user_metadata?.member_id || `TRP-${new Date().getFullYear()}-${String(user.id).slice(-3).toUpperCase()}`,
+          userId: user.user_metadata?.user_id || `TRP-${new Date().getFullYear()}-${String(user.id).slice(-3).toUpperCase()}`,
           joinDate: new Date(user.created_at).toLocaleDateString('en-US', { 
             year: 'numeric', 
             month: 'long', 
@@ -220,7 +220,7 @@ const Profile = () => {
                   {profileData.fullName || "No name provided"}
                 </h3>
                 <p className="text-muted-foreground">
-                  {profileData.memberId || "Generating member ID..."}
+                  {profileData.userId || "Generating user ID..."}
                 </p>
                 <div className="flex items-center justify-center gap-1 mt-2">
                   <Shield className="w-4 h-4 text-green-500" />

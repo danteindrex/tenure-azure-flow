@@ -17,8 +17,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const admin = createClient(url, serviceKey);
   try {
     const { data, error } = await admin
-      .from("member")
-      .select("auth_user_id, email, name, phone, city, state, zip_code, street_address, created_at")
+      .from("users_complete")
+      .select("auth_user_id, email, full_name, phone, city, state, postal_code, street_address, user_created_at")
       .eq("email", email)
       .limit(1);
 

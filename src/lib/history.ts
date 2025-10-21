@@ -49,7 +49,7 @@ export interface QueueHistory {
 
 export interface MilestoneHistory {
   id?: string;
-  milestone_type: 'fund_amount' | 'member_count' | 'payout' | 'special';
+  milestone_type: 'fund_amount' | 'user_count' | 'payout' | 'special';
   milestone_value?: number;
   description: string;
   achieved_at?: string;

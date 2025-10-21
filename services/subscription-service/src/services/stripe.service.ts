@@ -22,26 +22,32 @@ export class StripeService {
     try {
       const { memberId, successUrl, cancelUrl } = data;
 
-      // Get member details
-      const memberQuery = 'SELECT * FROM member WHERE id = $1';
-      const memberResult = await pool.query(memberQuery, [memberId]);
+      // Get user details from normalized schema
+      const userQuery = `
+        SELECT u.*, p.first_name, p.last_name, c.contact_value as phone
+        FROM users u
+        LEFT JOIN user_profiles p ON u.id = p.user_id
+        LEFT JOIN user_contacts c ON u.id = c.user_id AND c.contact_type = 'phone' AND c.is_primary = true
+        WHERE u.id = $1
+      `;
+      const userResult = await pool.query(userQuery, [memberId]);
 
-      if (memberResult.rows.length === 0) {
-        throw new Error('Member not found');
+      if (userResult.rows.length === 0) {
+        throw new Error('User not found');
       }
 
-      const member = memberResult.rows[0];
+      const user = userResult.rows[0];
 
-      // Check if member already has active subscription
-      const existingSub = await SubscriptionModel.findByMemberId(memberId);
+      // Check if user already has active subscription
+      const existingSub = await SubscriptionModel.findByUserId(memberId);
       if (existingSub && existingSub.status === 'active') {
-        throw new Error('Member already has an active subscription');
+        throw new Error('User already has an active subscription');
       }
 
       // Create or retrieve Stripe customer
       let customer: Stripe.Customer;
       const existingCustomers = await stripe.customers.list({
-        email: member.email,
+        email: user.email,
         limit: 1,
       });
 

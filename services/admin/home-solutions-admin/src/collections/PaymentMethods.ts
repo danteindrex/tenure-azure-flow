@@ -6,10 +6,10 @@ interface User {
 }
 
 export const PaymentMethods: CollectionConfig = {
-  slug: 'payment_methods',
+  slug: 'user_payment_methods',
   admin: {
     useAsTitle: 'method_type',
-    defaultColumns: ['member_id', 'method_type', 'is_default', 'is_active'],
+    defaultColumns: ['user_id', 'method_type', 'provider', 'is_default', 'is_active'],
     description: 'Stores user payment method preferences and tokens',
     group: 'Financial',
   },
@@ -29,13 +29,24 @@ export const PaymentMethods: CollectionConfig = {
       },
     },
     {
-      name: 'member_id',
-      type: 'number',
+      name: 'user_id',
+      type: 'text',
       required: true,
-      label: 'Member ID',
+      label: 'User ID',
       admin: {
-        description: 'Reference to member table',
+        description: 'Reference to users table',
       },
+    },
+    {
+      name: 'provider',
+      type: 'select',
+      defaultValue: 'stripe',
+      label: 'Provider',
+      options: [
+        { label: 'Stripe', value: 'stripe' },
+        { label: 'PayPal', value: 'paypal' },
+        { label: 'Bank', value: 'bank' },
+      ],
     },
     {
       name: 'method_type',
@@ -43,19 +54,53 @@ export const PaymentMethods: CollectionConfig = {
       required: true,
       label: 'Payment Method Type',
       options: [
-        { label: 'Credit Card', value: 'CREDIT_CARD' },
-        { label: 'Mobile Money', value: 'MOBILE_MONEY' },
-        { label: 'Bank Transfer', value: 'BANK_TRANSFER' },
+        { label: 'Card', value: 'card' },
+        { label: 'Bank Account', value: 'bank_account' },
+        { label: 'Digital Wallet', value: 'digital_wallet' },
       ],
     },
     {
-      name: 'source_token',
-      type: 'textarea',
-      label: 'Source Token',
+      name: 'method_subtype',
+      type: 'select',
+      label: 'Payment Method Subtype',
+      options: [
+        { label: 'Apple Pay', value: 'apple_pay' },
+        { label: 'Google Pay', value: 'google_pay' },
+        { label: 'Cash App', value: 'cash_app' },
+      ],
+    },
+    {
+      name: 'provider_payment_method_id',
+      type: 'text',
+      label: 'Provider Payment Method ID',
       admin: {
-        description: 'Encrypted payment source token',
+        description: 'Provider payment method identifier',
         readOnly: true,
       },
+    },
+    {
+      name: 'last_four',
+      type: 'text',
+      maxLength: 4,
+      label: 'Last Four Digits',
+    },
+    {
+      name: 'brand',
+      type: 'text',
+      label: 'Brand',
+      admin: {
+        description: 'Card brand (visa, mastercard, etc.)',
+      },
+    },
+    {
+      name: 'expires_month',
+      type: 'number',
+      label: 'Expiry Month',
+    },
+    {
+      name: 'expires_year',
+      type: 'number',
+      label: 'Expiry Year',
     },
     {
       name: 'is_default',

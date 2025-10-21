@@ -1,8 +1,9 @@
 export interface Subscription {
-  subscriptionid: number;
-  memberid: number;
-  stripe_subscription_id: string;
-  stripe_customer_id: string;
+  id: string;
+  user_id: string;
+  provider: string;
+  provider_subscription_id: string;
+  provider_customer_id: string;
   status: 'active' | 'past_due' | 'canceled' | 'incomplete' | 'trialing' | 'unpaid';
   current_period_start: Date;
   current_period_end: Date;
@@ -14,12 +15,14 @@ export interface Subscription {
 }
 
 export interface Payment {
-  paymentid: number;
-  memberid: number;
-  subscriptionid?: number;
-  stripe_payment_intent_id?: string;
-  stripe_invoice_id?: string;
-  stripe_charge_id?: string;
+  id: string;
+  user_id: string;
+  subscription_id?: string;
+  payment_method_id?: string;
+  provider: string;
+  provider_payment_id?: string;
+  provider_invoice_id?: string;
+  provider_charge_id?: string;
   amount: number;
   currency: string;
   payment_type: 'initial' | 'recurring' | 'one_time';
@@ -28,15 +31,16 @@ export interface Payment {
   is_first_payment: boolean;
   failure_reason?: string;
   receipt_url?: string;
+  metadata?: object;
   created_at: Date;
   updated_at: Date;
 }
 
 export interface Queue {
-  queueid: number;
-  memberid: number;
+  id: string;
+  user_id: string;
   queue_position: number;
-  joined_at: Date;
+  joined_queue_at: Date;
   is_eligible: boolean;
   subscription_active: boolean;
   total_months_subscribed: number;
@@ -48,21 +52,18 @@ export interface Queue {
   updated_at: Date;
 }
 
-export interface Member {
-  id: number;
+export interface User {
+  id: string;
   auth_user_id?: string;
-  name: string;
   email: string;
-  phone?: string;
-  join_date: Date;
+  email_verified: boolean;
   status: 'Active' | 'Inactive' | 'Suspended' | 'Pending';
-  tenure?: number;
   created_at: Date;
   updated_at: Date;
 }
 
 export interface CreateCheckoutSessionRequest {
-  memberId: number;
+  userId: string;
   successUrl?: string;
   cancelUrl?: string;
 }

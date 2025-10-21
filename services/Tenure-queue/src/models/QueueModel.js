@@ -8,7 +8,7 @@ class QueueModel {
   async getAllQueueMembers() {
     try {
       const { data: queueData, error: queueError } = await this.supabase
-        .from('queue')
+        .from('membership_queue')
         .select('*')
         .order('queue_position', { ascending: true });
 
@@ -16,23 +16,23 @@ class QueueModel {
         throw queueError;
       }
 
-      // Fetch member data to enrich queue data
-      const memberIds = queueData?.map(q => q.memberid) || [];
-      const { data: members } = await this.supabase
-        .from('member')
-        .select('id, name, email, status, join_date')
-        .in('id', memberIds);
+      // Fetch user data to enrich queue data using normalized schema
+      const userIds = queueData?.map(q => q.user_id) || [];
+      const { data: users } = await this.supabase
+        .from('users_complete') // Use the view for complete user data
+        .select('id, email, status, first_name, last_name, full_name, join_date')
+        .in('id', userIds);
 
-      // Enrich queue data with member information
+      // Enrich queue data with user information
       const enrichedQueueData = queueData?.map(item => {
-        const member = members?.find(m => m.id === item.memberid);
+        const user = users?.find(u => u.id === item.user_id);
         return {
           ...item,
-          member: member || null,
-          member_name: member?.name || `Member ${item.memberid}`,
-          member_email: member?.email || '',
-          member_status: member?.status || 'Unknown',
-          member_join_date: member?.join_date || ''
+          user: user || null,
+          user_name: user?.full_name || `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || `User ${item.user_id}`,
+          user_email: user?.email || '',
+          user_status: user?.status || 'Unknown',
+          user_join_date: user?.join_date || ''
         };
       }) || [];
 
@@ -42,12 +42,12 @@ class QueueModel {
     }
   }
 
-  async getQueueMemberById(memberId) {
+  async getQueueMemberById(userId) {
     try {
       const { data, error } = await this.supabase
-        .from('queue')
+        .from('membership_queue')
         .select('*')
-        .eq('memberid', memberId)
+        .eq('user_id', userId)
         .single();
 
       if (error) {
@@ -64,11 +64,11 @@ class QueueModel {
     try {
       const queueData = await this.getAllQueueMembers();
       
-      // Calculate total revenue from payments
+      // Calculate total revenue from payments using normalized schema
       const { data: payments, error: paymentsError } = await this.supabase
-        .from('payment')
+        .from('user_payments')
         .select('amount')
-        .eq('status', 'Completed');
+        .eq('status', 'succeeded');
 
       let totalRevenue = 0;
       if (!paymentsError && payments) {
@@ -95,12 +95,12 @@ class QueueModel {
     }
   }
 
-  async updateQueuePosition(memberId, newPosition) {
+  async updateQueuePosition(userId, newPosition) {
     try {
       const { data, error } = await this.supabase
-        .from('queue')
+        .from('membership_queue')
         .update({ queue_position: newPosition, updated_at: new Date().toISOString() })
-        .eq('memberid', memberId)
+        .eq('user_id', userId)
         .select();
 
       if (error) {
@@ -113,20 +113,20 @@ class QueueModel {
     }
   }
 
-  async addMemberToQueue(memberData) {
+  async addUserToQueue(userData) {
     try {
       const { data, error } = await this.supabase
-        .from('queue')
+        .from('membership_queue')
         .insert([{
-          memberid: memberData.memberid,
-          queue_position: memberData.queue_position,
-          is_eligible: memberData.is_eligible || false,
-          subscription_active: memberData.subscription_active || false,
-          total_months_subscribed: memberData.total_months_subscribed || 0,
-          lifetime_payment_total: memberData.lifetime_payment_total || 0,
+          user_id: userData.user_id,
+          queue_position: userData.queue_position,
+          is_eligible: userData.is_eligible || false,
+          subscription_active: userData.subscription_active || false,
+          total_months_subscribed: userData.total_months_subscribed || 0,
+          lifetime_payment_total: userData.lifetime_payment_total || 0,
           has_received_payout: false,
-          notes: memberData.notes || '',
-          joined_at: new Date().toISOString(),
+          notes: userData.notes || '',
+          joined_queue_at: new Date().toISOString(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }])
@@ -138,16 +138,24 @@ class QueueModel {
 
       return data[0];
     } catch (error) {
-      throw new Error(`Failed to add member to queue: ${error.message}`);
+      throw new Error(`Failed to add user to queue: ${error.message}`);
     }
   }
 
-  async removeMemberFromQueue(memberId) {
+  // Legacy compatibility method
+  async addMemberToQueue(memberData) {
+    return this.addUserToQueue({
+      user_id: memberData.memberid,
+      ...memberData
+    });
+  }
+
+  async removeUserFromQueue(userId) {
     try {
       const { data, error } = await this.supabase
-        .from('queue')
+        .from('membership_queue')
         .delete()
-        .eq('memberid', memberId)
+        .eq('user_id', userId)
         .select();
 
       if (error) {
@@ -156,8 +164,13 @@ class QueueModel {
 
       return data[0];
     } catch (error) {
-      throw new Error(`Failed to remove member from queue: ${error.message}`);
+      throw new Error(`Failed to remove user from queue: ${error.message}`);
     }
+  }
+
+  // Legacy compatibility method
+  async removeMemberFromQueue(memberId) {
+    return this.removeUserFromQueue(memberId);
   }
 }
 

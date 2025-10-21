@@ -21,15 +21,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    // Get member ID from database
-    const { data: memberData, error: memberError } = await supabaseAuth
-      .from('member')
+    // Get user ID from normalized database
+    const { data: userData, error: userError } = await supabaseAuth
+      .from('users')
       .select('id')
       .eq('auth_user_id', user.id)
       .single();
 
-    if (memberError || !memberData) {
-      return res.status(404).json({ error: 'Member record not found' });
+    if (userError || !userData) {
+      return res.status(404).json({ error: 'User record not found' });
     }
 
     // Call subscription service to create Stripe checkout session
@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        memberId: memberData.id,
+        userId: userData.id, // Using normalized user ID
         successUrl: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/signup?canceled=true`,
       }),

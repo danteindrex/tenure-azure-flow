@@ -19,7 +19,7 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
   // Real user data
   const displayUserData = {
     name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "User",
-    memberId: user?.user_metadata?.member_id || `TRP-${new Date().getFullYear()}-${String(user?.id || '').slice(-3).toUpperCase()}`,
+    userId: user?.user_metadata?.user_id || `TRP-${new Date().getFullYear()}-${String(user?.id || '').slice(-3).toUpperCase()}`,
   };
 
   const handleLogout = async () => {

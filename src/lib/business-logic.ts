@@ -12,9 +12,9 @@ export const BUSINESS_RULES = {
   PAYMENT_GRACE_DAYS: 30      // BR-8: Days before default
 };
 
-export interface MemberTenure {
-  memberId: number;
-  memberName: string;
+export interface UserTenure {
+  userId: string;
+  userName: string;
   tenureStart: Date;
   continuousTenure: boolean;
   isActive: boolean;
@@ -32,7 +32,7 @@ export interface PayoutStatus {
   daysUntilEligible: number;
 }
 
-export interface MemberPaymentStatus {
+export interface UserPaymentStatus {
   hasJoiningFee: boolean;
   joiningFeeDate: Date | null;
   lastMonthlyPayment: Date | null;

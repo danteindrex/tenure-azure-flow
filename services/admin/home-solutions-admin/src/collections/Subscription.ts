@@ -6,10 +6,10 @@ interface User {
 }
 
 export const Subscription: CollectionConfig = {
-  slug: 'subscription',
+  slug: 'user_subscriptions',
   admin: {
-    useAsTitle: 'stripe_subscription_id',
-    defaultColumns: ['memberid', 'status', 'current_period_start', 'current_period_end'],
+    useAsTitle: 'provider_subscription_id',
+    defaultColumns: ['user_id', 'status', 'current_period_start', 'current_period_end'],
     description: 'Stores Stripe subscription information for members',
     group: 'Financial',
   },
@@ -21,40 +21,50 @@ export const Subscription: CollectionConfig = {
   },
   fields: [
     {
-      name: 'subscriptionid',
-      type: 'number',
+      name: 'id',
+      type: 'text',
       admin: {
         readOnly: true,
         position: 'sidebar',
       },
     },
     {
-      name: 'memberid',
-      type: 'number',
+      name: 'user_id',
+      type: 'text',
       required: true,
-      label: 'Member ID',
+      label: 'User ID',
       admin: {
-        description: 'Reference to member table',
+        description: 'Reference to users table',
       },
     },
     {
-      name: 'stripe_subscription_id',
+      name: 'provider',
+      type: 'select',
+      defaultValue: 'stripe',
+      label: 'Provider',
+      options: [
+        { label: 'Stripe', value: 'stripe' },
+        { label: 'PayPal', value: 'paypal' },
+      ],
+    },
+    {
+      name: 'provider_subscription_id',
       type: 'text',
       required: true,
-      label: 'Stripe Subscription ID',
+      label: 'Provider Subscription ID',
       maxLength: 255,
       admin: {
-        description: 'Unique Stripe subscription identifier',
+        description: 'Unique provider subscription identifier',
       },
     },
     {
-      name: 'stripe_customer_id',
+      name: 'provider_customer_id',
       type: 'text',
       required: true,
-      label: 'Stripe Customer ID',
+      label: 'Provider Customer ID',
       maxLength: 255,
       admin: {
-        description: 'Stripe customer identifier',
+        description: 'Provider customer identifier',
       },
     },
     {

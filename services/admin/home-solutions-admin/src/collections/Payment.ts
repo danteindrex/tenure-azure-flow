@@ -6,10 +6,10 @@ interface User {
 }
 
 export const Payment: CollectionConfig = {
-  slug: 'payment',
+  slug: 'user_payments',
   admin: {
     useAsTitle: 'payment_type',
-    defaultColumns: ['memberid', 'amount', 'payment_type', 'status', 'payment_date'],
+    defaultColumns: ['user_id', 'amount', 'payment_type', 'status', 'payment_date'],
     description: 'Tracks all payment transactions and their status',
     group: 'Financial',
   },
@@ -21,53 +21,72 @@ export const Payment: CollectionConfig = {
   },
   fields: [
     {
-      name: 'paymentid',
-      type: 'number',
+      name: 'id',
+      type: 'text',
       admin: {
         readOnly: true,
         position: 'sidebar',
       },
     },
     {
-      name: 'memberid',
-      type: 'number',
+      name: 'user_id',
+      type: 'text',
       required: true,
-      label: 'Member ID',
+      label: 'User ID',
       admin: {
-        description: 'Reference to member table',
+        description: 'Reference to users table',
       },
     },
     {
-      name: 'subscriptionid',
-      type: 'number',
+      name: 'subscription_id',
+      type: 'text',
       label: 'Subscription ID',
       admin: {
-        description: 'Reference to subscription table (optional)',
+        description: 'Reference to user_subscriptions table (optional)',
       },
     },
     {
-      name: 'stripe_payment_intent_id',
+      name: 'payment_method_id',
+      type: 'text',
+      label: 'Payment Method ID',
+      admin: {
+        description: 'Reference to user_payment_methods table (optional)',
+      },
+    },
+    {
+      name: 'provider',
+      type: 'select',
+      defaultValue: 'stripe',
+      label: 'Payment Provider',
+      options: [
+        { label: 'Stripe', value: 'stripe' },
+        { label: 'PayPal', value: 'paypal' },
+        { label: 'Bank', value: 'bank' },
+      ],
+    },
+    {
+      name: 'provider_payment_id',
       type: 'text',
       maxLength: 255,
-      label: 'Stripe Payment Intent ID',
+      label: 'Provider Payment ID',
       admin: {
         position: 'sidebar',
       },
     },
     {
-      name: 'stripe_invoice_id',
+      name: 'provider_invoice_id',
       type: 'text',
       maxLength: 255,
-      label: 'Stripe Invoice ID',
+      label: 'Provider Invoice ID',
       admin: {
         position: 'sidebar',
       },
     },
     {
-      name: 'stripe_charge_id',
+      name: 'provider_charge_id',
       type: 'text',
       maxLength: 255,
-      label: 'Stripe Charge ID',
+      label: 'Provider Charge ID',
       admin: {
         position: 'sidebar',
       },
@@ -147,6 +166,14 @@ export const Payment: CollectionConfig = {
       label: 'Receipt URL',
       admin: {
         description: 'URL to payment receipt',
+      },
+    },
+    {
+      name: 'metadata',
+      type: 'json',
+      label: 'Metadata',
+      admin: {
+        description: 'Additional payment metadata (JSON format)',
       },
     },
   ],

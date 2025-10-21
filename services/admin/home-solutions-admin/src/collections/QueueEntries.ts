@@ -6,10 +6,10 @@ interface User {
 }
 
 export const QueueEntries: CollectionConfig = {
-  slug: 'queue_entries',
+  slug: 'membership_queue',
   admin: {
     useAsTitle: 'queue_position',
-    defaultColumns: ['member_id', 'queue_position', 'is_eligible', 'priority_score'],
+    defaultColumns: ['user_id', 'queue_position', 'is_eligible', 'subscription_active'],
     description: 'Manages membership queue positions and eligibility',
     group: 'Member Management',
   },
@@ -29,12 +29,12 @@ export const QueueEntries: CollectionConfig = {
       },
     },
     {
-      name: 'member_id',
-      type: 'number',
+      name: 'user_id',
+      type: 'text',
       required: true,
-      label: 'Member ID',
+      label: 'User ID',
       admin: {
-        description: 'Reference to member table',
+        description: 'Reference to users table',
       },
     },
     {
@@ -73,6 +73,43 @@ export const QueueEntries: CollectionConfig = {
       admin: {
         description: 'Priority score for queue ordering',
       },
+    },
+    {
+      name: 'subscription_active',
+      type: 'checkbox',
+      defaultValue: false,
+      label: 'Subscription Active',
+    },
+    {
+      name: 'total_months_subscribed',
+      type: 'number',
+      defaultValue: 0,
+      label: 'Total Months Subscribed',
+    },
+    {
+      name: 'last_payment_date',
+      type: 'date',
+      label: 'Last Payment Date',
+    },
+    {
+      name: 'lifetime_payment_total',
+      type: 'number',
+      label: 'Lifetime Payment Total',
+      admin: {
+        description: 'Total amount paid over lifetime',
+        step: 0.01,
+      },
+    },
+    {
+      name: 'has_received_payout',
+      type: 'checkbox',
+      defaultValue: false,
+      label: 'Has Received Payout',
+    },
+    {
+      name: 'notes',
+      type: 'textarea',
+      label: 'Notes',
     },
   ],
   timestamps: true,

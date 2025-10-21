@@ -6,10 +6,10 @@ interface User {
 }
 
 export const MemberAgreements: CollectionConfig = {
-  slug: 'member_agreements',
+  slug: 'user_agreements',
   admin: {
     useAsTitle: 'agreement_type',
-    defaultColumns: ['member_id', 'agreement_type', 'version_number', 'agreed_at_ts'],
+    defaultColumns: ['user_id', 'agreement_type', 'version_number', 'agreed_at'],
     description: 'Tracks user agreements to terms and conditions',
     group: 'Member Management',
   },
@@ -29,12 +29,12 @@ export const MemberAgreements: CollectionConfig = {
       },
     },
     {
-      name: 'member_id',
-      type: 'number',
+      name: 'user_id',
+      type: 'text',
       required: true,
-      label: 'Member ID',
+      label: 'User ID',
       admin: {
-        description: 'Reference to member table',
+        description: 'Reference to users table',
       },
     },
     {
@@ -58,7 +58,7 @@ export const MemberAgreements: CollectionConfig = {
       },
     },
     {
-      name: 'agreed_at_ts',
+      name: 'agreed_at',
       type: 'date',
       label: 'Agreed At',
       admin: {
@@ -67,6 +67,20 @@ export const MemberAgreements: CollectionConfig = {
         },
         description: 'When the user agreed to this version',
       },
+    },
+    {
+      name: 'document_url',
+      type: 'text',
+      label: 'Document URL',
+      admin: {
+        description: 'URL to the agreement document',
+      },
+    },
+    {
+      name: 'is_active',
+      type: 'checkbox',
+      defaultValue: true,
+      label: 'Is Active',
     },
     {
       name: 'ip_address',

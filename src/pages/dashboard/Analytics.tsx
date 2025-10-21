@@ -65,16 +65,16 @@ const Analytics = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        // Resolve current member_id
-        let memberId: number | null = null;
+        // Resolve current user_id
+        let userId: string | null = null;
         if (user?.id) {
-          const { data: member } = await supabase
-            .from('member')
-            .select('member_id, tenure')
+          const { data: userData } = await supabase
+            .from('users_complete')
+            .select('id, tenure')
             .eq('auth_user_id', user.id)
             .maybeSingle();
-          if (member?.member_id) memberId = member.member_id as number;
-          setOverview((o) => ({ ...o, tenureMonths: (member as any)?.tenure ?? 0 }));
+          if (userData?.id) userId = userData.id as string;
+          setOverview((o) => ({ ...o, tenureMonths: (userData as any)?.tenure ?? 0 }));
         }
 
         // Fetch payments for current user to compute invested and monthly series
@@ -86,12 +86,12 @@ const Analytics = () => {
           months.push({ key: `${d.getFullYear()}-${d.getMonth() + 1}`, invested: 0, earned: 0 });
         }
 
-        if (memberId) {
+        if (userId) {
           const fromDate = new Date(now.getFullYear(), now.getMonth() - (rangeMonths - 1), 1);
           const { data: myPayments } = await supabase
-            .from('payment')
+            .from('user_payments')
             .select('amount, payment_date, status')
-            .eq('member_id', memberId)
+            .eq('user_id', userId)
             .gte('payment_date', fromDate.toISOString())
             .order('payment_date', { ascending: true });
           if (myPayments) {
@@ -110,13 +110,13 @@ const Analytics = () => {
         let queueCount = 0;
         {
           const { data: queue } = await supabase
-            .from('queue')
-            .select('memberid, queue_position')
+            .from('membership_queue')
+            .select('user_id, queue_position')
             .order('queue_position', { ascending: true });
           if (queue) {
             queueCount = queue.length;
-            if (memberId) {
-              const row = (queue as any[]).find((q) => q.memberid === memberId);
+            if (userId) {
+              const row = (queue as any[]).find((q) => q.user_id === userId);
               queuePosition = row?.queue_position ?? 0;
             }
           }

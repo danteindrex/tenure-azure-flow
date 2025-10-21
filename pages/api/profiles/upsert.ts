@@ -51,30 +51,110 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const admin = createClient(url, serviceKey);
 
-    const { error } = await admin
-      .from("member")
-      .upsert(
-        {
-          auth_user_id: user.id,
-          email,
-          // Handle both new separate name fields and legacy full_name
-          first_name: first_name ?? null,
-          last_name: last_name ?? null,
-          middle_name: middle_name ?? null,
-          name: full_name ?? (first_name && last_name ? `${first_name} ${last_name}` : null),
-          date_of_birth: date_of_birth ?? null,
-          phone: phone ?? null,
-          street_address: street_address ?? null,
-          address_line_2: address_line_2 ?? null,
-          city: city ?? null,
-          state: state ?? null,
-          zip_code: zip_code ?? null,
-          country_code: country_code ?? 'US',
-        },
-        { onConflict: "auth_user_id" }
-      );
+    // Start transaction-like operations
+    try {
+      // 1. Upsert user record
+      const { data: userData, error: userError } = await admin
+        .from("users")
+        .upsert(
+          {
+            auth_user_id: user.id,
+            email,
+            email_verified: true, // Assume verified if they can call this API
+          },
+          { onConflict: "auth_user_id" }
+        )
+        .select()
+        .single();
 
-    if (error) {
+      if (userError) {
+        throw new Error(`User upsert failed: ${userError.message}`);
+      }
+
+      const userId = userData.id;
+
+      // 2. Upsert user profile
+      if (first_name || last_name || middle_name || date_of_birth || full_name) {
+        const { error: profileError } = await admin
+          .from("user_profiles")
+          .upsert(
+            {
+              user_id: userId,
+              first_name: first_name ?? (full_name ? full_name.split(' ')[0] : null),
+              last_name: last_name ?? (full_name && full_name.includes(' ') ? full_name.split(' ').slice(1).join(' ') : null),
+              middle_name: middle_name ?? null,
+              date_of_birth: date_of_birth ?? null,
+            },
+            { onConflict: "user_id" }
+          );
+
+        if (profileError) {
+          throw new Error(`Profile upsert failed: ${profileError.message}`);
+        }
+      }
+
+      // 3. Upsert phone contact
+      if (phone) {
+        const { error: contactError } = await admin
+          .from("user_contacts")
+          .upsert(
+            {
+              user_id: userId,
+              contact_type: 'phone',
+              contact_value: phone,
+              is_primary: true,
+              is_verified: false,
+            },
+            { onConflict: "user_id,contact_type,contact_value" }
+          );
+
+        if (contactError) {
+          throw new Error(`Contact upsert failed: ${contactError.message}`);
+        }
+      }
+
+      // 4. Upsert address
+      if (street_address || city || state || zip_code) {
+        const { error: addressError } = await admin
+          .from("user_addresses")
+          .upsert(
+            {
+              user_id: userId,
+              address_type: 'primary',
+              street_address: street_address ?? null,
+              address_line_2: address_line_2 ?? null,
+              city: city ?? null,
+              state: state ?? null,
+              postal_code: zip_code ?? null,
+              country_code: country_code ?? 'US',
+              is_primary: true,
+            },
+            { onConflict: "user_id,address_type" }
+          );
+
+        if (addressError) {
+          throw new Error(`Address upsert failed: ${addressError.message}`);
+        }
+      }
+
+      // 5. Upsert membership record
+      const { error: membershipError } = await admin
+        .from("user_memberships")
+        .upsert(
+          {
+            user_id: userId,
+            join_date: new Date().toISOString().split('T')[0],
+            tenure: 0,
+            verification_status: 'PENDING',
+          },
+          { onConflict: "user_id" }
+        );
+
+      if (membershipError) {
+        throw new Error(`Membership upsert failed: ${membershipError.message}`);
+      }
+
+    } catch (error) {
       return res.status(500).json({ error: error.message });
     }
 
