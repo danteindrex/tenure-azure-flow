@@ -11,7 +11,7 @@ interface QueueRowProps {
 
 export const QueueRow = ({ rank, name, tenureMonths, status, isCurrentUser, index }: QueueRowProps) => {
   const animatedRank = useCounterAnimation<HTMLTableRowElement>(rank, 800, index * 100);
-  const animatedMonths = useCounterAnimation<HTMLTableRowElement>(tenureMonths, 1000, index * 100 + 50);
+  const animatedMonths = useCounterAnimation<HTMLTableDataCellElement>(tenureMonths, 1000, index * 100 + 50);
 
   return (
     <tr

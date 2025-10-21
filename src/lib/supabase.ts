@@ -1,10 +1,10 @@
 // Supabase client singleton to prevent multiple GoTrueClient instances
-import { createClient } from '@supabase/supabase-js';
+import { SupabaseClient, createClient } from '@supabase/supabase-js';
 
 class SupabaseClientSingleton {
-  private static instance: ReturnType<typeof createClient> | null = null;
+  private static instance: SupabaseClient | null = null;
 
-  static getInstance(): ReturnType<typeof createClient> {
+  static getInstance(): SupabaseClient {
     if (!SupabaseClientSingleton.instance) {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -20,7 +20,7 @@ class SupabaseClientSingleton {
   }
 
   // Method to set instance from external client (for Next.js auth helpers)
-  static setInstance(client: ReturnType<typeof createClient>): void {
+  static setInstance(client: SupabaseClient): void {
     SupabaseClientSingleton.instance = client;
   }
 

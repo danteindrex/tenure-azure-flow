@@ -13,8 +13,7 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const supabase = useSupabaseClient();
-  const userData = useUser();
-  const user = userData?.user;
+  const user = useUser();
   const { theme, setTheme, actualTheme } = useTheme();
 
   // Real user data

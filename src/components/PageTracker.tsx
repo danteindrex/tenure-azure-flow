@@ -6,8 +6,7 @@ import { logPageVisit } from '@/lib/audit';
 export default function PageTracker() {
   const router = useRouter();
   const supabase = useSupabaseClient();
-  const userData = useUser();
-  const user = userData?.user;
+  const user = useUser();
 
   useEffect(() => {
     // Store the Supabase client globally to avoid multiple instances

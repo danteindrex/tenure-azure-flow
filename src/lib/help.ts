@@ -287,9 +287,24 @@ class HelpService {
 
   async incrementFAQViewCount(faqId: string): Promise<boolean> {
     try {
+      // First get the current view count
+      const { data: currentData, error: fetchError } = await this.supabase
+        .from('faq_items')
+        .select('view_count')
+        .eq('id', faqId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching current FAQ view count:', fetchError);
+        return false;
+      }
+
+      const currentViewCount = currentData?.view_count || 0;
+
+      // Then update with incremented value
       const { error } = await this.supabase
         .from('faq_items')
-        .update({ view_count: this.supabase.raw('view_count + 1') })
+        .update({ view_count: currentViewCount + 1 })
         .eq('id', faqId);
 
       if (error) {
