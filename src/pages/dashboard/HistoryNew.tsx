@@ -412,19 +412,19 @@ const HistoryNew = () => {
                       <p className="text-sm text-muted-foreground mb-2">{item.description}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span className="capitalize">{item.type}</span>
-                        {item.isActivity && <span>• Activity</span>}
-                        {item.isTransaction && <span>• Transaction</span>}
+                        {'isActivity' in item && item.isActivity && <span>• Activity</span>}
+                        {'isTransaction' in item && item.isTransaction && <span>• Transaction</span>}
                       </div>
                     </div>
                     <div className="text-right ml-4">
                       <div className="flex items-center gap-2 mb-1">
                         {item.amount !== null && item.amount !== undefined && (
                           <p className={`font-bold ${
-                            item.type === 'payment' || item.isTransaction 
+                            item.type === 'payment' || ('isTransaction' in item && item.isTransaction)
                               ? 'text-green-500' 
                               : 'text-blue-500'
                           }`}>
-                            {item.type === 'payment' || item.isTransaction ? '+' : ''}${item.amount.toFixed(2)}
+                            {item.type === 'payment' || ('isTransaction' in item && item.isTransaction) ? '+' : ''}${item.amount.toFixed(2)}
                           </p>
                         )}
                         {getStatusBadge(item.status)}

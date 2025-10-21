@@ -9,7 +9,7 @@ const poolConfig: PoolConfig = {
   },
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 15000, // Increased to 15 seconds for Supabase
 };
 
 export const pool = new Pool(poolConfig);
@@ -24,16 +24,30 @@ pool.on('error', (err) => {
 });
 
 export async function testConnection(): Promise<boolean> {
-  try {
-    const client = await pool.connect();
-    await client.query('SELECT NOW()');
-    client.release();
-    logger.info('Database connection test successful');
-    return true;
-  } catch (error) {
-    logger.error('Database connection test failed:', error);
-    return false;
+  const maxRetries = 3;
+  let retries = 0;
+
+  while (retries < maxRetries) {
+    try {
+      logger.info(`Database connection attempt ${retries + 1}/${maxRetries}`);
+      const client = await pool.connect();
+      await client.query('SELECT NOW()');
+      client.release();
+      logger.info('Database connection test successful');
+      return true;
+    } catch (error) {
+      retries++;
+      logger.error(`Database connection attempt ${retries} failed:`, error);
+      
+      if (retries < maxRetries) {
+        logger.info(`Retrying in 2 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
   }
+  
+  logger.error('All database connection attempts failed');
+  return false;
 }
 
 export async function closePool(): Promise<void> {

@@ -1,4 +1,4 @@
-import { CollectionConfig } from 'payload/types'
+import type { CollectionConfig } from 'payload'
 
 const UserAuditLogs: CollectionConfig = {
   slug: 'user_audit_logs',
@@ -53,7 +53,7 @@ const UserAuditLogs: CollectionConfig = {
       required: false,
       admin: {
         description: 'Error message if action failed',
-        condition: (data) => !data.success,
+        condition: (data: any) => !data.success,
       },
     },
     {

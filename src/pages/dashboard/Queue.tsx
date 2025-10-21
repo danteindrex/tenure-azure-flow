@@ -21,34 +21,7 @@ import {
 import { useUser } from "@supabase/auth-helpers-react";
 import { toast } from "sonner";
 import { useQueueService } from "@/lib/queueService";
-
-interface QueueMember {
-  id: number;
-  memberid: number;
-  queue_position: number;
-  joined_at: string;
-  is_eligible: boolean;
-  subscription_active: boolean;
-  total_months_subscribed: number;
-  last_payment_date: string;
-  lifetime_payment_total: number;
-  has_received_payout: boolean;
-  notes: string;
-  created_at: string;
-  updated_at: string;
-  // Joined member data
-  member?: {
-    id: number;
-    name: string;
-    email: string;
-    status: string;
-    join_date: string;
-  };
-  member_name?: string;
-  member_email?: string;
-  member_status?: string;
-  member_join_date?: string;
-}
+import { QueueMember } from "@/lib/types";
 
 const Queue = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -113,7 +86,7 @@ const Queue = () => {
 
   // Find current user in queue
   const currentUserMember = queueData.find(member => 
-    member.member?.id && user?.id && member.member.id.toString() === user.id
+    member.id && user?.id && member.id.toString() === user.id
   );
 
   // Use statistics from microservice
@@ -124,9 +97,9 @@ const Queue = () => {
 
   // Filter queue data based on search
   const filteredQueue = queueData.filter(member =>
-    member.member_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.member_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.memberid.toString().includes(searchTerm)
+    member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    member.id.toString().includes(searchTerm)
   );
 
   // Helper functions
@@ -238,20 +211,20 @@ const Queue = () => {
                 <p className="text-sm text-muted-foreground">Current status in the tenure queue</p>
               </div>
             </div>
-            {getRankBadge(currentUserMember.queue_position)}
+            {getRankBadge(currentUserMember.position)}
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-accent">#{currentUserMember.queue_position}</p>
+              <p className="text-2xl font-bold text-accent">#{currentUserMember.position}</p>
               <p className="text-sm text-muted-foreground">Queue Position</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold">{currentUserMember.total_months_subscribed}</p>
+              <p className="text-2xl font-bold">{currentUserMember.continuousTenure}</p>
               <p className="text-sm text-muted-foreground">Months Subscribed</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold">{formatCurrency(currentUserMember.lifetime_payment_total)}</p>
+              <p className="text-2xl font-bold">{formatCurrency(currentUserMember.totalPaid)}</p>
               <p className="text-sm text-muted-foreground">Total Paid</p>
             </div>
             <div className="text-center">
@@ -374,8 +347,8 @@ const Queue = () => {
                 </tr>
               ) : (
                 filteredQueue.map((member) => {
-                  const isCurrentUser = member.member?.id && user?.id && member.member.id.toString() === user.id;
-                  const isWinner = member.queue_position <= winnersCount && member.is_eligible;
+                  const isCurrentUser = member.id && user?.id && member.id.toString() === user.id;
+                  const isWinner = member.position <= winnersCount;
                   
                   return (
                     <tr 
@@ -386,7 +359,7 @@ const Queue = () => {
                     >
                       <td className="py-3 px-2">
                         <div className="flex items-center gap-2">
-                          {getRankBadge(member.queue_position)}
+                          {getRankBadge(member.position)}
                           {isWinner && (
                             <Award className="w-4 h-4 text-yellow-500" />
                           )}
@@ -396,13 +369,13 @@ const Queue = () => {
                         <div>
                           {isCurrentUser ? (
                             <>
-                              <p className="font-medium text-accent">{member.member_name} (You)</p>
-                              <p className="text-xs text-muted-foreground">ID: {member.memberid}</p>
-                              <p className="text-xs text-muted-foreground">{member.member_email}</p>
+                              <p className="font-medium text-accent">{member.name} (You)</p>
+                              <p className="text-xs text-muted-foreground">ID: {member.id}</p>
+                              <p className="text-xs text-muted-foreground">{member.email}</p>
                             </>
                           ) : (
                             <>
-                              <p className="font-medium text-muted-foreground">Member #{member.queue_position}</p>
+                              <p className="font-medium text-muted-foreground">Member #{member.position}</p>
                               <p className="text-xs text-muted-foreground">Anonymous Member</p>
                               <p className="text-xs text-muted-foreground">Privacy Protected</p>
                             </>
@@ -411,45 +384,36 @@ const Queue = () => {
                       </td>
                       <td className="py-3 px-2">
                         <div>
-                          <p className="font-medium">{member.total_months_subscribed} months</p>
+                          <p className="font-medium">{member.continuousTenure} months</p>
                           <div className="flex items-center gap-1 mt-1">
-                            {member.subscription_active ? (
+                            {member.status === 'active' ? (
                               <CheckCircle className="w-3 h-3 text-green-500" />
                             ) : (
                               <AlertCircle className="w-3 h-3 text-red-500" />
                             )}
                             <span className="text-xs">
-                              {member.subscription_active ? 'Active' : 'Inactive'}
+                              {member.status === 'active' ? 'Active' : 'Inactive'}
                             </span>
                           </div>
                         </div>
                       </td>
                       <td className="py-3 px-2">
-                        {getEligibilityBadge(member.is_eligible, member.subscription_active)}
+                        {getEligibilityBadge(true, member.status === 'active')}
                       </td>
                       <td className="py-3 px-2">
-                        <p className="text-sm">{formatDate(member.last_payment_date)}</p>
+                        <p className="text-sm">{formatDate(member.lastPaymentDate)}</p>
                       </td>
                       <td className="py-3 px-2">
-                        <p className="font-medium">{formatCurrency(member.lifetime_payment_total)}</p>
+                        <p className="font-medium">{formatCurrency(member.totalPaid)}</p>
                       </td>
                       <td className="py-3 px-2">
                         <div className="flex items-center gap-1">
-                          {member.has_received_payout ? (
-                            <>
-                              <CheckCircle className="w-3 h-3 text-green-500" />
-                              <span className="text-xs text-green-600">Received</span>
-                            </>
-                          ) : (
-                            <>
-                              <Clock className="w-3 h-3 text-yellow-500" />
-                              <span className="text-xs text-yellow-600">Pending</span>
-                            </>
-                          )}
+                          <Clock className="w-3 h-3 text-yellow-500" />
+                          <span className="text-xs text-yellow-600">Pending</span>
                         </div>
                       </td>
                       <td className="py-3 px-2">
-                        <p className="text-sm">{formatDate(member.joined_at)}</p>
+                        <p className="text-sm">{formatDate(member.joinDate)}</p>
                       </td>
                     </tr>
                   );

@@ -209,7 +209,7 @@ class QueueServiceAdapter {
       console.warn('Queue microservice unavailable, falling back to direct database access');
 
       // Fetch queue data directly from database
-      let query = this.supabase
+      const query = this.supabase
         .from('queue')
         .select('*')
         .order('queue_position', { ascending: true });
@@ -227,11 +227,30 @@ class QueueServiceAdapter {
         .select('id, name, email, status, join_date')
         .in('id', memberIds);
 
-      // Enrich queue data
+      // Enrich queue data and map to QueueMember interface
       const enrichedData = queueData?.map((item: any) => {
         const member = members?.find((m: any) => m.id === item.memberid);
         return {
-          ...item,
+          id: item.memberid,
+          name: member?.name || `Member ${item.memberid}`,
+          email: member?.email || '',
+          status: member?.status || 'Unknown',
+          joinDate: member?.join_date || item.joined_at || '',
+          position: item.queue_position,
+          continuousTenure: item.continuous_tenure || 0,
+          totalPaid: item.total_paid || 0,
+          lastPaymentDate: item.last_payment_date || '',
+          nextPaymentDue: item.next_payment_due || '',
+          // Keep original fields for internal use
+          memberid: item.memberid,
+          queue_position: item.queue_position,
+          joined_at: item.joined_at,
+          is_eligible: item.is_eligible,
+          has_received_payout: item.has_received_payout,
+          continuous_tenure: item.continuous_tenure,
+          total_paid: item.total_paid,
+          last_payment_date: item.last_payment_date,
+          next_payment_due: item.next_payment_due,
           member: member || null,
           member_name: member?.name || `Member ${item.memberid}`,
           member_email: member?.email || '',
