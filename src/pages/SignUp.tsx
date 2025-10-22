@@ -330,7 +330,7 @@ const SignUp = () => {
       const formattedPhone = formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode);
       
       // Create temporary email for account creation (will be updated in step 3)
-      const tempEmail = `temp${Date.now()}${Math.random().toString(36).substr(2, 5)}@gmail.com`;
+      const tempEmail = `user${Date.now()}@tempmail.com`;
 
       // Create user with temporary email and phone information
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -714,11 +714,14 @@ const SignUp = () => {
           <>
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold mb-2">Create Your Account</h1>
-              <p className="text-muted-foreground">Enter your phone number and create a password</p>
+              <p className="text-muted-foreground">Enter your email, phone number and create a password</p>
             </div>
 
             <div className="space-y-4">
               <div className="space-y-2">
+                <Label htmlFor="email">Email Address *</Label>
+                <Input
+   
                 <Label htmlFor="phoneNumber">Phone Number *</Label>
                 <div className="flex gap-2">
                   <Select
