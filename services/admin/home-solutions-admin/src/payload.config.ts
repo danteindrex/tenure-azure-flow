@@ -23,6 +23,7 @@ import UserAuditLogs from './collections/UserAuditLogs'
 import { UserContacts } from './collections/UserContacts'
 import { UserMemberships } from './collections/UserMemberships'
 import { UserProfiles } from './collections/UserProfiles'
+import DashboardMetrics from './components/DashboardMetrics'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -30,6 +31,9 @@ const dirname = path.dirname(filename)
 export default buildConfig({
   admin: {
     user: Admin.slug,
+    components: {
+      beforeDashboard: [DashboardMetrics],
+    },
   },
   collections: [
     Admin,
