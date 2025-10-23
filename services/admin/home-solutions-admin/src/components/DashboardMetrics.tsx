@@ -55,6 +55,42 @@ export const DashboardMetrics: React.FC = () => {
             </div>
           </div>
           
+          <div class="charts-section">
+            <div class="chart-container">
+              <h3>User Growth (Last 7 Days)</h3>
+              <div class="bar-chart">
+                <div class="bar" style="height: 60%" data-value="340"><span>Mon</span></div>
+                <div class="bar" style="height: 80%" data-value="450"><span>Tue</span></div>
+                <div class="bar" style="height: 45%" data-value="280"><span>Wed</span></div>
+                <div class="bar" style="height: 90%" data-value="520"><span>Thu</span></div>
+                <div class="bar" style="height: 70%" data-value="410"><span>Fri</span></div>
+                <div class="bar" style="height: 55%" data-value="320"><span>Sat</span></div>
+                <div class="bar" style="height: 40%" data-value="250"><span>Sun</span></div>
+              </div>
+            </div>
+            
+            <div class="chart-container">
+              <h3>Revenue Trend</h3>
+              <div class="line-chart">
+                <svg width="100%" height="120" viewBox="0 0 300 120">
+                  <polyline
+                    fill="none"
+                    stroke="#ffffff"
+                    stroke-width="2"
+                    points="20,100 60,80 100,90 140,60 180,70 220,40 260,50"
+                  />
+                  <circle cx="20" cy="100" r="3" fill="#ffffff" />
+                  <circle cx="60" cy="80" r="3" fill="#ffffff" />
+                  <circle cx="100" cy="90" r="3" fill="#ffffff" />
+                  <circle cx="140" cy="60" r="3" fill="#ffffff" />
+                  <circle cx="180" cy="70" r="3" fill="#ffffff" />
+                  <circle cx="220" cy="40" r="3" fill="#ffffff" />
+                  <circle cx="260" cy="50" r="3" fill="#ffffff" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          
           <div class="activity-feed">
             <h3>Recent Activity</h3>
             ${stats.recentActivity.map(activity => `
@@ -76,13 +112,37 @@ export const DashboardMetrics: React.FC = () => {
       }
     }
 
+    // Add Dashboard navigation button
+    const addDashboardButton = () => {
+      const nav = document.querySelector('.nav')
+      if (nav && !document.querySelector('.dashboard-nav-btn')) {
+        const dashboardBtn = document.createElement('a')
+        dashboardBtn.className = 'dashboard-nav-btn'
+        dashboardBtn.textContent = 'Dashboard'
+        dashboardBtn.href = '/admin'
+        dashboardBtn.onclick = (e) => {
+          e.preventDefault()
+          window.location.href = '/admin'
+        }
+        
+        // Insert at the beginning of nav
+        nav.insertBefore(dashboardBtn, nav.firstChild)
+      }
+    }
+
     // Run after a short delay to ensure DOM is ready
-    setTimeout(injectMetrics, 500)
+    setTimeout(() => {
+      injectMetrics()
+      addDashboardButton()
+    }, 500)
     
     // Also run when navigation changes
     const observer = new MutationObserver(() => {
       if (!document.getElementById('dashboard-metrics')) {
         setTimeout(injectMetrics, 100)
+      }
+      if (!document.querySelector('.dashboard-nav-btn')) {
+        setTimeout(addDashboardButton, 100)
       }
     })
     

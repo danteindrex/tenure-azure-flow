@@ -90,6 +90,92 @@
   }
 }
 
+/* Charts Section */
+.charts-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: base(1);
+  margin: base(2) 0;
+}
+
+.chart-container {
+  background: var(--theme-elevation-50);
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: var(--border-radius);
+  padding: base(1);
+  
+  h3 {
+    margin-bottom: base(1);
+    color: var(--theme-text);
+    font-size: 1rem;
+  }
+}
+
+/* Bar Chart */
+.bar-chart {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  height: 120px;
+  padding: base(0.5) 0;
+  gap: base(0.25);
+}
+
+.bar {
+  background: var(--theme-elevation-300);
+  width: 100%;
+  min-height: 20px;
+  border-radius: 2px 2px 0 0;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  transition: all 150ms ease;
+  position: relative;
+  cursor: pointer;
+  
+  &:hover {
+    background: var(--theme-elevation-400);
+    transform: scaleY(1.05);
+  }
+  
+  span {
+    color: var(--theme-text-dim);
+    font-size: 0.75rem;
+    position: absolute;
+    bottom: -20px;
+    white-space: nowrap;
+  }
+}
+
+/* Line Chart */
+.line-chart {
+  height: 120px;
+  display: flex;
+  align-items: center;
+  
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+  
+  polyline {
+    stroke: var(--theme-text);
+    stroke-width: 2;
+    fill: none;
+  }
+  
+  circle {
+    fill: var(--theme-text);
+    transition: all 150ms ease;
+    cursor: pointer;
+    
+    &:hover {
+      r: 5;
+      fill: var(--theme-elevation-400);
+    }
+  }
+}
+
 .activity-feed {
   background: var(--theme-elevation-50);
   border: 1px solid var(--theme-elevation-150);
@@ -120,15 +206,21 @@
   }
 }
 
+/* Responsive Charts */
+@media (max-width: 768px) {
+  .charts-section {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Navigation Enhancement - Add Dashboard link */
 .nav {
   background-color: var(--theme-elevation-50);
   border-right: 1px solid var(--theme-elevation-150);
 }
 
-/* Add Dashboard link at top of navigation */
-.nav::before {
-  content: 'Dashboard';
+/* Dashboard Navigation Button */
+.dashboard-nav-btn {
   display: block;
   padding: base(0.75) base(1);
   margin: base(0.5);
@@ -139,11 +231,20 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 150ms ease;
-}
-
-.nav::before:hover {
-  background: var(--theme-elevation-200);
-  transform: translateY(-1px);
+  text-decoration: none;
+  text-align: center;
+  
+  &:hover {
+    background: var(--theme-elevation-200);
+    transform: translateY(-1px);
+    color: var(--theme-text);
+    text-decoration: none;
+  }
+  
+  &:focus {
+    outline: 2px solid var(--theme-elevation-400);
+    outline-offset: 2px;
+  }
 }
 
 /* Collection Cards Enhancement */
