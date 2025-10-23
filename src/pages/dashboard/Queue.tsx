@@ -334,9 +334,9 @@ const Queue = () => {
             <thead>
               <tr className="border-b border-border">
                 <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Position</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Member</th>
+                <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">user_id</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Subscription</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Eligibility</th>
+                <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">eligibility</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Last Payment</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Total Paid</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Payout Status</th>
@@ -374,15 +374,13 @@ const Queue = () => {
                         <div>
                           {isCurrentUser ? (
                             <>
-                              <p className="font-medium text-accent">{member.name} (You)</p>
-                              <p className="text-xs text-muted-foreground">ID: {member.id}</p>
+                              <p className="font-medium text-accent">{member.id} (You)</p>
                               <p className="text-xs text-muted-foreground">{member.email}</p>
                             </>
                           ) : (
                             <>
-                              <p className="font-medium text-muted-foreground">Member {member.queue_position ?? member.position}</p>
-                              <p className="text-xs text-muted-foreground">Anonymous Member</p>
-                              <p className="text-xs text-muted-foreground">Privacy Protected</p>
+                              <p className="font-medium text-muted-foreground">{member.id}</p>
+                              <p className="text-xs text-muted-foreground">{member.email ?? 'Privacy Protected'}</p>
                             </>
                           )}
                         </div>
@@ -403,7 +401,11 @@ const Queue = () => {
                         </div>
                       </td>
                       <td className="py-3 px-2">
-                        {getEligibilityBadge(true, member.status === 'active')}
+                        {(() => {
+                          // Prefer explicit eligibility flag from API, otherwise fallback to active status
+                          const isEligible = (member as any).eligible ?? (member.status === 'active');
+                          return getEligibilityBadge(!!isEligible, member.status === 'active');
+                        })()}
                       </td>
                       <td className="py-3 px-2">
                         <p className="text-sm">{formatDate(member.lastPaymentDate)}</p>
