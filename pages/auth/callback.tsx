@@ -26,8 +26,20 @@ const AuthCallback = () => {
         }
 
         if (data.session) {
-          // Successfully authenticated, redirect to dashboard
-          router.replace('/dashboard');
+          // Check if this is a new user who needs to complete profile
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('auth_user_id', data.session.user.id)
+            .single();
+
+          if (userError || !userData) {
+            // New user - redirect to complete profile
+            router.replace('/signup/complete-profile');
+          } else {
+            // Existing user - redirect to dashboard
+            router.replace('/dashboard');
+          }
         } else {
           // No session, redirect to login
           router.replace('/login');

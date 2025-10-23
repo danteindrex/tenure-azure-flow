@@ -20,6 +20,7 @@ const DashboardSimple = () => {
   const pollRef = useRef<number | null>(null);
   const BUSINESS_LAUNCH_DATE = process.env.NEXT_PUBLIC_BUSINESS_LAUNCH_DATE || ""; // ISO string fallback
   const PRIZE_PER_WINNER = 100000; // BR-4
+  const FUND_TARGET = 500000; // Target fund amount for payouts
 
   // Compute next draw as days until the 15th of next month
   const computeDaysUntilNextDraw = () => {
@@ -218,9 +219,9 @@ const DashboardSimple = () => {
   }, [supabase, user?.id, BUSINESS_LAUNCH_DATE, totalRevenue]);
 
   const userData = {
-    memberId: queuePosition ? `#${queuePosition.toString().padStart(3, '0')}` : "—",
+    memberId: queuePosition ? `#${queuePosition.toString().padStart(3, '0')}` : "Not in queue",
     tenureStart: "", // Not available here
-    nextPaymentDue: daysUntilPayment > 0 ? `${daysUntilPayment} days` : "—",
+    nextPaymentDue: daysUntilPayment > 0 ? `${daysUntilPayment} days` : "No payment due",
   };
 
   const stats = {
@@ -240,7 +241,9 @@ const DashboardSimple = () => {
       {/* Welcome Section */}
       <div className="text-center py-8">
         <h1 className="text-3xl font-bold mb-2">Welcome to Your Dashboard</h1>
-        <p className="text-muted-foreground">Member ID: {userData.memberId}</p>
+        <p className="text-muted-foreground">
+          {queuePosition ? `Member ID: ${userData.memberId}` : "Complete your membership to get your Member ID"}
+        </p>
       </div>
 
       {/* Key Stats */}
@@ -259,7 +262,9 @@ const DashboardSimple = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Queue Position</p>
-              <p className="text-2xl font-bold">#{stats.queuePosition}</p>
+              <p className="text-2xl font-bold">
+                {stats.queuePosition > 0 ? `#${stats.queuePosition}` : "Not in queue"}
+              </p>
             </div>
             <Users className="w-8 h-8 text-purple-500" />
           </div>
@@ -279,7 +284,10 @@ const DashboardSimple = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Next Draw</p>
-              <p className="text-2xl font-bold">{stats.daysUntilDraw} days</p>
+              <p className="text-2xl font-bold">
+                {stats.daysUntilDraw > 0 ? `${stats.daysUntilDraw} days` : 
+                 stats.totalRevenue >= PRIZE_PER_WINNER ? "Ready" : "Pending fund"}
+              </p>
             </div>
             <Award className="w-8 h-8 text-yellow-500" />
           </div>
@@ -295,14 +303,18 @@ const DashboardSimple = () => {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Current Fund</span>
-            <span className="text-sm font-medium">${stats.totalRevenue.toLocaleString()} / $500,000</span>
+            <span className="text-sm font-medium">${stats.totalRevenue.toLocaleString()} / ${FUND_TARGET.toLocaleString()}</span>
           </div>
-          <Progress value={50} className="h-2" />
-          <p className="text-xs text-muted-foreground">50% complete - Need $250,000 more for next payout</p>
+          <Progress value={Math.min((stats.totalRevenue / FUND_TARGET) * 100, 100)} className="h-2" />
+          <p className="text-xs text-muted-foreground">
+            {Math.round((stats.totalRevenue / FUND_TARGET) * 100)}% complete - 
+            {stats.totalRevenue >= FUND_TARGET 
+              ? " Fund target reached!" 
+              : ` Need $${(FUND_TARGET - stats.totalRevenue).toLocaleString()} more for next payout`}
+          </p>
         </div>
       </Card>
       
-      {/* Your Position is shown inline in the Queue Status list below */}
       {/* Queue Status */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -313,58 +325,70 @@ const DashboardSimple = () => {
           )}
         </h3>
         <div className="space-y-3">
-          {/* Show top 3 positions */}
-          {topQueue.slice(0, 3).map((member) => (
-            <div
-              key={member.rank}
-              className={`flex items-center justify-between p-3 rounded-lg transition-shadow ${
-                member.isCurrentUser ? 'bg-indigo-50 border-2 border-indigo-200 shadow-md' : 'bg-background/50 border'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                  member.rank <= 2 ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
-                }`}>
-                      {member.rank}
-                </div>
-                <div>
-                      <p className="font-medium">{member.userId ?? member.name}</p>
-                  <p className="text-sm text-muted-foreground">{member.tenureMonths} months</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium">{member.status}</p>
-                {member.isCurrentUser && (
-                  <p className="text-xs text-indigo-600 font-semibold">You are here</p>
-                )}
-              </div>
-            </div>
-          ))}
-          
-          {/* Show ellipsis if current user is not in top 3 */}
-          {currentUserEntry && !topQueue.slice(0, 3).some(member => member.isCurrentUser) && (
+          {topQueue.length > 0 ? (
             <>
-              <div className="text-center py-2">
-                <div className="text-muted-foreground">•••</div>
-              </div>
-              <div
-                className="flex items-center justify-between p-3 rounded-lg transition-shadow bg-indigo-50 border-2 border-indigo-200 shadow-md"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold bg-blue-100 text-blue-800">
-                    {currentUserEntry.rank}
+              {/* Show top 3 positions */}
+              {topQueue.slice(0, 3).map((member) => (
+                <div
+                  key={member.rank}
+                  className={`flex items-center justify-between p-3 rounded-lg transition-shadow ${
+                    member.isCurrentUser ? 'bg-indigo-50 border-2 border-indigo-200 shadow-md' : 'bg-background/50 border'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                      member.rank <= 2 ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {member.rank}
+                    </div>
+                    <div>
+                      <p className="font-medium">{member.name}</p>
+                      <p className="text-sm text-muted-foreground">{member.tenureMonths} months</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">{currentUserEntry.name}</p>
-                    <p className="text-sm text-muted-foreground">{currentUserEntry.tenureMonths} months</p>
+                  <div className="text-right">
+                    <p className="text-sm font-medium">{member.status}</p>
+                    {member.isCurrentUser && (
+                      <p className="text-xs text-indigo-600 font-semibold">You are here</p>
+                    )}
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium">{currentUserEntry.status}</p>
-                  <p className="text-xs text-indigo-600 font-semibold">You are here</p>
-                </div>
-              </div>
+              ))}
+              
+              {/* Show ellipsis if current user is not in top 3 */}
+              {currentUserEntry && !topQueue.slice(0, 3).some(member => member.isCurrentUser) && (
+                <>
+                  <div className="text-center py-2">
+                    <div className="text-muted-foreground">•••</div>
+                  </div>
+                  <div
+                    className="flex items-center justify-between p-3 rounded-lg transition-shadow bg-indigo-50 border-2 border-indigo-200 shadow-md"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold bg-blue-100 text-blue-800">
+                        {currentUserEntry.rank}
+                      </div>
+                      <div>
+                        <p className="font-medium">{currentUserEntry.name}</p>
+                        <p className="text-sm text-muted-foreground">{currentUserEntry.tenureMonths} months</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium">{currentUserEntry.status}</p>
+                      <p className="text-xs text-indigo-600 font-semibold">You are here</p>
+                    </div>
+                  </div>
+                </>
+              )}
             </>
+          ) : (
+            <div className="text-center py-8">
+              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No members in queue yet</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                {!currentUserEntry ? "Complete your membership to join the queue" : ""}
+              </p>
+            </div>
           )}
         </div>
       </Card>
@@ -375,16 +399,25 @@ const DashboardSimple = () => {
           <h3 className="text-lg font-semibold mb-4">Next Payment</h3>
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">Due: {userData.nextPaymentDue}</p>
-            <p className="text-2xl font-bold">${stats.paymentAmount}.00</p>
-            <Button className="w-full">Make Payment</Button>
+            <p className="text-2xl font-bold">
+              {stats.paymentAmount > 0 ? `$${stats.paymentAmount}.00` : "$25.00"}
+            </p>
+            <Button className="w-full" disabled={stats.daysUntilPayment <= 0 && stats.paymentAmount > 0}>
+              {stats.daysUntilPayment <= 0 && stats.paymentAmount > 0 ? "Payment Not Due" : "Make Payment"}
+            </Button>
           </div>
         </Card>
         
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Next Draw</h3>
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Date: {fundData.nextDrawDate}</p>
-            <p className="text-2xl font-bold">{stats.potentialWinners} winners</p>
+            <p className="text-sm text-muted-foreground">
+              {stats.daysUntilDraw > 0 ? `In: ${stats.daysUntilDraw} days` : 
+               stats.totalRevenue >= PRIZE_PER_WINNER ? "Ready to draw" : "Waiting for fund target"}
+            </p>
+            <p className="text-2xl font-bold">
+              {stats.potentialWinners > 0 ? `${stats.potentialWinners} eligible` : "No eligible members"}
+            </p>
             <Button variant="outline" className="w-full">View Details</Button>
           </div>
         </Card>
