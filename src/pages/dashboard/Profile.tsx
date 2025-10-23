@@ -54,24 +54,112 @@ const Profile = () => {
       try {
         setLoading(true);
         
-        // Get user data from auth
+        // Prefer normalized DB tables (users, user_profiles, user_contacts, user_addresses)
+        let normalizedUserId: string | null = null;
+        let createdAt: string | null = null;
+
+        try {
+          const { data: u, error: uErr } = await supabase
+            .from('users')
+            .select('id, created_at')
+            .eq('auth_user_id', user.id)
+            .maybeSingle();
+          if (!uErr && u) {
+            normalizedUserId = u.id;
+            createdAt = u.created_at;
+          }
+        } catch (e) {
+          // ignore and fall back to auth user
+        }
+
+        // Fetch profile row
+        let profileRow: any = null;
+        if (normalizedUserId) {
+          try {
+            const { data: p } = await supabase
+              .from('user_profiles')
+              .select('first_name, last_name, middle_name, date_of_birth')
+              .eq('user_id', normalizedUserId)
+              .maybeSingle();
+            profileRow = p;
+          } catch (e) {
+            // ignore
+          }
+        }
+
+        // Fetch primary phone contact
+        let phoneVal: string | null = null;
+        try {
+          if (normalizedUserId) {
+            const { data: phone } = await supabase
+              .from('user_contacts')
+              .select('contact_value')
+              .eq('user_id', normalizedUserId)
+              .eq('contact_type', 'phone')
+              .eq('is_primary', true)
+              .maybeSingle();
+            if (phone && phone.contact_value) phoneVal = phone.contact_value;
+          }
+        } catch (e) {
+          // ignore
+        }
+
+        // Fetch primary address
+        let addressRow: any = null;
+        try {
+          if (normalizedUserId) {
+            const { data: addr } = await supabase
+              .from('user_addresses')
+              .select('street_address, address_line_2, city, state, postal_code')
+              .eq('user_id', normalizedUserId)
+              .eq('is_primary', true)
+              .maybeSingle();
+            addressRow = addr;
+          }
+        } catch (e) {
+          // ignore
+        }
+
+        // Compose display fields with fallbacks to auth metadata
+        const firstName = profileRow?.first_name ?? user.user_metadata?.first_name ?? '';
+        const lastName = profileRow?.last_name ?? user.user_metadata?.last_name ?? '';
+        const fullName = `${firstName}${firstName && lastName ? ' ' : ''}${lastName}`.trim() || user.user_metadata?.full_name || '';
+
+        // Normalize phone number into country code + number when possible
+        let phoneCountryCode = '+1';
+        let phoneNumber = '';
+        const rawPhone = phoneVal ?? user.user_metadata?.phone ?? '';
+        if (rawPhone) {
+          // simple parse: if starts with +, split
+          if (rawPhone.startsWith('+')) {
+            const parts = rawPhone.split(/(\d{1,3})(.*)/).filter(Boolean);
+            if (parts.length >= 2) {
+              phoneCountryCode = `+${parts[0]}`;
+              phoneNumber = parts.slice(1).join('').replace(/[^0-9]/g, '');
+            } else {
+              phoneNumber = rawPhone.replace(/[^0-9]/g, '');
+            }
+          } else {
+            phoneNumber = rawPhone.replace(/[^0-9]/g, '');
+          }
+        }
+
+        const userIdDisplay = normalizedUserId ?? user.user_metadata?.user_id ?? `USR-${String(user.id).slice(-6)}`;
+        const joinDate = createdAt ? new Date(createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : (user.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '');
+
         const userData = {
-          fullName: user.user_metadata?.full_name || "",
-          email: user.email || "",
-          phoneCountryCode: "+1",
-          phoneNumber: user.user_metadata?.phone || "",
-          streetAddress: user.user_metadata?.street_address || "",
-          city: user.user_metadata?.city || "",
-          state: user.user_metadata?.state || "",
-          zipCode: user.user_metadata?.zip_code || "",
-          userId: user.user_metadata?.user_id || `TRP-${new Date().getFullYear()}-${String(user.id).slice(-3).toUpperCase()}`,
-          joinDate: new Date(user.created_at).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          }),
-          status: "Active",
-          bio: user.user_metadata?.bio || "",
+          fullName,
+          email: user.email || '',
+          phoneCountryCode,
+          phoneNumber,
+          streetAddress: addressRow?.street_address ?? user.user_metadata?.street_address ?? '',
+          city: addressRow?.city ?? user.user_metadata?.city ?? '',
+          state: addressRow?.state ?? user.user_metadata?.state ?? '',
+          zipCode: addressRow?.postal_code ?? user.user_metadata?.zip_code ?? '',
+          userId: userIdDisplay,
+          joinDate,
+          status: 'Active',
+          bio: user.user_metadata?.bio ?? '',
         };
 
         setProfileData(userData);
