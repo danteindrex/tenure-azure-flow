@@ -1,3 +1,24 @@
+# Twilio SMS setup
+
+Add Twilio credentials to your local `.env.local` (do NOT commit this file):
+
+```
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token_here
+TWILIO_FROM_NUMBER=+1234567890
+```
+
+Start the dev server and test the SMS endpoint with curl (server-side route will use env vars):
+
+```bash
+# Replace +15551234567 with the recipient number
+curl -X POST http://localhost:3000/api/sms/send \
+	-H 'Content-Type: application/json' \
+	-d '{"to":"+15551234567","body":"Test message"}'
+```
+
+The endpoint will respond with Twilio's API response or an error. For production, configure secrets in your deployment platform's secret store.
+
 # Welcome to your Lovable project
 
 ## Project info
