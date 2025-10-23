@@ -74,10 +74,23 @@ const DashboardSimple = () => {
             const mine = queue.find((q: any) => q.user_id === currentUserId);
             if (mine) pos = mine.queue_position;
             if (mine) {
+              // fetch current user's display name (email local-part) if available
+              let displayName = 'You';
+              try {
+                const { data: meData } = await supabase
+                  .from('users')
+                  .select('email')
+                  .eq('id', currentUserId)
+                  .maybeSingle();
+                if (meData?.email) displayName = meData.email.split('@')[0];
+              } catch (e) {
+                // ignore and fallback to 'You'
+              }
+
               // populate current user entry (may not be in top preview)
               setCurrentUserEntry({
                 rank: mine.queue_position,
-                name: `You`,
+                name: displayName,
                 tenureMonths: mine.total_months_subscribed ?? 0,
                 status: mine.subscription_active ? 'Active' : 'Inactive',
                 isCurrentUser: true
@@ -96,10 +109,11 @@ const DashboardSimple = () => {
             .in('id', userIds);
 
           const preview = queue.slice(0, 5).map((q: any) => {
-            const userInfo = users?.find((u: any) => u.id === q.user_id);
+            // display raw user_id to match membership_queue entries
             return {
               rank: q.queue_position,
-              name: userInfo?.email ? userInfo.email.split('@')[0] : `User ${q.user_id.slice(0, 8)}`,
+              userId: q.user_id,
+              name: q.user_id, // kept for backward compat with existing JSX (member.name), but set to user_id
               tenureMonths: q.total_months_subscribed ?? 0,
               status: q.subscription_active ? 'Active' : 'Inactive',
               isCurrentUser: currentUserId ? q.user_id === currentUserId : false,
@@ -294,6 +308,9 @@ const DashboardSimple = () => {
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Users className="w-5 h-5 text-accent" />
           Your Queue Status
+          {currentUserEntry && (
+            <span className="ml-auto text-sm font-medium text-muted-foreground">Your position: #{currentUserEntry.rank}</span>
+          )}
         </h3>
         <div className="space-y-3">
           {/* Show top 3 positions */}
@@ -308,10 +325,10 @@ const DashboardSimple = () => {
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
                   member.rank <= 2 ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
                 }`}>
-                  {member.rank}
+                      {member.rank}
                 </div>
                 <div>
-                  <p className="font-medium">{member.name}</p>
+                      <p className="font-medium">{member.userId ?? member.name}</p>
                   <p className="text-sm text-muted-foreground">{member.tenureMonths} months</p>
                 </div>
               </div>

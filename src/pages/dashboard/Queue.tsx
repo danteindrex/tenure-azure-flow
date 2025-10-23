@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { useUser } from "@supabase/auth-helpers-react";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { toast } from "sonner";
 import { useQueueService } from "@/lib/queueService";
 import { QueueMember } from "@/lib/types";
@@ -37,6 +39,8 @@ const Queue = () => {
     receivedPayouts: 0
   });
   const [refreshing, setRefreshing] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const supabase = useSupabaseClient();
 
   const queueService = useQueueService();
   const user = useUser();
@@ -172,12 +176,13 @@ const Queue = () => {
   };
 
   const getRankBadge = (rank: number) => {
+    // show the raw number (no # prefix) — callers should pass queue_position when available
     if (rank <= 3) {
-      return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">#{rank}</Badge>;
+      return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">{rank}</Badge>;
     } else if (rank <= 10) {
-      return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">#{rank}</Badge>;
+      return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">{rank}</Badge>;
     } else {
-      return <Badge variant="secondary">#{rank}</Badge>;
+      return <Badge variant="secondary">{rank}</Badge>;
     }
   };
 
@@ -216,7 +221,7 @@ const Queue = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-accent">#{currentUserMember.position}</p>
+              <p className="text-2xl font-bold text-accent">{currentUserMember.queue_position ?? currentUserMember.position}</p>
               <p className="text-sm text-muted-foreground">Queue Position</p>
             </div>
             <div className="text-center">
@@ -375,7 +380,7 @@ const Queue = () => {
                             </>
                           ) : (
                             <>
-                              <p className="font-medium text-muted-foreground">Member #{member.position}</p>
+                              <p className="font-medium text-muted-foreground">Member {member.queue_position ?? member.position}</p>
                               <p className="text-xs text-muted-foreground">Anonymous Member</p>
                               <p className="text-xs text-muted-foreground">Privacy Protected</p>
                             </>
