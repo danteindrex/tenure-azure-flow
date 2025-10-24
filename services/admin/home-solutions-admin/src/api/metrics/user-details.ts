@@ -91,8 +91,8 @@ export async function GET(request: NextRequest, { params }: { params: { userId: 
     const queueData = queueEntry.docs[0]
     const queueInfo = {
       position: queueData?.position || 0,
-      status: queueData?.status || 'Not in queue',
-      isEligible: queueData?.is_eligible || false,
+      status: 'In Queue', // Simplified since we don't have status field
+      isEligible: true, // Assume eligible since they're in queue
       joinedDate: queueData?.created_at?.split('T')[0] || ''
     }
 

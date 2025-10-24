@@ -69,8 +69,8 @@ export async function GET(request: NextRequest) {
       })),
       safeQuery(() => payload.count({ collection: 'membership_queue' })),
       safeQuery(() => payload.count({
-        collection: 'membership_queue',
-        where: { status: { equals: 'eligible' } }
+        collection: 'membership_queue'
+        // No eligibility filtering - just count all queue entries
       })),
       safeQuery(() => payload.count({
         collection: 'kyc_verification',

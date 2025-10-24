@@ -47,7 +47,8 @@ export default buildConfig({
         label: '👥 User Management',
         Component: () => import('./pages/UserManagement'),
       }
-    ]
+    ],
+    locking: false, // Disable document locking to avoid relationship errors
   },
   collections: [
     // Core Admin

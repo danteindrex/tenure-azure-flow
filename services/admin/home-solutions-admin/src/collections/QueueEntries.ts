@@ -38,31 +38,7 @@ const QueueEntries: CollectionConfig = {
         description: 'When the user joined the queue',
       },
     },
-    {
-      name: 'status',
-      type: 'select',
-      required: true,
-      defaultValue: 'waiting',
-      options: [
-        { label: 'Waiting', value: 'waiting' },
-        { label: 'Eligible', value: 'eligible' },
-        { label: 'Processing', value: 'processing' },
-        { label: 'Completed', value: 'completed' },
-        { label: 'Suspended', value: 'suspended' },
-      ],
-      admin: {
-        description: 'Current status in the queue',
-      },
-    },
-    {
-      name: 'is_eligible',
-      type: 'checkbox',
-      required: true,
-      defaultValue: true,
-      admin: {
-        description: 'Whether the user is eligible for payout',
-      },
-    },
+    // Status and eligibility fields removed - not part of actual database schema
     // subscription_active removed - determined by joining with user_subscriptions table
     {
       name: 'total_months_subscribed',

@@ -584,14 +584,6 @@ export interface MembershipQueue {
    */
   joined_queue_at: string;
   /**
-   * Current status in the queue
-   */
-  status: 'waiting' | 'eligible' | 'processing' | 'completed' | 'suspended';
-  /**
-   * Whether the user is eligible for payout
-   */
-  is_eligible: boolean;
-  /**
    * Total months the user has been subscribed
    */
   total_months_subscribed: number;
@@ -1452,8 +1444,6 @@ export interface MembershipQueueSelect<T extends boolean = true> {
   user_id?: T;
   queue_position?: T;
   joined_queue_at?: T;
-  status?: T;
-  is_eligible?: T;
   total_months_subscribed?: T;
   last_payment_date?: T;
   lifetime_payment_total?: T;
