@@ -16,8 +16,8 @@ export class PaymentModel {
     receipt_url?: string;
   }): Promise<Payment> {
     const query = `
-      INSERT INTO payment (
-        memberid, subscriptionid, stripe_payment_intent_id, stripe_invoice_id,
+      INSERT INTO user_payments (
+        user_id, subscription_id, stripe_payment_intent_id, stripe_invoice_id,
         stripe_charge_id, amount, currency, payment_type, status,
         is_first_payment, receipt_url
       )
@@ -45,8 +45,8 @@ export class PaymentModel {
 
   static async findByMemberId(memberId: number): Promise<Payment[]> {
     const query = `
-      SELECT * FROM payment
-      WHERE memberid = $1
+      SELECT * FROM user_payments
+      WHERE user_id = $1
       ORDER BY payment_date DESC
     `;
 
@@ -55,28 +55,28 @@ export class PaymentModel {
   }
 
   static async findByStripePaymentIntentId(intentId: string): Promise<Payment | null> {
-    const query = 'SELECT * FROM payment WHERE stripe_payment_intent_id = $1';
+    const query = 'SELECT * FROM user_payments WHERE stripe_payment_intent_id = $1';
     const result = await pool.query<Payment>(query, [intentId]);
     return result.rows[0] || null;
   }
 
   static async update(paymentId: number, data: Partial<Payment>): Promise<Payment> {
     const fields = Object.keys(data)
-      .filter(key => key !== 'paymentid' && key !== 'created_at')
+      .filter(key => key !== 'id' && key !== 'created_at')
       .map((key, index) => `${key} = $${index + 2}`)
       .join(', ');
 
     const values = [
       paymentId,
       ...Object.keys(data)
-        .filter(key => key !== 'paymentid' && key !== 'created_at')
+        .filter(key => key !== 'id' && key !== 'created_at')
         .map(key => data[key as keyof Payment]),
     ];
 
     const query = `
-      UPDATE payment
+      UPDATE user_payments
       SET ${fields}, updated_at = NOW()
-      WHERE paymentid = $1
+      WHERE id = $1
       RETURNING *
     `;
 
@@ -87,8 +87,8 @@ export class PaymentModel {
   static async getTotalPaidByMember(memberId: number): Promise<number> {
     const query = `
       SELECT COALESCE(SUM(amount), 0) as total
-      FROM payment
-      WHERE memberid = $1 AND status = 'succeeded'
+      FROM user_payments
+      WHERE user_id = $1 AND status = 'succeeded'
     `;
 
     const result = await pool.query<{ total: string }>(query, [memberId]);

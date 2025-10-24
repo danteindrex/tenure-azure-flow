@@ -76,7 +76,7 @@ export class SubscriptionModel {
     ];
 
     const query = `
-      UPDATE user_subscritions
+      UPDATE user_subscriptions
       SET ${fields}, updated_at = NOW()
       WHERE id = $1
       RETURNING *
@@ -88,7 +88,7 @@ export class SubscriptionModel {
 
   static async cancelSubscription(subscriptionId: string): Promise<Subscription> {
     const query = `
-      UPDATE user_subscrions
+      UPDATE user_subscriptions
       SET status = 'canceled', canceled_at = NOW(), updated_at = NOW()
       WHERE id = $1
       RETURNING *
@@ -100,7 +100,7 @@ export class SubscriptionModel {
 
   static async getActiveSubscriptions(): Promise<Subscription[]> {
     const query = `
-      SELECT * FROM user_subscri
+      SELECT * FROM user_subscriptions
       WHERE status IN ('active', 'trialing')
       ORDER BY created_at DESC
     `;

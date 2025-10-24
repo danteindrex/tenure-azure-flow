@@ -84,29 +84,48 @@ async function fallbackToDirectAccess(supabase: any, res: NextApiResponse) {
 
     // Fetch user data to enrich queue data using normalized schema
     const userIds = queueData?.map(q => q.user_id) || [];
-    const { data: users } = await supabase
-      .from('users_complete')
-      .select('id, full_name, email, status, join_date')
-      .in('id', userIds);
+
+    // Get user profiles
+    const { data: userProfiles } = await supabase
+      .from('user_profiles')
+      .select('user_id, first_name, last_name, created_at')
+      .in('user_id', userIds);
+
+    // Get user emails
+    const { data: userContacts } = await supabase
+      .from('user_contacts')
+      .select('user_id, contact_value')
+      .in('user_id', userIds)
+      .eq('contact_type', 'email')
+      .eq('is_primary', true);
 
     // Enrich queue data with user information
     const enrichedQueueData = queueData?.map(item => {
-      const user = users?.find(u => u.id === item.user_id);
+      const profile = userProfiles?.find(u => u.user_id === item.user_id);
+      const contact = userContacts?.find(c => c.user_id === item.user_id);
+      const fullName = profile ? `${profile.first_name} ${profile.last_name}` : `User ${item.user_id}`;
+
       return {
         ...item,
-        user: user || null,
-        user_name: user?.full_name || `User ${item.user_id}`,
-        user_email: user?.email || '',
-        user_status: user?.status || 'Unknown',
-        member_join_date: user?.join_date || ''
+        user: profile ? {
+          id: item.user_id,
+          full_name: fullName,
+          email: contact?.contact_value || '',
+          status: item.is_active ? 'Active' : 'Inactive',
+          join_date: profile.created_at
+        } : null,
+        user_name: fullName,
+        user_email: contact?.contact_value || '',
+        user_status: item.is_active ? 'Active' : 'Inactive',
+        member_join_date: profile?.created_at || ''
       };
     }) || [];
 
     // Calculate total revenue from payments
     const { data: payments, error: paymentsError } = await supabase
-      .from('payment')
+      .from('user_payments')
       .select('amount')
-      .eq('status', 'Completed');
+      .eq('status', 'completed');
 
     let totalRevenue = 0;
     if (!paymentsError && payments) {

@@ -3,7 +3,7 @@ import { Queue } from '../types';
 
 export class QueueModel {
   static async findByMemberId(memberId: number): Promise<Queue | null> {
-    const query = 'SELECT * FROM queue WHERE memberid = $1';
+    const query = 'SELECT * FROM membership_queue WHERE user_id = $1';
     const result = await pool.query<Queue>(query, [memberId]);
     return result.rows[0] || null;
   }
@@ -45,13 +45,13 @@ export class QueueModel {
     lastPaymentDate: Date
   ): Promise<Queue> {
     const query = `
-      UPDATE queue
+      UPDATE membership_queue
       SET
-        total_months_subscribed = $2,
-        lifetime_payment_total = $3,
+        months_in_queue = $2,
+        total_amount_paid = $3,
         last_payment_date = $4,
         updated_at = NOW()
-      WHERE memberid = $1
+      WHERE user_id = $1
       RETURNING *
     `;
 

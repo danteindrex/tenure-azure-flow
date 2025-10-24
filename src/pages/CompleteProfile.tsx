@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Crown, Check } from "lucide-react";
+import { Crown, Check, ChevronRight, ChevronLeft, Loader2, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
 import { logPageVisit, logError } from "@/lib/audit";
+import { COUNTRY_DIAL_CODES } from "@/lib/countryDialCodes";
 
 const CompleteProfile = () => {
   const [loading, setLoading] = useState(false);

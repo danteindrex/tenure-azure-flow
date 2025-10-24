@@ -69,12 +69,19 @@ const Analytics = () => {
         let userId: string | null = null;
         if (user?.id) {
           const { data: userData } = await supabase
-            .from('users_complete')
-            .select('id, tenure')
+            .from('users')
+            .select('id')
             .eq('auth_user_id', user.id)
             .maybeSingle();
           if (userData?.id) userId = userData.id as string;
-          setOverview((o) => ({ ...o, tenureMonths: (userData as any)?.tenure ?? 0 }));
+
+          // Get tenure from membership_queue
+          const { data: queueData } = await supabase
+            .from('membership_queue')
+            .select('months_in_queue')
+            .eq('user_id', userId)
+            .maybeSingle();
+          setOverview((o) => ({ ...o, tenureMonths: queueData?.months_in_queue ?? 0 }));
         }
 
         // Fetch payments for current user to compute invested and monthly series
@@ -130,9 +137,9 @@ const Analytics = () => {
         let totalRevenueAll = 0;
         {
           const { data: allPayments } = await supabase
-            .from('payment')
+            .from('user_payments')
             .select('amount')
-            .eq('status', 'Completed');
+            .eq('status', 'completed');
           if (allPayments) totalRevenueAll = (allPayments as any[]).reduce((s, p) => s + (p.amount || 0), 0);
         }
         const potentialPayout = Math.max(totalRevenueAll / 2, 0);

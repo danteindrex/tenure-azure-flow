@@ -210,7 +210,7 @@ class QueueServiceAdapter {
 
       // Fetch queue data directly from database
       const query = this.supabase
-        .from('queue')
+        .from('membership_queue')
         .select('*')
         .order('queue_position', { ascending: true });
 
@@ -220,42 +220,58 @@ class QueueServiceAdapter {
         throw queueError;
       }
 
-      // Fetch member data
-      const memberIds = queueData?.map((q: any) => q.memberid) || [];
-      const { data: members } = await this.supabase
-        .from('member')
-        .select('id, name, email, status, join_date')
-        .in('id', memberIds);
+      // Fetch user data with profiles
+      const userIds = queueData?.map((q: any) => q.user_id) || [];
+      const { data: userProfiles } = await this.supabase
+        .from('user_profiles')
+        .select('user_id, first_name, last_name, created_at')
+        .in('user_id', userIds);
+
+      const { data: userContacts } = await this.supabase
+        .from('user_contacts')
+        .select('user_id, contact_value')
+        .in('user_id', userIds)
+        .eq('contact_type', 'email')
+        .eq('is_primary', true);
 
       // Enrich queue data and map to QueueMember interface
       const enrichedData = queueData?.map((item: any) => {
-        const member = members?.find((m: any) => m.id === item.memberid);
+        const profile = userProfiles?.find((p: any) => p.user_id === item.user_id);
+        const contact = userContacts?.find((c: any) => c.user_id === item.user_id);
+        const fullName = profile ? `${profile.first_name} ${profile.last_name}` : `User ${item.user_id}`;
+
         return {
-          id: item.memberid,
-          name: member?.name || `Member ${item.memberid}`,
-          email: member?.email || '',
-          status: member?.status || 'Unknown',
-          joinDate: member?.join_date || item.joined_at || '',
+          id: item.user_id,
+          name: fullName,
+          email: contact?.contact_value || '',
+          status: item.is_active ? 'Active' : 'Inactive',
+          joinDate: profile?.created_at || item.joined_at || '',
           position: item.queue_position,
-          continuousTenure: item.continuous_tenure || 0,
-          totalPaid: item.total_paid || 0,
+          continuousTenure: item.months_in_queue || 0,
+          totalPaid: item.total_amount_paid || 0,
           lastPaymentDate: item.last_payment_date || '',
-          nextPaymentDue: item.next_payment_due || '',
+          nextPaymentDue: '', // Calculate if needed
           // Keep original fields for internal use
-          memberid: item.memberid,
+          memberid: item.user_id,
           queue_position: item.queue_position,
           joined_at: item.joined_at,
-          is_eligible: item.is_eligible,
-          has_received_payout: item.has_received_payout,
-          continuous_tenure: item.continuous_tenure,
-          total_paid: item.total_paid,
-          last_payment_date: item.last_payment_date,
-          next_payment_due: item.next_payment_due,
-          member: member || null,
-          member_name: member?.name || `Member ${item.memberid}`,
-          member_email: member?.email || '',
-          member_status: member?.status || 'Unknown',
-          member_join_date: member?.join_date || ''
+          is_eligible: item.is_eligible || false,
+          has_received_payout: item.has_received_payout || false,
+          continuous_tenure: item.months_in_queue || 0,
+          total_paid: item.total_amount_paid || 0,
+          last_payment_date: item.last_payment_date || '',
+          next_payment_due: '',
+          member: profile ? {
+            id: item.user_id,
+            name: fullName,
+            email: contact?.contact_value || '',
+            status: item.is_active ? 'Active' : 'Inactive',
+            join_date: profile.created_at
+          } : null,
+          member_name: fullName,
+          member_email: contact?.contact_value || '',
+          member_status: item.is_active ? 'Active' : 'Inactive',
+          member_join_date: profile?.created_at || ''
         };
       }) || [];
 
@@ -272,9 +288,9 @@ class QueueServiceAdapter {
 
       // Calculate statistics
       const { data: payments } = await this.supabase
-        .from('payment')
+        .from('user_payments')
         .select('amount')
-        .eq('status', 'Completed');
+        .eq('status', 'completed');
 
       const totalRevenue = payments?.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0) || 0;
       // All members in queue have active subscriptions (inactive ones are removed)

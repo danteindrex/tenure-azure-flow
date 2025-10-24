@@ -68,21 +68,21 @@ const NewsFeed = () => {
         setNewsPosts(posts || []);
       }
 
-      // Calculate fund statistics
+      // Calculate fund statistics using normalized tables
       const { data: payments, error: paymentsError } = await supabase
-        .from('payment')
+        .from('user_payments')
         .select('amount')
-        .eq('status', 'Completed');
+        .eq('status', 'completed');
 
       const { data: members, error: membersError } = await supabase
-        .from('member')
+        .from('users')
         .select('id')
         .eq('status', 'Active');
 
       if (!paymentsError && !membersError) {
         const totalRevenue = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
         const totalMembers = members?.length || 0;
-        const potentialWinners = Math.min(Math.floor(totalRevenue / 125000), totalMembers);
+        const potentialWinners = Math.min(Math.floor(totalRevenue / 100000), totalMembers); // BR-4: $100K per winner
 
         setFundStats({
           totalRevenue,

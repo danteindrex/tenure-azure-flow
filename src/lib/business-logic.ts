@@ -53,15 +53,17 @@ class BusinessLogicService {
 
   /**
    * BR-9: Calculate tenure start from joining fee payment date
+   * Uses normalized user_payments table
    */
-  async getMemberTenureStart(memberId: number): Promise<Date | null> {
+  async getMemberTenureStart(userId: string): Promise<Date | null> {
     try {
       const { data: joiningPayment, error } = await this.supabase
-        .from('payment')
+        .from('user_payments')
         .select('payment_date')
-        .eq('memberid', memberId)
+        .eq('user_id', userId)
         .eq('amount', BUSINESS_RULES.JOINING_FEE)
-        .eq('status', 'Completed')
+        .eq('status', 'completed')
+        .eq('is_first_payment', true)
         .order('payment_date', { ascending: true })
         .limit(1)
         .single();
@@ -79,21 +81,25 @@ class BusinessLogicService {
 
   /**
    * BR-5, BR-6, BR-10: Get winner order based on continuous tenure and tie-breaker
+   * Uses normalized tables: users, user_profiles, user_payments, membership_queue
    */
   async getWinnerOrder(): Promise<MemberTenure[]> {
     try {
-      // Get all active members with their joining fee payment
+      // Get all active members with their joining fee payment from normalized tables
       const { data: members, error } = await this.supabase
-        .from('member')
+        .from('users')
         .select(`
           id,
-          name,
           status,
-          payment!inner(payment_date, amount, status)
+          user_profiles!inner(first_name, last_name),
+          user_payments!inner(payment_date, amount, status, is_first_payment),
+          membership_queue!inner(queue_position, is_eligible)
         `)
         .eq('status', 'Active')
-        .eq('payment.amount', BUSINESS_RULES.JOINING_FEE)
-        .eq('payment.status', 'Completed');
+        .eq('user_payments.amount', BUSINESS_RULES.JOINING_FEE)
+        .eq('user_payments.status', 'completed')
+        .eq('user_payments.is_first_payment', true)
+        .eq('membership_queue.is_eligible', true);
 
       if (error || !members) {
         console.error('Error fetching members for winner order:', error);

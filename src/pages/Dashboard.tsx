@@ -91,33 +91,33 @@ const Dashboard = () => {
       try {
         setLoading(true);
         
-        // Get member data
-        const { data: memberData, error: memberError } = await supabase
-          .from('member')
-          .select('*')
+        // Get user data from normalized tables
+        const { data: dbUser, error: userError } = await supabase
+          .from('users')
+          .select('id')
           .eq('auth_user_id', user.id)
           .single();
 
-        if (memberError) {
-          console.error('Error fetching member data:', memberError);
+        if (userError) {
+          console.error('Error fetching user data:', userError);
         }
 
-        // Get queue position
+        // Get queue position from membership_queue
         const { data: queueData, error: queueError } = await supabase
-          .from('queue')
-          .select('queue_position, subscription_active, total_months_subscribed, last_payment_date, lifetime_payment_total')
-          .eq('memberid', memberData?.id)
+          .from('membership_queue')
+          .select('queue_position, is_active, months_in_queue, last_payment_date, total_amount_paid')
+          .eq('user_id', dbUser?.id)
           .single();
 
         if (queueError) {
           console.error('Error fetching queue data:', queueError);
         }
 
-        // Get latest payment
+        // Get latest payment from user_payments
         const { data: latestPayment, error: paymentError } = await supabase
-          .from('payment')
+          .from('user_payments')
           .select('payment_date, amount, status')
-          .eq('memberid', memberData?.id)
+          .eq('user_id', dbUser?.id)
           .order('payment_date', { ascending: false })
           .limit(1)
           .single();
@@ -136,9 +136,9 @@ const Dashboard = () => {
 
         // Get payout status using correct business rules
         const payoutStatus = await businessLogic.getPayoutStatus();
-        
+
         // Get member payment status
-        const memberPaymentStatus = await businessLogic.getMemberPaymentStatus(memberData?.id);
+        const memberPaymentStatus = await businessLogic.getMemberPaymentStatus(dbUser?.id);
 
         // Calculate next payment due using business logic
         let nextPaymentDue = '';
@@ -162,11 +162,11 @@ const Dashboard = () => {
         }
 
         // Get tenure start from business logic (BR-9)
-        const tenureStart = await businessLogic.getMemberTenureStart(memberData?.id);
+        const tenureStart = await businessLogic.getMemberTenureStart(dbUser?.id);
 
         // Set user data with correct business logic
         const userInfo = {
-          memberId: memberData?.id ? `TRP-${memberData.id.toString().padStart(3, '0')}` : `TRP-${new Date().getFullYear()}-${String(user.id).slice(-3).toUpperCase()}`,
+          memberId: dbUser?.id ? `TRP-${dbUser.id.toString().padStart(3, '0')}` : `TRP-${new Date().getFullYear()}-${String(user.id).slice(-3).toUpperCase()}`,
           tenureStart: tenureStart ? tenureStart.toLocaleDateString('en-US', { 
             year: 'numeric', 
             month: 'long', 
@@ -207,7 +207,7 @@ const Dashboard = () => {
             (Date.now() - member.tenureStart.getTime()) / (1000 * 60 * 60 * 24 * 30)
           ),
           status: member.isActive ? 'Active' : 'Inactive',
-          isCurrentUser: member.memberId === memberData?.id,
+          isCurrentUser: member.memberId === dbUser?.id,
           memberId: member.memberId
         }));
 

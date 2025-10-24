@@ -66,7 +66,7 @@ async function fallbackToDirectAccess(supabase: any, res: NextApiResponse) {
   try {
     // Fetch queue data from database
     const { data: queueData, error: queueError } = await supabase
-      .from('queue')
+      .from('membership_queue')
       .select('*')
       .order('queue_position', { ascending: true });
 
@@ -76,9 +76,9 @@ async function fallbackToDirectAccess(supabase: any, res: NextApiResponse) {
 
     // Calculate total revenue from payments
     const { data: payments, error: paymentsError } = await supabase
-      .from('payment')
+      .from('user_payments')
       .select('amount')
-      .eq('status', 'Completed');
+      .eq('status', 'completed');
 
     let totalRevenue = 0;
     if (!paymentsError && payments) {
@@ -86,7 +86,7 @@ async function fallbackToDirectAccess(supabase: any, res: NextApiResponse) {
     }
 
     // Calculate statistics
-    const activeMembers = queueData?.filter(user => user.subscription_active).length || 0;
+    const activeMembers = queueData?.filter(user => user.is_active).length || 0;
     const eligibleMembers = queueData?.filter(user => user.is_eligible).length || 0;
     const totalMembers = queueData?.length || 0;
 
