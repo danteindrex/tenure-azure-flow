@@ -80,6 +80,7 @@ export interface Config {
     queue: Queue;
     membership_queue: MembershipQueue;
     payout_management: PayoutManagement;
+    kyc_verification: KycVerification;
     auditlog: Auditlog;
     user_audit_logs: UserAuditLog;
     user_agreements: UserAgreement;
@@ -105,6 +106,7 @@ export interface Config {
     queue: QueueSelect<false> | QueueSelect<true>;
     membership_queue: MembershipQueueSelect<false> | MembershipQueueSelect<true>;
     payout_management: PayoutManagementSelect<false> | PayoutManagementSelect<true>;
+    kyc_verification: KycVerificationSelect<false> | KycVerificationSelect<true>;
     auditlog: AuditlogSelect<false> | AuditlogSelect<true>;
     user_audit_logs: UserAuditLogsSelect<false> | UserAuditLogsSelect<true>;
     user_agreements: UserAgreementsSelect<false> | UserAgreementsSelect<true>;
@@ -173,7 +175,7 @@ export interface Admin {
   password?: string | null;
 }
 /**
- * Complete user profiles with financial and queue information
+ * User accounts and authentication - Click on a user to view detailed information
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users".
@@ -187,60 +189,6 @@ export interface User {
   email: string;
   email_verified?: boolean | null;
   status: 'Active' | 'Inactive' | 'Suspended' | 'Pending';
-  /**
-   * Total amount paid by this user
-   */
-  total_payments?: number | null;
-  /**
-   * Number of successful payments
-   */
-  payment_count?: number | null;
-  /**
-   * Current position in membership queue
-   */
-  queue_position?: number | null;
-  /**
-   * Current subscription status
-   */
-  subscription_status?: string | null;
-  /**
-   * KYC verification status
-   */
-  kyc_status?: string | null;
-  /**
-   * Date of last successful payment
-   */
-  last_payment_date?: string | null;
-  profile_info?: {
-    /**
-     * Full name from user_profiles table
-     */
-    full_name?: string | null;
-    /**
-     * Phone number from user_contacts table
-     */
-    phone_number?: string | null;
-    /**
-     * Address from user_addresses table
-     */
-    address?: string | null;
-  };
-  financial_summary?: {
-    /**
-     * Recent payment history
-     */
-    payment_history?: string | null;
-    /**
-     * Current subscription information
-     */
-    subscription_details?: string | null;
-  };
-  queue_info?: {
-    /**
-     * Queue position and eligibility details
-     */
-    queue_details?: string | null;
-  };
   updatedAt: string;
   createdAt: string;
 }
@@ -636,6 +584,10 @@ export interface MembershipQueue {
    */
   joined_queue_at: string;
   /**
+   * Current status in the queue
+   */
+  status: 'waiting' | 'eligible' | 'processing' | 'completed' | 'suspended';
+  /**
    * Whether the user is eligible for payout
    */
   is_eligible: boolean;
@@ -827,6 +779,23 @@ export interface PayoutManagement {
     | null;
   created_at?: string | null;
   updated_at?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * KYC verification records
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "kyc_verification".
+ */
+export interface KycVerification {
+  id: number;
+  user_id: string;
+  status: 'pending' | 'approved' | 'rejected' | 'under_review';
+  document_type?: ('passport' | 'drivers_license' | 'national_id') | null;
+  verified_at?: string | null;
+  verified_by?: string | null;
+  rejection_reason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1162,6 +1131,10 @@ export interface PayloadLockedDocument {
         value: string | PayoutManagement;
       } | null)
     | ({
+        relationTo: 'kyc_verification';
+        value: number | KycVerification;
+      } | null)
+    | ({
         relationTo: 'auditlog';
         value: number | Auditlog;
       } | null)
@@ -1260,30 +1233,6 @@ export interface UsersSelect<T extends boolean = true> {
   email?: T;
   email_verified?: T;
   status?: T;
-  total_payments?: T;
-  payment_count?: T;
-  queue_position?: T;
-  subscription_status?: T;
-  kyc_status?: T;
-  last_payment_date?: T;
-  profile_info?:
-    | T
-    | {
-        full_name?: T;
-        phone_number?: T;
-        address?: T;
-      };
-  financial_summary?:
-    | T
-    | {
-        payment_history?: T;
-        subscription_details?: T;
-      };
-  queue_info?:
-    | T
-    | {
-        queue_details?: T;
-      };
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1503,6 +1452,7 @@ export interface MembershipQueueSelect<T extends boolean = true> {
   user_id?: T;
   queue_position?: T;
   joined_queue_at?: T;
+  status?: T;
   is_eligible?: T;
   total_months_subscribed?: T;
   last_payment_date?: T;
@@ -1603,6 +1553,20 @@ export interface PayoutManagementSelect<T extends boolean = true> {
       };
   created_at?: T;
   updated_at?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "kyc_verification_select".
+ */
+export interface KycVerificationSelect<T extends boolean = true> {
+  user_id?: T;
+  status?: T;
+  document_type?: T;
+  verified_at?: T;
+  verified_by?: T;
+  rejection_reason?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -39,6 +39,22 @@ const QueueEntries: CollectionConfig = {
       },
     },
     {
+      name: 'status',
+      type: 'select',
+      required: true,
+      defaultValue: 'waiting',
+      options: [
+        { label: 'Waiting', value: 'waiting' },
+        { label: 'Eligible', value: 'eligible' },
+        { label: 'Processing', value: 'processing' },
+        { label: 'Completed', value: 'completed' },
+        { label: 'Suspended', value: 'suspended' },
+      ],
+      admin: {
+        description: 'Current status in the queue',
+      },
+    },
+    {
       name: 'is_eligible',
       type: 'checkbox',
       required: true,

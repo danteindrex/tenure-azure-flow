@@ -12,6 +12,7 @@ import { AdminAlerts } from './collections/AdminAlerts'
 import { AuditLog } from './collections/AuditLog'
 import { Disputes } from './collections/Disputes'
 import { FinancialSchedules } from './collections/FinancialSchedules'
+import { KYCVerification } from './collections/KYCVerification'
 import { MemberAgreements } from './collections/MemberAgreements'
 import { NewsFeedPost } from './collections/NewsFeedPost'
 import { Payment } from './collections/Payment'
@@ -28,6 +29,7 @@ import { UserProfiles } from './collections/UserProfiles'
 import { Users } from './collections/Users'
 import FinancialDashboard from './components/FinancialDashboard'
 import AnalyticsGraphs from './components/AnalyticsGraphs'
+import AdminNavigation from './components/AdminNavigation'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -37,7 +39,15 @@ export default buildConfig({
     user: Admin.slug,
     components: {
       beforeDashboard: [FinancialDashboard, AnalyticsGraphs],
+      beforeNavLinks: [AdminNavigation],
     },
+    pages: [
+      {
+        slug: 'user-management',
+        label: '👥 User Management',
+        Component: () => import('./pages/UserManagement'),
+      }
+    ]
   },
   collections: [
     // Core Admin
@@ -62,7 +72,7 @@ export default buildConfig({
     PayoutManagement, // Payout workflow and approvals
 
     // Compliance & Security (Feature-flagged)
-    // KYCVerification, // KYC verification tracking - Disabled due to missing related tables
+    KYCVerification, // KYC verification tracking
     // TransactionMonitoring, // AML and fraud monitoring - Disabled due to missing related tables
     AuditLog,
     UserAuditLogs, // Points to 'user_audit_logs' table
