@@ -39,9 +39,7 @@ const Settings = () => {
   // Settings state
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences | null>(null);
-  const [securitySettings, setSecuritySettings] = useState<SecuritySettings | null>(null);
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
-  const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [appearanceSettings, setAppearanceSettings] = useState<AppearanceSettings | null>(null);
 
   const supabase = useSupabaseClient();
@@ -68,16 +66,12 @@ const Settings = () => {
         const [
           userSettingsData,
           notificationData,
-          securityData,
           paymentData,
-          privacyData,
           appearanceData
         ] = await Promise.all([
           settingsService.getUserSettings(user.id),
           settingsService.getNotificationPreferences(user.id),
-          settingsService.getSecuritySettings(user.id),
           settingsService.getPaymentSettings(user.id),
-          settingsService.getPrivacySettings(user.id),
           settingsService.getAppearanceSettings(user.id)
         ]);
 
@@ -94,9 +88,7 @@ const Settings = () => {
           }
 
           setNotificationPreferences(notificationData);
-          setSecuritySettings(securityData);
           setPaymentSettings(paymentData);
-          setPrivacySettings(privacyData);
           setAppearanceSettings(appearanceData);
         }
 
@@ -283,14 +275,6 @@ const Settings = () => {
                 Notifications
               </Button>
               <Button 
-                variant={activeTab === 'security' ? 'default' : 'ghost'} 
-                className="w-full justify-start"
-                onClick={() => setActiveTab('security')}
-              >
-                <Shield className="w-4 h-4 mr-2" />
-                Security
-              </Button>
-              <Button 
                 variant={activeTab === 'privacy' ? 'default' : 'ghost'} 
                 className="w-full justify-start"
                 onClick={() => setActiveTab('privacy')}
@@ -380,156 +364,8 @@ const Settings = () => {
           )}
 
           {/* Security Tab */}
-          {activeTab === 'security' && (
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Shield className="w-5 h-5 text-accent" />
-                Security
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="two-factor">Two-Factor Authentication</Label>
-                    <p className="text-sm text-muted-foreground">Add an extra layer of security to your account</p>
-                  </div>
-                  <Switch
-                    id="two-factor"
-                    checked={userSettings?.two_factor_auth || false}
-                    onCheckedChange={(checked) => handleSettingChange("user", "two_factor_auth", checked)}
-                  />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="login-alerts">Login Alerts</Label>
-                    <p className="text-sm text-muted-foreground">Get notified of new login attempts</p>
-                  </div>
-                  <Switch
-                    id="login-alerts"
-                    checked={userSettings?.login_alerts || false}
-                    onCheckedChange={(checked) => handleSettingChange("user", "login_alerts", checked)}
-                  />
-                </div>
-                <Separator />
-                <div className="space-y-2">
-                  <Label htmlFor="session-timeout">Session Timeout</Label>
-                  <Select
-                    value={userSettings?.session_timeout?.toString() || "30"}
-                    onValueChange={(value) => handleSettingChange("user", "session_timeout", parseInt(value))}
-                  >
-                    <SelectTrigger className="w-40 bg-background/50">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="15">15 minutes</SelectItem>
-                      <SelectItem value="30">30 minutes</SelectItem>
-                      <SelectItem value="60">1 hour</SelectItem>
-                      <SelectItem value="240">4 hours</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Separator />
-                <div className="space-y-4">
-                  <h4 className="font-medium">Change Password</h4>
-                  <div className="space-y-2">
-                    <Label htmlFor="current-password">Current Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="current-password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Enter current password"
-                        className="bg-background/50 pr-10"
-                        value={passwordData.currentPassword}
-                        onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="new-password">New Password</Label>
-                    <Input
-                      id="new-password"
-                      type="password"
-                      placeholder="Enter new password"
-                      className="bg-background/50"
-                      value={passwordData.newPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirm New Password</Label>
-                    <Input
-                      id="confirm-password"
-                      type="password"
-                      placeholder="Confirm new password"
-                      className="bg-background/50"
-                      value={passwordData.confirmPassword}
-                      onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                    />
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={handlePasswordChange}
-                    disabled={saving}
-                  >
-                    {saving ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : null}
-                    Change Password
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          )}
 
           {/* Privacy Tab */}
-          {activeTab === 'privacy' && (
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Globe className="w-5 h-5 text-accent" />
-                Privacy
-              </h3>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="profile-visibility">Profile Visibility</Label>
-                  <Select
-                    value={userSettings?.profile_visibility || "private"}
-                    onValueChange={(value) => handleSettingChange("user", "profile_visibility", value)}
-                  >
-                    <SelectTrigger className="bg-background/50">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="public">Public</SelectItem>
-                      <SelectItem value="private">Private</SelectItem>
-                      <SelectItem value="friends">Friends Only</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="data-sharing">Data Sharing</Label>
-                    <p className="text-sm text-muted-foreground">Allow data to be used for analytics and improvements</p>
-                  </div>
-                  <Switch
-                    id="data-sharing"
-                    checked={userSettings?.data_sharing || false}
-                    onCheckedChange={(checked) => handleSettingChange("user", "data_sharing", checked)}
-                  />
-                </div>
-              </div>
-            </Card>
-          )}
 
           {/* Payment Settings Tab */}
           {activeTab === 'payment' && (

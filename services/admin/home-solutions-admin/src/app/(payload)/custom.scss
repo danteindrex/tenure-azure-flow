@@ -1,0 +1,320 @@
+@import '~@payloadcms/ui/scss';
+
+/* ===================================
+   HOME SOLUTIONS ADMIN CUSTOMIZATION
+   Following Payload's official CSS customization guidelines
+   ================================== */
+
+/* Black/White/Gray Theme Variables */
+:root {
+  --theme-bg: #000000;
+  --theme-elevation-0: #000000;
+  --theme-elevation-50: #0f0f0f;
+  --theme-elevation-100: #1a1a1a;
+  --theme-elevation-150: #262626;
+  --theme-elevation-200: #333333;
+  --theme-elevation-300: #404040;
+  --theme-elevation-400: #525252;
+  --theme-elevation-500: #737373;
+  --theme-text: #ffffff;
+  --theme-text-dim: #a3a3a3;
+}
+
+/* Reduce Dashboard Title Size */
+.dashboard h1,
+.template-default h1 {
+  font-size: 1.5rem !important; /* Smaller title */
+  margin-bottom: base(1) !important;
+}
+
+/* Dashboard Enhancement with Real Metrics */
+.dashboard {
+  background-color: var(--theme-bg);
+  
+  /* Add real metrics dashboard */
+  &::after {
+    content: '';
+    display: block;
+    position: relative;
+    margin-bottom: base(2);
+  }
+}
+
+/* Inject Dashboard Metrics with JavaScript */
+.dashboard::after {
+  content: '';
+  display: block;
+  min-height: 300px;
+  background: var(--theme-elevation-50);
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: var(--border-radius);
+  position: relative;
+}
+
+/* Dashboard Metrics Container */
+#dashboard-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: base(1);
+  margin-bottom: base(2);
+  padding: base(1);
+}
+
+.metric-card {
+  background: var(--theme-elevation-50);
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: var(--border-radius);
+  padding: base(1);
+  
+  .metric-title {
+    font-size: 0.875rem;
+    color: var(--theme-text-dim);
+    margin-bottom: base(0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--theme-text);
+    margin-bottom: base(0.25);
+  }
+  
+  .metric-growth {
+    font-size: 0.75rem;
+    color: var(--theme-text-dim);
+    
+    &.positive { color: #22c55e; }
+    &.negative { color: #ef4444; }
+  }
+}
+
+/* Charts Section */
+.charts-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: base(1);
+  margin: base(2) 0;
+}
+
+.chart-container {
+  background: var(--theme-elevation-50);
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: var(--border-radius);
+  padding: base(1);
+  
+  h3 {
+    margin-bottom: base(1);
+    color: var(--theme-text);
+    font-size: 1rem;
+  }
+}
+
+/* Bar Chart */
+.bar-chart {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  height: 120px;
+  padding: base(0.5) 0;
+  gap: base(0.25);
+}
+
+.bar {
+  background: var(--theme-elevation-300);
+  width: 100%;
+  min-height: 20px;
+  border-radius: 2px 2px 0 0;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  transition: all 150ms ease;
+  position: relative;
+  cursor: pointer;
+  
+  &:hover {
+    background: var(--theme-elevation-400);
+    transform: scaleY(1.05);
+  }
+  
+  span {
+    color: var(--theme-text-dim);
+    font-size: 0.75rem;
+    position: absolute;
+    bottom: -20px;
+    white-space: nowrap;
+  }
+}
+
+/* Line Chart */
+.line-chart {
+  height: 120px;
+  display: flex;
+  align-items: center;
+  
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+  
+  polyline {
+    stroke: var(--theme-text);
+    stroke-width: 2;
+    fill: none;
+  }
+  
+  circle {
+    fill: var(--theme-text);
+    transition: all 150ms ease;
+    cursor: pointer;
+    
+    &:hover {
+      r: 5;
+      fill: var(--theme-elevation-400);
+    }
+  }
+}
+
+.activity-feed {
+  background: var(--theme-elevation-50);
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: var(--border-radius);
+  padding: base(1);
+  margin-top: base(1);
+  
+  h3 {
+    margin-bottom: base(1);
+    color: var(--theme-text);
+  }
+  
+  .activity-item {
+    padding: base(0.5) 0;
+    border-bottom: 1px solid var(--theme-elevation-150);
+    
+    &:last-child { border-bottom: none; }
+    
+    .activity-message {
+      color: var(--theme-text);
+      font-size: 0.875rem;
+    }
+    
+    .activity-time {
+      color: var(--theme-text-dim);
+      font-size: 0.75rem;
+    }
+  }
+}
+
+/* Responsive Charts */
+@media (max-width: 768px) {
+  .charts-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Navigation Enhancement - Add Dashboard link */
+.nav {
+  background-color: var(--theme-elevation-50);
+  border-right: 1px solid var(--theme-elevation-150);
+}
+
+/* Dashboard Navigation Button */
+.dashboard-nav-btn {
+  display: block;
+  padding: base(0.75) base(1);
+  margin: base(0.5);
+  background: var(--theme-elevation-100);
+  border: 1px solid var(--theme-elevation-200);
+  border-radius: var(--border-radius);
+  color: var(--theme-text);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+  text-decoration: none;
+  text-align: center;
+  
+  &:hover {
+    background: var(--theme-elevation-200);
+    transform: translateY(-1px);
+    color: var(--theme-text);
+    text-decoration: none;
+  }
+  
+  &:focus {
+    outline: 2px solid var(--theme-elevation-400);
+    outline-offset: 2px;
+  }
+}
+
+/* Collection Cards Enhancement */
+.collection-card {
+  background: var(--theme-elevation-50);
+  border: 1px solid var(--theme-elevation-150);
+  color: var(--theme-text);
+  
+  &:hover {
+    border-color: var(--theme-elevation-300);
+    transform: translateY(-2px);
+  }
+}
+
+/* Global Theme Application */
+body,
+html,
+.app {
+  background-color: var(--theme-bg) !important;
+  color: var(--theme-text) !important;
+}
+
+/* Header Styling */
+.app-header {
+  background-color: var(--theme-elevation-50);
+  border-bottom: 1px solid var(--theme-elevation-150);
+  color: var(--theme-text);
+}
+
+/* Navigation Links */
+.nav__link {
+  color: var(--theme-text-dim);
+  transition: all 150ms ease;
+  
+  &:hover {
+    color: var(--theme-text);
+    background-color: var(--theme-elevation-100);
+  }
+  
+  &--active {
+    color: var(--theme-text);
+    background-color: var(--theme-elevation-200);
+  }
+}
+
+/* Form Elements */
+.field-label {
+  color: var(--theme-text);
+}
+
+.input,
+.textarea,
+.select {
+  background-color: var(--theme-elevation-100);
+  border: 1px solid var(--theme-elevation-200);
+  color: var(--theme-text);
+  
+  &:focus {
+    border-color: var(--theme-elevation-400);
+  }
+}
+
+/* Buttons */
+.btn--primary {
+  background-color: var(--theme-text);
+  color: var(--theme-bg);
+}
+
+.btn--secondary {
+  background-color: var(--theme-elevation-200);
+  color: var(--theme-text);
+  border: 1px solid var(--theme-elevation-300);
+}
