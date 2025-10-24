@@ -12,25 +12,22 @@ import { AdminAlerts } from './collections/AdminAlerts'
 import { AuditLog } from './collections/AuditLog'
 import { Disputes } from './collections/Disputes'
 import { FinancialSchedules } from './collections/FinancialSchedules'
-import { KYCVerification } from './collections/KYCVerification'
 import { MemberAgreements } from './collections/MemberAgreements'
-import { Members } from './collections/Members'
 import { NewsFeedPost } from './collections/NewsFeedPost'
 import { Payment } from './collections/Payment'
 import { PaymentMethods } from './collections/PaymentMethods'
 import { PayoutManagement } from './collections/PayoutManagement'
 import { Queue } from './collections/Queue'
 import QueueEntries from './collections/QueueEntries'
-import { ReportTemplates } from './collections/ReportTemplates'
 import { Subscription } from './collections/Subscription'
-import { TaxForms } from './collections/TaxForms'
-import { TransactionMonitoring } from './collections/TransactionMonitoring'
 import { UserAddresses } from './collections/UserAddresses'
 import UserAuditLogs from './collections/UserAuditLogs'
 import { UserContacts } from './collections/UserContacts'
 import { UserMemberships } from './collections/UserMemberships'
 import { UserProfiles } from './collections/UserProfiles'
-import EnhancedDashboardMetrics from './components/EnhancedDashboardMetrics'
+import { Users } from './collections/Users'
+import FinancialDashboard from './components/FinancialDashboard'
+import AnalyticsGraphs from './components/AnalyticsGraphs'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -39,7 +36,7 @@ export default buildConfig({
   admin: {
     user: Admin.slug,
     components: {
-      beforeDashboard: [EnhancedDashboardMetrics],
+      beforeDashboard: [FinancialDashboard, AnalyticsGraphs],
     },
   },
   collections: [
@@ -47,7 +44,7 @@ export default buildConfig({
     Admin,
 
     // User Management
-    Members, // Points to 'users' table
+    Users, // Enhanced users collection with comprehensive details
     UserProfiles, // Points to 'user_profiles' table
     UserContacts, // Points to 'user_contacts' table
     UserAddresses, // Points to 'user_addresses' table
@@ -65,19 +62,19 @@ export default buildConfig({
     PayoutManagement, // Payout workflow and approvals
 
     // Compliance & Security (Feature-flagged)
-    KYCVerification, // KYC verification tracking
-    TransactionMonitoring, // AML and fraud monitoring
+    // KYCVerification, // KYC verification tracking - Disabled due to missing related tables
+    // TransactionMonitoring, // AML and fraud monitoring - Disabled due to missing related tables
     AuditLog,
     UserAuditLogs, // Points to 'user_audit_logs' table
 
     // Tax & Legal (Feature-flagged)
-    TaxForms, // W-9, 1099 generation
+    // TaxForms, // W-9, 1099 generation - Disabled due to missing related tables
     MemberAgreements,
     FinancialSchedules,
 
     // System & Operations (Feature-flagged)
     AdminAlerts, // Alert management
-    ReportTemplates, // Custom reports
+    // ReportTemplates, // Custom reports - Disabled due to missing related tables
     NewsFeedPost,
   ],
   editor: lexicalEditor(),

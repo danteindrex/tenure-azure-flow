@@ -33,6 +33,11 @@ interface DashboardStats {
 }
 
 export const EnhancedDashboardMetrics: React.FC = () => {
+  // Prevent server-side rendering issues
+  if (typeof window === 'undefined') {
+    return null
+  }
+
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -108,33 +113,34 @@ export const EnhancedDashboardMetrics: React.FC = () => {
             }
 
             .metric-card {
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              border-radius: 12px;
+              background: #0f0f0f;
+              border: 1px solid #262626;
+              border-radius: 8px;
               padding: 1.5rem;
-              color: white;
-              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-              transition: transform 0.2s;
+              color: #ffffff;
+              transition: all 0.2s ease;
             }
 
             .metric-card:hover {
-              transform: translateY(-4px);
-              box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+              transform: translateY(-2px);
+              border-color: #404040;
+              background: #1a1a1a;
             }
 
             .metric-card.success {
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              border-left: 3px solid #22c55e;
             }
 
             .metric-card.warning {
-              background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+              border-left: 3px solid #f59e0b;
             }
 
             .metric-card.danger {
-              background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+              border-left: 3px solid #ef4444;
             }
 
             .metric-card.info {
-              background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+              border-left: 3px solid #3b82f6;
             }
 
             .metric-title {
@@ -173,10 +179,10 @@ export const EnhancedDashboardMetrics: React.FC = () => {
             }
 
             .alerts-section {
-              background: white;
-              border-radius: 12px;
+              background: #0f0f0f;
+              border: 1px solid #262626;
+              border-radius: 8px;
               padding: 1.5rem;
-              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
               margin-bottom: 2rem;
             }
 
@@ -208,31 +214,30 @@ export const EnhancedDashboardMetrics: React.FC = () => {
             }
 
             .feature-flag-notice {
-              background: #dbeafe;
-              border: 1px solid #93c5fd;
+              background: #1a1a1a;
+              border: 1px solid #404040;
               border-radius: 8px;
               padding: 1rem;
               margin-bottom: 1.5rem;
-              color: #1e40af;
+              color: #a3a3a3;
               font-size: 0.875rem;
             }
           </style>
 
           <div id="enhanced-dashboard-metrics">
-            ${
-              Object.keys(features).some((category) =>
-                Object.values(features[category as keyof typeof features]).some(
-                  (value) => value === false
-                )
-              )
-                ? `
+            ${Object.keys(features).some((category) =>
+          Object.values(features[category as keyof typeof features]).some(
+            (value) => value === false
+          )
+        )
+            ? `
             <div class="feature-flag-notice">
               ℹ️ <strong>Development Mode:</strong> Some features are disabled via feature flags.
               Check <code>src/config/features.ts</code> to enable/disable features.
             </div>
             `
-                : ''
-            }
+            : ''
+          }
 
             <div class="metrics-grid">
               <!-- Users Card -->
@@ -252,9 +257,8 @@ export const EnhancedDashboardMetrics: React.FC = () => {
               </div>
 
               <!-- Queue Card -->
-              ${
-                features.queue.queueAnalytics
-                  ? `
+              ${features.queue.queueAnalytics
+            ? `
               <div class="metric-card info">
                 <div class="metric-title">🎯 Queue Status</div>
                 <div class="metric-value">${stats.queue.total}</div>
@@ -262,34 +266,32 @@ export const EnhancedDashboardMetrics: React.FC = () => {
                 <div class="metric-growth">${stats.queue.eligibleForPayout} × $${(stats.queue.nextPayoutAmount / 1000).toFixed(0)}K</div>
               </div>
               `
-                  : ''
-              }
+            : ''
+          }
 
               <!-- Compliance Card -->
-              ${
-                features.compliance.kycVerification
-                  ? `
+              ${features.compliance.kycVerification
+            ? `
               <div class="metric-card ${stats.compliance.kycPending > 50 ? 'warning' : 'info'}">
                 <div class="metric-title">✅ Compliance Status</div>
                 <div class="metric-value">${stats.compliance.kycVerified}</div>
                 <div class="metric-subtitle">${stats.compliance.kycPending} KYC pending review</div>
               </div>
               `
-                  : ''
-              }
+            : ''
+          }
 
               <!-- Alerts Card -->
-              ${
-                features.alerts.adminAlerts
-                  ? `
+              ${features.alerts.adminAlerts
+            ? `
               <div class="metric-card ${stats.alerts.critical > 0 ? 'danger' : stats.alerts.warnings > 0 ? 'warning' : 'success'}">
                 <div class="metric-title">🚨 System Alerts</div>
                 <div class="metric-value">${stats.alerts.unresolved}</div>
                 <div class="metric-subtitle">${stats.alerts.critical} critical • ${stats.alerts.warnings} warnings</div>
               </div>
               `
-                  : ''
-              }
+            : ''
+          }
 
               <!-- Payment Success Rate -->
               <div class="metric-card ${stats.payments.successRate >= 95 ? 'success' : 'warning'}">
@@ -299,38 +301,35 @@ export const EnhancedDashboardMetrics: React.FC = () => {
               </div>
             </div>
 
-            ${
-              features.alerts.adminAlerts && stats.alerts.unresolved > 0
-                ? `
+            ${features.alerts.adminAlerts && stats.alerts.unresolved > 0
+            ? `
             <div class="alerts-section">
               <div class="alerts-header">
                 <h3>Recent Alerts</h3>
                 <a href="/admin/collections/admin_alerts" style="color: #3b82f6; text-decoration: none; font-size: 0.875rem;">View All →</a>
               </div>
 
-              ${
-                stats.alerts.critical > 0
-                  ? `
+              ${stats.alerts.critical > 0
+              ? `
               <div class="alert-item critical">
                 <strong>⚠️ Critical:</strong>&nbsp; ${stats.alerts.critical} critical alerts require immediate attention
               </div>
               `
-                  : ''
-              }
+              : ''
+            }
 
-              ${
-                stats.alerts.warnings > 0
-                  ? `
+              ${stats.alerts.warnings > 0
+              ? `
               <div class="alert-item warning">
                 <strong>⚡ Warning:</strong>&nbsp; ${stats.alerts.warnings} warnings need review
               </div>
               `
-                  : ''
-              }
+              : ''
+            }
             </div>
             `
-                : ''
-            }
+            : ''
+          }
           </div>
         `
 

@@ -1,11 +1,11 @@
 @import '~@payloadcms/ui/scss';
 
 /* ===================================
-   HOME SOLUTIONS ADMIN CUSTOMIZATION
-   Following Payload's official CSS customization guidelines
+   FINANCIAL INSTITUTION ADMIN THEME
+   Minimal dark theme for financial operations
    ================================== */
 
-/* Black/White/Gray Theme Variables */
+/* Minimal Dark Theme Variables */
 :root {
   --theme-bg: #000000;
   --theme-elevation-0: #000000;
@@ -18,6 +18,27 @@
   --theme-elevation-500: #737373;
   --theme-text: #ffffff;
   --theme-text-dim: #a3a3a3;
+  --theme-success: #22c55e;
+  --theme-warning: #f59e0b;
+  --theme-error: #ef4444;
+  --theme-info: #3b82f6;
+}
+
+/* Hide all icons globally */
+.icon,
+.nav__icon,
+.collection-card__icon,
+.btn__icon,
+[class*="icon-"],
+svg[class*="icon"] {
+  display: none !important;
+}
+
+/* Remove icon spacing */
+.nav__link,
+.collection-card,
+.btn {
+  padding-left: 1rem !important;
 }
 
 /* Reduce Dashboard Title Size */
