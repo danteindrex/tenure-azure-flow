@@ -16,15 +16,16 @@ const AdminNavigation: React.FC = () => {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          padding: 8px 16px;
+          padding: 10px 20px;
           background: #007bff;
           color: white;
           text-decoration: none;
           border-radius: 6px;
-          font-size: 14px;
-          font-weight: 500;
+          font-size: 15px;
+          font-weight: 600;
           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
           transition: all 0.2s ease;
+          letter-spacing: 0.5px;
         }
         .home-button:hover {
           background: #0056b3;
@@ -38,7 +39,7 @@ const AdminNavigation: React.FC = () => {
       
       <Link href="/admin" className="home-button">
         <span className="home-icon">🏠</span>
-        <span>Dashboard Home</span>
+        <span>HOME SOLUTIONS</span>
       </Link>
     </div>
   )
