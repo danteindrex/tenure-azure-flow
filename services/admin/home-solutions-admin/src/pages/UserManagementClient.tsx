@@ -144,12 +144,12 @@ const UserManagementClient: React.FC = () => {
       <style jsx>{`
         .user-management-page {
           padding: 0;
-          background: #000000;
+          background: #1a1a1a;
           min-height: 100vh;
         }
         .page-header {
-          background: #111111;
-          border-bottom: 1px solid #334155;
+          background: #000000;
+          border-bottom: 1px solid #262626;
           padding: 24px 32px;
           margin-bottom: 0;
         }
@@ -160,13 +160,13 @@ const UserManagementClient: React.FC = () => {
           margin: 0 0 8px 0;
         }
         .page-subtitle {
-          color: #94a3b8;
+          color: #a3a3a3;
           font-size: 16px;
           margin: 0;
         }
         .stats-section {
-          background: #111111;
-          border-bottom: 1px solid #334155;
+          background: #000000;
+          border-bottom: 1px solid #262626;
           padding: 24px 32px;
         }
         .stats-grid {
@@ -177,9 +177,9 @@ const UserManagementClient: React.FC = () => {
         .stat-card {
           text-align: center;
           padding: 16px;
-          border-bottom: 1px solid #334155;
+          border-bottom: 1px solid #262626;
           border-radius: 8px;
-          background: #000000;
+          background: #1a1a1a;
         }
         .stat-value {
           font-size: 28px;
@@ -189,7 +189,7 @@ const UserManagementClient: React.FC = () => {
         }
         .stat-label {
           font-size: 14px;
-          color: #94a3b8;
+          color: #a3a3a3;
           font-weight: 500;
         }
         .content-section {
@@ -199,13 +199,13 @@ const UserManagementClient: React.FC = () => {
           min-height: calc(100vh - 200px);
         }
         .users-panel {
-          background: #111111;
-          border-bottom: 1px solid #334155;
+          background: #000000;
+          border-bottom: 1px solid #262626;
         }
         .panel-header {
           padding: 20px 24px;
-          border-bottom: 1px solid #334155;
-          background: #000000;
+          border-bottom: 1px solid #262626;
+          background: #1a1a1a;
         }
         .panel-title {
           font-size: 18px;
@@ -216,10 +216,10 @@ const UserManagementClient: React.FC = () => {
         .search-input {
           width: 100%;
           padding: 8px 12px;
-          border: 1px solid #334155;
+          border: 1px solid #333333;
           border-radius: 6px;
           font-size: 14px;
-          background: #000000;
+          background: #1a1a1a;
           color: #f1f5f9;
         }
         .users-list {
@@ -233,7 +233,7 @@ const UserManagementClient: React.FC = () => {
           transition: background-color 0.2s;
         }
         .user-item:hover {
-          background-color: #000000;
+          background-color: #1a1a1a;
         }
         .user-item.selected {
           background-color: #2d3748;
@@ -249,7 +249,7 @@ const UserManagementClient: React.FC = () => {
           align-items: center;
           gap: 12px;
           font-size: 12px;
-          color: #94a3b8;
+          color: #a3a3a3;
         }
         .status-badge {
           padding: 2px 8px;
@@ -262,7 +262,7 @@ const UserManagementClient: React.FC = () => {
         .status-inactive { background: #63171b; color: #fc8181; }
         .status-suspended { background: #63171b; color: #fc8181; }
         .details-panel {
-          background: #111111;
+          background: #000000;
           padding: 24px;
           overflow-y: auto;
         }
@@ -278,16 +278,16 @@ const UserManagementClient: React.FC = () => {
           margin: 0 0 8px 0;
         }
         .details-subtitle {
-          color: #94a3b8;
+          color: #a3a3a3;
           font-size: 14px;
           margin: 0;
         }
         .detail-section {
           margin-bottom: 24px;
           padding: 16px;
-          border-bottom: 1px solid #334155;
+          border-bottom: 1px solid #262626;
           border-radius: 8px;
-          background: #000000;
+          background: #1a1a1a;
         }
         .section-title {
           font-size: 16px;
@@ -310,7 +310,7 @@ const UserManagementClient: React.FC = () => {
           font-size: 14px;
         }
         .detail-label {
-          color: #94a3b8;
+          color: #a3a3a3;
           font-weight: 500;
         }
         .detail-value {
@@ -320,9 +320,9 @@ const UserManagementClient: React.FC = () => {
         .payment-history {
           max-height: 150px;
           overflow-y: auto;
-          border-bottom: 1px solid #334155;
+          border-bottom: 1px solid #262626;
           border-radius: 4px;
-          background: #000000;
+          background: #1a1a1a;
         }
         .payment-item {
           display: flex;
@@ -338,13 +338,13 @@ const UserManagementClient: React.FC = () => {
         }
         .no-selection {
           text-align: center;
-          color: #94a3b8;
+          color: #a3a3a3;
           padding: 60px 20px;
         }
         .loading-container, .error-container {
           text-align: center;
           padding: 60px;
-          color: #94a3b8;
+          color: #a3a3a3;
         }
         .loading-spinner {
           width: 40px;
@@ -374,7 +374,7 @@ const UserManagementClient: React.FC = () => {
         .details-loading {
           text-align: center;
           padding: 40px;
-          color: #94a3b8;
+          color: #a3a3a3;
         }
       `}</style>
 

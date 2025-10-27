@@ -59,6 +59,29 @@ export default buildConfig({
       },
     },
     locking: false, // Disable document locking to avoid relationship errors
+    // Hide collections from navigation - only show custom pages
+    hideCollections: [
+      'admin',
+      'users',
+      'user_profiles',
+      'user_contacts',
+      'user_addresses',
+      'user_memberships',
+      'user_payments',
+      'user_payment_methods',
+      'user_subscriptions',
+      'disputes',
+      'queue',
+      'membership_queue',
+      'payout_management',
+      'kyc_verification',
+      'audit_logs',
+      'user_audit_logs',
+      'member_agreements',
+      'financial_schedules',
+      'admin_alerts',
+      'news_feed_posts',
+    ],
   },
   collections: [
     // Core Admin

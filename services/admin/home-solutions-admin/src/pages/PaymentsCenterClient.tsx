@@ -54,10 +54,10 @@ export default function PaymentsCenterClient() {
         <style jsx>{`
           .payments-page {
             padding: 60px;
-            background: #000000;
+            background: #1a1a1a;
             min-height: 100vh;
             text-align: center;
-            color: #94a3b8;
+            color: #a3a3a3;
           }
           .loading-spinner {
             width: 40px;
@@ -84,12 +84,12 @@ export default function PaymentsCenterClient() {
       <style jsx>{`
         .payments-page {
           padding: 0;
-          background: #000000;
+          background: #1a1a1a;
           min-height: 100vh;
         }
         .page-header {
-          background: #111111;
-          border-bottom: 1px solid #334155;
+          background: #000000;
+          border-bottom: 1px solid #262626;
           padding: 24px 32px;
         }
         .page-title {
@@ -99,13 +99,13 @@ export default function PaymentsCenterClient() {
           margin: 0 0 8px 0;
         }
         .page-subtitle {
-          color: #94a3b8;
+          color: #a3a3a3;
           font-size: 16px;
           margin: 0;
         }
         .stats-section {
-          background: #111111;
-          border-bottom: 1px solid #334155;
+          background: #000000;
+          border-bottom: 1px solid #262626;
           padding: 24px 32px;
         }
         .stats-grid {
@@ -116,9 +116,9 @@ export default function PaymentsCenterClient() {
         .stat-card {
           text-align: center;
           padding: 16px;
-          border: 1px solid #334155;
+          border: 1px solid #333333;
           border-radius: 8px;
-          background: #000000;
+          background: #1a1a1a;
         }
         .stat-value {
           font-size: 28px;
@@ -128,7 +128,7 @@ export default function PaymentsCenterClient() {
         }
         .stat-label {
           font-size: 14px;
-          color: #94a3b8;
+          color: #a3a3a3;
           font-weight: 500;
         }
         .content-section {
@@ -138,13 +138,13 @@ export default function PaymentsCenterClient() {
           min-height: calc(100vh - 200px);
         }
         .transactions-panel {
-          background: #111111;
+          background: #000000;
           border-right: 1px solid #334155;
         }
         .panel-header {
           padding: 20px 24px;
-          border-bottom: 1px solid #334155;
-          background: #000000;
+          border-bottom: 1px solid #262626;
+          background: #1a1a1a;
         }
         .panel-title {
           font-size: 18px;
@@ -163,7 +163,7 @@ export default function PaymentsCenterClient() {
           transition: background-color 0.2s;
         }
         .txn-item:hover {
-          background-color: #000000;
+          background-color: #1a1a1a;
         }
         .txn-item.selected {
           background-color: #1e40af;
@@ -179,7 +179,7 @@ export default function PaymentsCenterClient() {
           align-items: center;
           gap: 12px;
           font-size: 12px;
-          color: #94a3b8;
+          color: #a3a3a3;
         }
         .status-badge {
           padding: 2px 8px;
@@ -192,7 +192,7 @@ export default function PaymentsCenterClient() {
         .status-failed { background: #7f1d1d; color: #fca5a5; }
         .status-refunded { background: #1e3a8a; color: #93c5fd; }
         .details-panel {
-          background: #111111;
+          background: #000000;
           padding: 24px;
           overflow-y: auto;
         }
@@ -208,16 +208,16 @@ export default function PaymentsCenterClient() {
           margin: 0 0 8px 0;
         }
         .details-subtitle {
-          color: #94a3b8;
+          color: #a3a3a3;
           font-size: 14px;
           margin: 0;
         }
         .detail-section {
           margin-bottom: 24px;
           padding: 16px;
-          border: 1px solid #334155;
+          border: 1px solid #333333;
           border-radius: 8px;
-          background: #000000;
+          background: #1a1a1a;
         }
         .section-title {
           font-size: 16px;
@@ -237,7 +237,7 @@ export default function PaymentsCenterClient() {
           font-size: 14px;
         }
         .detail-label {
-          color: #94a3b8;
+          color: #a3a3a3;
           font-weight: 500;
         }
         .detail-value {
@@ -246,7 +246,7 @@ export default function PaymentsCenterClient() {
         }
         .no-selection {
           text-align: center;
-          color: #94a3b8;
+          color: #a3a3a3;
           padding: 60px 20px;
         }
       `}</style>

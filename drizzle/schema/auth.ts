@@ -21,8 +21,15 @@ export const user = pgTable('user', {
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   emailVerified: boolean('emailVerified').notNull().default(false),
+  phone: text('phone').unique(), // Phone number for authentication
+  phoneVerified: boolean('phoneVerified').notNull().default(false),
   password: text('password'), // bcrypt hashed password
   image: text('image'),
+
+  // Onboarding step tracking (1-5)
+  onboardingStep: integer('onboardingStep').notNull().default(1),
+  onboardingCompleted: boolean('onboardingCompleted').notNull().default(false),
+
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow()
 })

@@ -31,7 +31,7 @@ export default {
 
   // Database connection
   dbCredentials: {
-    url: process.env.DATABASE_URL!
+    url: process.env.DATABASE_URL! + '?sslmode=no-verify'
   },
 
   // Schema filtering - only work with public schema

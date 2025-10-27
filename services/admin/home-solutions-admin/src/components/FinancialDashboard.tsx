@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 
 interface FinancialMetrics {
   totalRevenue: number
@@ -29,29 +29,29 @@ interface FinancialMetrics {
 }
 
 // This is a Payload CMS beforeDashboard component
-export const FinancialDashboard: React.FC = () => {
+const FinancialDashboardComponent: React.FC = () => {
   const [metrics, setMetrics] = useState<FinancialMetrics | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchMetrics = async () => {
-      try {
-        const response = await fetch('/api/metrics/financial-dashboard')
-        if (response.ok) {
-          const data = await response.json()
-          setMetrics(data)
-        }
-      } catch (error) {
-        console.error('Failed to fetch financial metrics:', error)
-      } finally {
-        setLoading(false)
+  const fetchMetrics = useCallback(async () => {
+    try {
+      const response = await fetch('/api/metrics/financial-dashboard')
+      if (response.ok) {
+        const data = await response.json()
+        setMetrics(data)
       }
+    } catch (error) {
+      console.error('Failed to fetch financial metrics:', error)
+    } finally {
+      setLoading(false)
     }
+  }, [])
 
+  useEffect(() => {
     fetchMetrics()
     const interval = setInterval(fetchMetrics, 30000) // Refresh every 30 seconds
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchMetrics])
 
   if (loading) {
     return (
@@ -382,4 +382,6 @@ export const FinancialDashboard: React.FC = () => {
   )
 }
 
+// Memoize the component to prevent unnecessary re-renders
+export const FinancialDashboard = React.memo(FinancialDashboardComponent)
 export default FinancialDashboard

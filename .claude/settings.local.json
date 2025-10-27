@@ -4,7 +4,10 @@
       "Bash(curl:*)",
       "Bash(cat:*)",
       "Bash(mkdir:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(sed:*)",
+      "Bash(npx tsx:*)",
+      "Bash(node run-migration.cjs:*)"
     ],
     "deny": [],
     "ask": []

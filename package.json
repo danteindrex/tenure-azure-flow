@@ -7,7 +7,13 @@
     "lint": "eslint .",
     "dev:next": "next dev -p 3000",
     "build:next": "next build",
-    "start:next": "next start -p 3000"
+    "start:next": "next start -p 3000",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:migrate:settings": "tsx scripts/apply-settings-migration.ts",
+    "db:migrate:auth": "tsx scripts/apply-better-auth-tables.ts",
+    "db:migrate:users": "tsx scripts/migrate-users-to-better-auth.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
