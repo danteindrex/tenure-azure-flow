@@ -1,5 +1,10 @@
 @import '~@payloadcms/ui/scss';
 
+/* Tailwind CSS directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ===================================
    FINANCIAL INSTITUTION ADMIN THEME
    Minimal dark theme for financial operations
