@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LogOut, User, Sun } from "lucide-react";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { authClient, useSession } from "@/lib/auth-client";
 import { logLogout } from "@/lib/audit";
 import { useTheme } from "@/contexts/ThemeContext";
 import Sidebar from "./Sidebar";
@@ -12,14 +12,14 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
   const router = useRouter();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const { data: session, isPending } = useSession();
   const { theme, setTheme, actualTheme } = useTheme();
 
-  // Real user data
+  // Real user data from Better Auth session
+  const user = session?.user;
   const displayUserData = {
-    name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || "User",
-    userId: user?.user_metadata?.user_id || `TRP-${new Date().getFullYear()}-${String(user?.id || '').slice(-3).toUpperCase()}`,
+    name: user?.name || user?.email?.split('@')[0] || "User",
+    userId: user?.id ? `TRP-${new Date().getFullYear()}-${String(user.id).slice(-3).toUpperCase()}` : "Loading...",
   };
 
   const handleLogout = async () => {
@@ -29,8 +29,8 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
         await logLogout(user.id);
       }
 
-      // Sign out from Supabase
-      await supabase.auth.signOut();
+      // Sign out using Better Auth
+      await authClient.signOut();
 
       router.replace("/login");
     } catch (error) {

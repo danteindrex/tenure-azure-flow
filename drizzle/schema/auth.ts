@@ -10,7 +10,7 @@
  * - Two-factor authentication (TOTP + backup codes)
  */
 
-import { pgTable, text, timestamp, boolean, uuid, integer } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, uuid, integer, unique } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
 // ============================================================================
@@ -19,20 +19,20 @@ import { relations } from 'drizzle-orm'
 export const user = pgTable('user', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
-  email: text('email').notNull().unique(),
+  email: text('email').notNull(),
   emailVerified: boolean('emailVerified').notNull().default(false),
-  phone: text('phone').unique(), // Phone number for authentication
-  phoneVerified: boolean('phoneVerified').notNull().default(false),
   password: text('password'), // bcrypt hashed password
   image: text('image'),
-
-  // Onboarding step tracking (1-5)
+  phone: text('phone'), // Added for Better Auth phone support
+  phoneVerified: boolean('phoneVerified').notNull().default(false),
   onboardingStep: integer('onboardingStep').notNull().default(1),
   onboardingCompleted: boolean('onboardingCompleted').notNull().default(false),
-
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow()
-})
+}, (table) => ({
+  emailUnique: unique('user_email_unique').on(table.email),
+  phoneUnique: unique('user_phone_unique').on(table.phone)
+}))
 
 // ============================================================================
 // BETTER AUTH: Session Management
@@ -80,7 +80,7 @@ export const passkey = pgTable('passkey', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
   name: text('name'), // User-friendly name (e.g., "iPhone 15 Pro")
-  credentialId: text('credentialId').notNull().unique(), // WebAuthn credential ID
+  credentialId: text('credentialId').notNull(), // WebAuthn credential ID
   publicKey: text('publicKey').notNull(), // Public key for verification
   counter: integer('counter').notNull().default(0), // Signature counter
   deviceType: text('deviceType'), // 'platform' or 'cross-platform'
@@ -88,20 +88,24 @@ export const passkey = pgTable('passkey', {
   transports: text('transports').array(), // ['internal', 'usb', 'nfc', 'ble']
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   lastUsedAt: timestamp('lastUsedAt', { withTimezone: true })
-})
+}, (table) => ({
+  credentialIdUnique: unique('passkey_credentialId_unique').on(table.credentialId)
+}))
 
 // ============================================================================
 // BETTER AUTH: Two-Factor Authentication
 // ============================================================================
 export const twoFactor = pgTable('two_factor', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('userId').notNull().references(() => user.id, { onDelete: 'cascade' }).unique(),
+  userId: uuid('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
   secret: text('secret').notNull(), // Encrypted TOTP secret
   backupCodes: text('backupCodes').array(), // Encrypted backup codes
   verified: boolean('verified').notNull().default(false), // Has user verified 2FA setup?
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   verifiedAt: timestamp('verifiedAt', { withTimezone: true })
-})
+}, (table) => ({
+  userIdUnique: unique('two_factor_userId_unique').on(table.userId)
+}))
 
 // ============================================================================
 // DRIZZLE RELATIONS

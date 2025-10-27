@@ -11,7 +11,7 @@
  * - Member management
  */
 
-import { pgTable, uuid, text, varchar, timestamp, index } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, varchar, timestamp, index, unique } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { user } from './auth'
 
@@ -21,13 +21,14 @@ import { user } from './auth'
 export const organization = pgTable('organization', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
-  slug: text('slug').notNull().unique(), // URL-friendly identifier
+  slug: text('slug').notNull(), // URL-friendly identifier
   logo: text('logo'),
   metadata: text('metadata'), // JSON string for additional data
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow()
 }, (table) => ({
-  slugIdx: index('idx_organization_slug').on(table.slug)
+  slugIdx: index('idx_organization_slug').on(table.slug),
+  slugUnique: unique('organization_slug_unique').on(table.slug)
 }))
 
 // ============================================================================
@@ -55,14 +56,15 @@ export const organizationInvitation = pgTable('organization_invitation', {
   role: varchar('role', { length: 20 }).notNull().default('member'), // 'admin', 'member'
   inviterId: uuid('inviterId').notNull().references(() => user.id, { onDelete: 'cascade' }),
   status: varchar('status', { length: 20 }).notNull().default('pending'), // 'pending', 'accepted', 'declined', 'expired'
-  token: text('token').notNull().unique(), // Invitation token
+  token: text('token').notNull(), // Invitation token
   expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow()
 }, (table) => ({
   orgIdIdx: index('idx_organization_invitation_org_id').on(table.organizationId),
   emailIdx: index('idx_organization_invitation_email').on(table.email),
   tokenIdx: index('idx_organization_invitation_token').on(table.token),
-  statusIdx: index('idx_organization_invitation_status').on(table.status)
+  statusIdx: index('idx_organization_invitation_status').on(table.status),
+  tokenUnique: unique('organization_invitation_token_unique').on(table.token)
 }))
 
 // ============================================================================

@@ -55,36 +55,24 @@ export const systemAuditLogs = pgTable('system_audit_logs', {
 // ============================================================================
 export const userAuditLogs = pgTable('user_audit_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-
-  // Event Information
-  eventType: varchar('event_type', { length: 50 }).notNull(), // 'login', 'logout', 'profile_update', 'password_change'
-  eventCategory: varchar('event_category', { length: 50 }), // 'authentication', 'profile', 'security', 'payment'
-  eventDescription: text('event_description'),
-
-  // Event Data
-  eventData: jsonb('event_data'), // Additional event-specific data
-
-  // Request Context
+  userId: uuid('user_id'),
+  adminId: integer('admin_id'),
+  entityType: varchar('entity_type').notNull(),
+  entityId: uuid('entity_id'),
+  action: varchar('action').notNull(),
+  oldValues: jsonb('old_values'),
+  newValues: jsonb('new_values'),
+  success: boolean('success').notNull(),
+  errorMessage: text('error_message'),
   ipAddress: inet('ip_address'),
   userAgent: text('user_agent'),
-  deviceType: varchar('device_type', { length: 20 }), // 'desktop', 'mobile', 'tablet'
-  browser: varchar('browser', { length: 50 }),
-  os: varchar('os', { length: 50 }),
-
-  // Location
-  location: jsonb('location'), // { country, city, lat, lng }
-
-  // Status
-  success: boolean('success').default(true),
-  failureReason: text('failure_reason'),
-
+  metadata: jsonb('metadata').default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
   userIdIdx: index('idx_user_audit_logs_user_id').on(table.userId),
-  eventTypeIdx: index('idx_user_audit_logs_event_type').on(table.eventType),
-  eventCategoryIdx: index('idx_user_audit_logs_event_category').on(table.eventCategory),
-  createdAtIdx: index('idx_user_audit_logs_created_at').on(table.createdAt)
+  actionIdx: index('idx_user_audit_logs_action').on(table.action),
+  createdAtIdx: index('idx_user_audit_logs_created_at').on(table.createdAt),
+  entityTypeIdx: index('idx_user_audit_logs_entity_type').on(table.entityType)
 }))
 
 // ============================================================================

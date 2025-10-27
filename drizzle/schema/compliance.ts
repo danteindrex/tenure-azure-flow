@@ -124,34 +124,19 @@ export const transactionMonitoring = pgTable('transaction_monitoring', {
 // ============================================================================
 export const verificationCodes = pgTable('verification_codes', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  codeType: varchar('code_type', { length: 20 }).notNull(), // 'email', 'sms', 'totp'
-  code: varchar('code', { length: 10 }).notNull(), // 6-digit code (hashed)
-  purpose: varchar('purpose', { length: 50 }).notNull(), // 'signup', 'login', 'reset_password', '2fa'
-
-  // Contact Information
-  email: varchar('email', { length: 255 }),
-  phoneNumber: varchar('phone_number', { length: 20 }),
-
-  // Status
-  used: boolean('used').default(false),
-  usedAt: timestamp('used_at', { withTimezone: true }),
+  email: varchar('email', { length: 255 }).notNull(),
+  code: varchar('code', { length: 6 }).notNull(),
+  linkToken: varchar('link_token', { length: 64 }).notNull().unique(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-
-  // Attempt Tracking
-  attempts: integer('attempts').default(0),
-  maxAttempts: integer('max_attempts').default(3),
-
-  // Metadata
-  ipAddress: text('ip_address'),
-  userAgent: text('user_agent'),
-
+  used: boolean('used').default(false),
+  userId: uuid('user_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
-  userIdIdx: index('idx_verification_codes_user_id').on(table.userId),
   codeIdx: index('idx_verification_codes_code').on(table.code),
   emailIdx: index('idx_verification_codes_email').on(table.email),
-  expiresAtIdx: index('idx_verification_codes_expires_at').on(table.expiresAt)
+  expiresAtIdx: index('idx_verification_codes_expires_at').on(table.expiresAt),
+  linkTokenIdx: index('idx_verification_codes_link_token').on(table.linkToken),
+  userIdIdx: index('idx_verification_codes_user_id').on(table.userId)
 }))
 
 // ============================================================================

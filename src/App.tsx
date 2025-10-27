@@ -18,6 +18,7 @@ import History from "./pages/dashboard/History";
 import HistoryNew from "./pages/dashboard/HistoryNew";
 import Analytics from "./pages/dashboard/Analytics";
 import Queue from "./pages/dashboard/Queue";
+import Security from "./pages/dashboard/Security";
 import DashboardLayout from "./components/DashboardLayout";
 import NotFound from "./pages/NotFound";
 
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="analytics" element={<Analytics />} />
             <Route path="history" element={<HistoryNew />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="security" element={<Security />} />
             <Route path="settings" element={<Settings />} />
             <Route path="help" element={<Help />} />
           </Route>

@@ -21,18 +21,15 @@ import { user } from './auth'
 // ============================================================================
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
-  authUserId: text('auth_user_id').unique(), // OLD: Links to auth.users (Supabase)
-  userId: uuid('user_id').references(() => user.id), // NEW: Links to Better Auth user
-  email: varchar('email', { length: 255 }).unique().notNull(),
+  authUserId: text('auth_user_id'),
+  email: varchar('email', { length: 255 }).notNull(),
   emailVerified: boolean('email_verified').default(false),
-  status: text('status').notNull().default('Pending'), // enum_member_status
+  status: text('status').notNull().default('Pending'), // This will be enum_users_status in DB
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
   emailIdx: index('idx_users_email').on(table.email),
-  authUserIdIdx: index('idx_users_auth_user_id').on(table.authUserId),
-  statusIdx: index('idx_users_status').on(table.status),
-  createdAtIdx: index('idx_users_created_at').on(table.createdAt)
+  updatedAtIdx: index('idx_users_updated_at').on(table.updatedAt)
 }))
 
 // ============================================================================

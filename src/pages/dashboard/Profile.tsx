@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { User, Mail, Phone, MapPin, Calendar, Shield, Edit3, Save, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { authClient, useSession } from "@/lib/auth-client";
 import { logProfileUpdate, logError } from "@/lib/audit";
 
 const Profile = () => {
@@ -43,123 +43,53 @@ const Profile = () => {
     bio: "",
   });
   
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const { data: session, isPending } = useSession();
+  const user = session?.user;
 
   // Load user profile data
   useEffect(() => {
     const loadProfile = async () => {
-      if (!user) return;
+      if (!user || isPending) return;
       
       try {
         setLoading(true);
         
-        // Prefer normalized DB tables (users, user_profiles, user_contacts, user_addresses)
-        let normalizedUserId: string | null = null;
-        let createdAt: string | null = null;
-
-        try {
-          const { data: u, error: uErr } = await supabase
-            .from('users')
-            .select('id, created_at')
-            .eq('auth_user_id', user.id)
-            .maybeSingle();
-          if (!uErr && u) {
-            normalizedUserId = u.id;
-            createdAt = u.created_at;
-          }
-        } catch (e) {
-          // ignore and fall back to auth user
-        }
-
-        // Fetch profile row
-        let profileRow: any = null;
-        if (normalizedUserId) {
-          try {
-            const { data: p } = await supabase
-              .from('user_profiles')
-              .select('first_name, last_name, middle_name, date_of_birth')
-              .eq('user_id', normalizedUserId)
-              .maybeSingle();
-            profileRow = p;
-          } catch (e) {
-            // ignore
-          }
-        }
-
-        // Fetch primary phone contact
-        let phoneVal: string | null = null;
-        try {
-          if (normalizedUserId) {
-            const { data: phone } = await supabase
-              .from('user_contacts')
-              .select('contact_value')
-              .eq('user_id', normalizedUserId)
-              .eq('contact_type', 'phone')
-              .eq('is_primary', true)
-              .maybeSingle();
-            if (phone && phone.contact_value) phoneVal = phone.contact_value;
-          }
-        } catch (e) {
-          // ignore
-        }
-
-        // Fetch primary address
-        let addressRow: any = null;
-        try {
-          if (normalizedUserId) {
-            const { data: addr } = await supabase
-              .from('user_addresses')
-              .select('street_address, address_line_2, city, state, postal_code')
-              .eq('user_id', normalizedUserId)
-              .eq('is_primary', true)
-              .maybeSingle();
-            addressRow = addr;
-          }
-        } catch (e) {
-          // ignore
-        }
-
-        // Compose display fields with fallbacks to auth metadata
-        const firstName = profileRow?.first_name ?? user.user_metadata?.first_name ?? '';
-        const lastName = profileRow?.last_name ?? user.user_metadata?.last_name ?? '';
-        const fullName = `${firstName}${firstName && lastName ? ' ' : ''}${lastName}`.trim() || user.user_metadata?.full_name || '';
-
-        // Normalize phone number into country code + number when possible
+        // Get user data from Better Auth session
+        const fullName = user.name || '';
+        const email = user.email || '';
+        
+        // Parse phone number if available
         let phoneCountryCode = '+1';
         let phoneNumber = '';
-        const rawPhone = phoneVal ?? user.user_metadata?.phone ?? '';
+        const rawPhone = user.metadata?.phone || '';
         if (rawPhone) {
-          // simple parse: if starts with +, split
           if (rawPhone.startsWith('+')) {
-            const parts = rawPhone.split(/(\d{1,3})(.*)/).filter(Boolean);
-            if (parts.length >= 2) {
-              phoneCountryCode = `+${parts[0]}`;
-              phoneNumber = parts.slice(1).join('').replace(/[^0-9]/g, '');
-            } else {
-              phoneNumber = rawPhone.replace(/[^0-9]/g, '');
+            const match = rawPhone.match(/^(\+\d{1,3})(.+)$/);
+            if (match) {
+              phoneCountryCode = match[1];
+              phoneNumber = match[2].replace(/[^0-9]/g, '');
             }
           } else {
             phoneNumber = rawPhone.replace(/[^0-9]/g, '');
           }
         }
 
-        const userIdDisplay = normalizedUserId ?? user.user_metadata?.user_id ?? `USR-${String(user.id).slice(-6)}`;
-        const joinDate = createdAt ? new Date(createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : (user.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '');
+        const userIdDisplay = `USR-${String(user.id).slice(-6)}`;
+        const joinDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
 
         const userData = {
           fullName,
-          email: user.email || '',
+          email,
           phoneCountryCode,
           phoneNumber,
-          streetAddress: addressRow?.street_address ?? user.user_metadata?.street_address ?? '',
-          city: addressRow?.city ?? user.user_metadata?.city ?? '',
-          state: addressRow?.state ?? user.user_metadata?.state ?? '',
-          zipCode: addressRow?.postal_code ?? user.user_metadata?.zip_code ?? '',
+          streetAddress: user.metadata?.streetAddress || '',
+          city: user.metadata?.city || '',
+          state: user.metadata?.state || '',
+          zipCode: user.metadata?.zipCode || '',
           userId: userIdDisplay,
           joinDate,
           status: 'Active',
-          bio: user.user_metadata?.bio ?? '',
+          bio: user.metadata?.bio || '',
         };
 
         setProfileData(userData);
@@ -174,7 +104,7 @@ const Profile = () => {
     };
 
     loadProfile();
-  }, [user]);
+  }, [user, isPending]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -182,28 +112,25 @@ const Profile = () => {
     try {
       setSaving(true);
       
-      // Prepare update data
-      const updateData = {
-        full_name: profileData.fullName,
-        phone: profileData.phoneNumber,
-        street_address: profileData.streetAddress,
-        city: profileData.city,
-        state: profileData.state,
-        zip_code: profileData.zipCode,
-        bio: profileData.bio,
-      };
-
-      // Update user metadata
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: updateData
+      // Update user profile with Better Auth
+      const result = await authClient.updateUser({
+        name: profileData.fullName,
+        metadata: {
+          phone: profileData.phoneNumber,
+          streetAddress: profileData.streetAddress,
+          city: profileData.city,
+          state: profileData.state,
+          zipCode: profileData.zipCode,
+          bio: profileData.bio,
+        }
       });
 
-      if (updateError) {
-        throw updateError;
+      if (result.error) {
+        throw new Error(result.error.message);
       }
 
       // Log profile update
-      const changes = Object.keys(updateData).filter(key => 
+      const changes = Object.keys(profileData).filter(key => 
         originalData[key] !== profileData[key]
       ).reduce((acc, key) => {
         acc[key] = {

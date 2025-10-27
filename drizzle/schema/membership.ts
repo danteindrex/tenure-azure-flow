@@ -11,7 +11,7 @@
  * - disputes: Dispute management
  */
 
-import { pgTable, uuid, text, varchar, boolean, timestamp, decimal, integer, date, index } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, varchar, boolean, timestamp, decimal, integer, date, index, jsonb } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { users } from './users'
 
@@ -71,23 +71,27 @@ export const kycVerification = pgTable('kyc_verification', {
 // ============================================================================
 export const payoutManagement = pgTable('payout_management', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  payoutAmount: decimal('payout_amount', { precision: 10, scale: 2 }).notNull(),
-  payoutMethod: varchar('payout_method', { length: 50 }), // 'bank_transfer', 'check', 'paypal'
-  payoutStatus: varchar('payout_status', { length: 20 }).notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
-  payoutDate: timestamp('payout_date', { withTimezone: true }),
-  scheduledDate: date('scheduled_date'),
-  completedDate: timestamp('completed_date', { withTimezone: true }),
-  transactionId: varchar('transaction_id', { length: 255 }),
-  failureReason: text('failure_reason'),
-  bankAccountLast4: varchar('bank_account_last4', { length: 4 }),
-  notes: text('notes'),
+  payoutId: text('payout_id').notNull().unique(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  queuePosition: integer('queue_position').notNull(),
+  amount: decimal('amount', { precision: 12, scale: 2 }).notNull().default('100000.00'),
+  currency: text('currency').default('USD'),
+  status: text('status').notNull().default('pending_approval'),
+  eligibilityCheck: jsonb('eligibility_check').default({}),
+  approvalWorkflow: jsonb('approval_workflow').default([]),
+  scheduledDate: timestamp('scheduled_date', { withTimezone: true }),
+  paymentMethod: text('payment_method').notNull().default('ach'),
+  bankDetails: jsonb('bank_details'),
+  taxWithholding: jsonb('tax_withholding'),
+  processing: jsonb('processing'),
+  receiptUrl: text('receipt_url'),
+  internalNotes: jsonb('internal_notes').default([]),
+  auditTrail: jsonb('audit_trail').default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
   userIdIdx: index('idx_payout_management_user_id').on(table.userId),
-  statusIdx: index('idx_payout_management_status').on(table.payoutStatus),
-  dateIdx: index('idx_payout_management_payout_date').on(table.payoutDate)
+  statusIdx: index('idx_payout_management_status').on(table.status)
 }))
 
 // ============================================================================
