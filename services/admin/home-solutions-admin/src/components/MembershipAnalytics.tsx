@@ -170,29 +170,29 @@ const MembershipAnalytics: React.FC = () => {
     <div className="membership-analytics-container">
       <style jsx>{`
         .membership-analytics-container {
-          background: white;
+          background: var(--theme-elevation-50, #0f0f0f);
           padding: 24px;
           border-radius: 8px;
           margin: 24px 0;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          border: 1px solid var(--theme-elevation-150, #262626);
         }
 
         .analytics-header {
           margin-bottom: 24px;
-          border-bottom: 2px solid #e9ecef;
+          border-bottom: 2px solid var(--theme-elevation-150, #262626);
           padding-bottom: 16px;
         }
 
         .analytics-title {
           font-size: 24px;
           font-weight: 600;
-          color: #333;
+          color: var(--theme-text, #ffffff);
           margin: 0 0 8px 0;
         }
 
         .analytics-subtitle {
           font-size: 14px;
-          color: #666;
+          color: var(--theme-text-dim, #a3a3a3);
           margin: 0;
         }
 
@@ -204,8 +204,8 @@ const MembershipAnalytics: React.FC = () => {
         }
 
         .chart-card {
-          background: #f8f9fa;
-          border: 1px solid #e9ecef;
+          background: var(--theme-elevation-100, #1a1a1a);
+          border: 1px solid var(--theme-elevation-200, #333333);
           border-radius: 8px;
           padding: 20px;
           position: relative;
@@ -221,13 +221,13 @@ const MembershipAnalytics: React.FC = () => {
         .chart-title {
           font-size: 16px;
           font-weight: 600;
-          color: #333;
+          color: var(--theme-text, #ffffff);
           margin: 0;
         }
 
         .chart-metric {
           font-size: 12px;
-          color: #666;
+          color: var(--theme-text-dim, #a3a3a3);
           font-weight: 500;
         }
 
@@ -244,54 +244,59 @@ const MembershipAnalytics: React.FC = () => {
         }
 
         .kpi-card {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
+          background: var(--theme-elevation-100, #1a1a1a);
+          color: var(--theme-text, #ffffff);
           padding: 20px;
           border-radius: 8px;
           text-align: center;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          border: 1px solid var(--theme-elevation-200, #333333);
         }
 
         .kpi-value {
           font-size: 32px;
           font-weight: 700;
           margin-bottom: 8px;
+          color: var(--theme-text, #ffffff);
         }
 
         .kpi-label {
           font-size: 14px;
-          opacity: 0.9;
+          color: var(--theme-text-dim, #a3a3a3);
           text-transform: uppercase;
           letter-spacing: 0.5px;
         }
 
         .kpi-card.primary {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: var(--theme-elevation-100, #1a1a1a);
+          border: 1px solid var(--theme-elevation-200, #333333);
         }
 
         .kpi-card.success {
-          background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+          background: var(--theme-elevation-100, #1a1a1a);
+          border: 1px solid var(--theme-elevation-200, #333333);
         }
 
         .kpi-card.warning {
-          background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+          background: var(--theme-elevation-100, #1a1a1a);
+          border: 1px solid var(--theme-elevation-200, #333333);
         }
 
         .kpi-card.info {
-          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+          background: var(--theme-elevation-100, #1a1a1a);
+          border: 1px solid var(--theme-elevation-200, #333333);
         }
 
         .analytics-loading, .analytics-error {
           text-align: center;
           padding: 60px 20px;
-          color: #666;
+          color: var(--theme-text-dim, #a3a3a3);
         }
 
         .loading-spinner {
           width: 40px;
           height: 40px;
-          border: 4px solid #f3f3f3;
-          border-top: 4px solid #2196f3;
+          border: 4px solid var(--theme-elevation-200, #333333);
+          border-top: 4px solid var(--theme-info, #3b82f6);
           border-radius: 50%;
           animation: spin 1s linear infinite;
           margin: 0 auto 16px;
@@ -304,8 +309,8 @@ const MembershipAnalytics: React.FC = () => {
 
         .retry-button {
           padding: 8px 16px;
-          background: #2196f3;
-          color: white;
+          background: var(--theme-info, #3b82f6);
+          color: var(--theme-text, #ffffff);
           border: none;
           border-radius: 4px;
           cursor: pointer;
@@ -313,7 +318,7 @@ const MembershipAnalytics: React.FC = () => {
         }
 
         .retry-button:hover {
-          background: #1976d2;
+          background: var(--theme-elevation-400, #525252);
         }
 
         @media (max-width: 768px) {
