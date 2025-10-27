@@ -1,47 +1,63 @@
 'use client'
-import React from 'react'
-import Link from 'next/link'
 
-const AdminNavigation: React.FC = () => {
+import React from 'react'
+import { getFeatureFlags } from '@/config/features'
+
+interface NavSection {
+  title: string
+  description: string
+  href: string
+  enabled: boolean
+}
+
+export default function AdminNavigation() {
+  const features = getFeatureFlags()
+
+  const navSections: NavSection[] = [
+    {
+      title: 'Dashboard',
+      description: 'Main admin dashboard',
+      href: '/admin',
+      enabled: true,
+    },
+    {
+      title: 'User Management',
+      description: 'Comprehensive user dashboard',
+      href: '/admin/user-management',
+      enabled: features.core.users,
+    },
+    {
+      title: 'Compliance Center',
+      description: 'KYC verification and AML monitoring',
+      href: '/admin/compliance-center',
+      enabled: features.core.users,
+    },
+    {
+      title: 'Payments Center',
+      description: 'Transaction management and analytics',
+      href: '/admin/payments-center',
+      enabled: features.core.users,
+    },
+  ]
+
+  const enabledSections = navSections.filter((section) => section.enabled)
+
+  if (enabledSections.length === 0) {
+    return null
+  }
+
   return (
-    <div className="admin-navigation">
-      <style jsx>{`
-        .admin-navigation {
-          position: fixed;
-          top: 20px;
-          left: 20px;
-          z-index: 1000;
-        }
-        .home-button {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 8px 16px;
-          background: #007bff;
-          color: white;
-          text-decoration: none;
-          border-radius: 6px;
-          font-size: 14px;
-          font-weight: 500;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          transition: all 0.2s ease;
-        }
-        .home-button:hover {
-          background: #0056b3;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        }
-        .home-icon {
-          font-size: 16px;
-        }
-      `}</style>
-      
-      <Link href="/admin" className="home-button">
-        <span className="home-icon">🏠</span>
-        <span>Dashboard Home</span>
-      </Link>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      {enabledSections.map((section) => (
+        <a
+          key={section.href}
+          href={section.href}
+          className="block px-3 py-2 text-sm hover:no-underline"
+          style={{ backgroundColor: 'transparent', display: 'block' }}
+        >
+          {section.title}
+        </a>
+      ))}
     </div>
   )
 }
-
-export default AdminNavigation

@@ -30,6 +30,9 @@ import { Users } from './collections/Users'
 import FinancialDashboard from './components/FinancialDashboard'
 import AnalyticsGraphs from './components/AnalyticsGraphs'
 import AdminNavigation from './components/AdminNavigation'
+import UserManagementView from './pages/UserManagementView'
+import ComplianceCenterView from './pages/ComplianceCenterView'
+import PaymentsCenterView from './pages/PaymentsCenterView'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -40,14 +43,21 @@ export default buildConfig({
     components: {
       beforeDashboard: [FinancialDashboard, AnalyticsGraphs],
       beforeNavLinks: [AdminNavigation],
+      views: {
+        userManagement: {
+          Component: UserManagementView,
+          path: '/user-management',
+        },
+        complianceCenter: {
+          Component: ComplianceCenterView,
+          path: '/compliance-center',
+        },
+        paymentsCenter: {
+          Component: PaymentsCenterView,
+          path: '/payments-center',
+        },
+      },
     },
-    pages: [
-      {
-        slug: 'user-management',
-        label: '👥 User Management',
-        Component: () => import('./pages/UserManagement'),
-      }
-    ],
     locking: false, // Disable document locking to avoid relationship errors
   },
   collections: [

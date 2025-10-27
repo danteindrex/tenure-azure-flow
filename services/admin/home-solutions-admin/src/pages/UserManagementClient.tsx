@@ -51,7 +51,7 @@ interface UserStats {
   averagePayments: number
 }
 
-const UserManagement: React.FC = () => {
+const UserManagementClient: React.FC = () => {
   const [users, setUsers] = useState<UserData[]>([])
   const [stats, setStats] = useState<UserStats | null>(null)
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null)
@@ -144,29 +144,29 @@ const UserManagement: React.FC = () => {
       <style jsx>{`
         .user-management-page {
           padding: 0;
-          background: #fafbfc;
+          background: #000000;
           min-height: 100vh;
         }
         .page-header {
-          background: white;
-          border-bottom: 1px solid #e9ecef;
+          background: #111111;
+          border-bottom: 1px solid #334155;
           padding: 24px 32px;
           margin-bottom: 0;
         }
         .page-title {
           font-size: 32px;
           font-weight: 600;
-          color: #333;
+          color: #f1f5f9;
           margin: 0 0 8px 0;
         }
         .page-subtitle {
-          color: #666;
+          color: #94a3b8;
           font-size: 16px;
           margin: 0;
         }
         .stats-section {
-          background: white;
-          border-bottom: 1px solid #e9ecef;
+          background: #111111;
+          border-bottom: 1px solid #334155;
           padding: 24px 32px;
         }
         .stats-grid {
@@ -177,19 +177,19 @@ const UserManagement: React.FC = () => {
         .stat-card {
           text-align: center;
           padding: 16px;
-          border: 1px solid #e9ecef;
+          border-bottom: 1px solid #334155;
           border-radius: 8px;
-          background: #f8f9fa;
+          background: #000000;
         }
         .stat-value {
           font-size: 28px;
           font-weight: 700;
-          color: #333;
+          color: #f1f5f9;
           margin-bottom: 4px;
         }
         .stat-label {
           font-size: 14px;
-          color: #666;
+          color: #94a3b8;
           font-weight: 500;
         }
         .content-section {
@@ -199,26 +199,28 @@ const UserManagement: React.FC = () => {
           min-height: calc(100vh - 200px);
         }
         .users-panel {
-          background: white;
-          border-right: 1px solid #e9ecef;
+          background: #111111;
+          border-bottom: 1px solid #334155;
         }
         .panel-header {
           padding: 20px 24px;
-          border-bottom: 1px solid #e9ecef;
-          background: #f8f9fa;
+          border-bottom: 1px solid #334155;
+          background: #000000;
         }
         .panel-title {
           font-size: 18px;
           font-weight: 600;
-          color: #333;
+          color: #f1f5f9;
           margin: 0 0 12px 0;
         }
         .search-input {
           width: 100%;
           padding: 8px 12px;
-          border: 1px solid #ddd;
+          border: 1px solid #334155;
           border-radius: 6px;
           font-size: 14px;
+          background: #000000;
+          color: #f1f5f9;
         }
         .users-list {
           max-height: calc(100vh - 300px);
@@ -226,20 +228,20 @@ const UserManagement: React.FC = () => {
         }
         .user-item {
           padding: 16px 24px;
-          border-bottom: 1px solid #f1f3f4;
+          border-bottom: 1px solid #0f172a;
           cursor: pointer;
           transition: background-color 0.2s;
         }
         .user-item:hover {
-          background-color: #f8f9fa;
+          background-color: #000000;
         }
         .user-item.selected {
-          background-color: #e3f2fd;
-          border-left: 4px solid #2196f3;
+          background-color: #2d3748;
+          border-left: 4px solid #4299e1;
         }
         .user-email {
           font-weight: 500;
-          color: #333;
+          color: #f1f5f9;
           margin-bottom: 4px;
         }
         .user-meta {
@@ -247,6 +249,7 @@ const UserManagement: React.FC = () => {
           align-items: center;
           gap: 12px;
           font-size: 12px;
+          color: #94a3b8;
         }
         .status-badge {
           padding: 2px 8px;
@@ -254,42 +257,42 @@ const UserManagement: React.FC = () => {
           font-size: 11px;
           font-weight: 500;
         }
-        .status-active { background: #d4edda; color: #155724; }
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-inactive { background: #f8d7da; color: #721c24; }
-        .status-suspended { background: #f8d7da; color: #721c24; }
+        .status-active { background: #2d5016; color: #9ae6b4; }
+        .status-pending { background: #744210; color: #fbd38d; }
+        .status-inactive { background: #63171b; color: #fc8181; }
+        .status-suspended { background: #63171b; color: #fc8181; }
         .details-panel {
-          background: white;
+          background: #111111;
           padding: 24px;
           overflow-y: auto;
         }
         .details-header {
           margin-bottom: 24px;
           padding-bottom: 16px;
-          border-bottom: 2px solid #e9ecef;
+          border-bottom: 2px solid #334155;
         }
         .details-title {
           font-size: 20px;
           font-weight: 600;
-          color: #333;
+          color: #f1f5f9;
           margin: 0 0 8px 0;
         }
         .details-subtitle {
-          color: #666;
+          color: #94a3b8;
           font-size: 14px;
           margin: 0;
         }
         .detail-section {
           margin-bottom: 24px;
           padding: 16px;
-          border: 1px solid #e9ecef;
+          border-bottom: 1px solid #334155;
           border-radius: 8px;
-          background: #fafbfc;
+          background: #000000;
         }
         .section-title {
           font-size: 16px;
           font-weight: 600;
-          color: #333;
+          color: #f1f5f9;
           margin: 0 0 12px 0;
           display: flex;
           align-items: center;
@@ -307,46 +310,47 @@ const UserManagement: React.FC = () => {
           font-size: 14px;
         }
         .detail-label {
-          color: #666;
+          color: #94a3b8;
           font-weight: 500;
         }
         .detail-value {
-          color: #333;
+          color: #f1f5f9;
           font-weight: 400;
         }
         .payment-history {
           max-height: 150px;
           overflow-y: auto;
-          border: 1px solid #e9ecef;
+          border-bottom: 1px solid #334155;
           border-radius: 4px;
-          background: white;
+          background: #000000;
         }
         .payment-item {
           display: flex;
           justify-content: space-between;
           align-items: center;
           padding: 8px 12px;
-          border-bottom: 1px solid #f1f3f4;
+          border-bottom: 1px solid #0f172a;
           font-size: 13px;
+          color: #f1f5f9;
         }
         .payment-item:last-child {
           border-bottom: none;
         }
         .no-selection {
           text-align: center;
-          color: #666;
+          color: #94a3b8;
           padding: 60px 20px;
         }
         .loading-container, .error-container {
           text-align: center;
           padding: 60px;
-          color: #666;
+          color: #94a3b8;
         }
         .loading-spinner {
           width: 40px;
           height: 40px;
-          border: 4px solid #f3f3f3;
-          border-top: 4px solid #2196f3;
+          border: 4px solid #1e293b;
+          border-top: 4px solid #4299e1;
           border-radius: 50%;
           animation: spin 1s linear infinite;
           margin: 0 auto 16px;
@@ -357,7 +361,7 @@ const UserManagement: React.FC = () => {
         }
         .retry-button {
           padding: 8px 16px;
-          background: #2196f3;
+          background: #4299e1;
           color: white;
           border: none;
           border-radius: 4px;
@@ -365,17 +369,17 @@ const UserManagement: React.FC = () => {
           margin-top: 16px;
         }
         .retry-button:hover {
-          background: #1976d2;
+          background: #3182ce;
         }
         .details-loading {
           text-align: center;
           padding: 40px;
-          color: #666;
+          color: #94a3b8;
         }
       `}</style>
 
       <div className="page-header">
-        <h1 className="page-title">👥 User Management</h1>
+        <h1 className="page-title">User Management</h1>
         <p className="page-subtitle">Comprehensive user information and management</p>
       </div>
 
@@ -431,7 +435,7 @@ const UserManagement: React.FC = () => {
                   <span className={`status-badge status-${user.status.toLowerCase()}`}>
                     {user.status}
                   </span>
-                  <span>{user.email_verified ? '✅ Verified' : '❌ Unverified'}</span>
+                  <span>{user.email_verified ? 'Verified' : 'Unverified'}</span>
                   <span>{new Date(user.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
@@ -455,7 +459,7 @@ const UserManagement: React.FC = () => {
               ) : userDetails ? (
                 <>
                   <div className="detail-section">
-                    <h4 className="section-title">📧 Account Information</h4>
+                    <h4 className="section-title">Account Information</h4>
                     <div className="detail-grid">
                       <div className="detail-item">
                         <span className="detail-label">Status:</span>
@@ -475,7 +479,7 @@ const UserManagement: React.FC = () => {
                   </div>
 
                   <div className="detail-section">
-                    <h4 className="section-title">👤 Profile Information</h4>
+                    <h4 className="section-title">Profile Information</h4>
                     <div className="detail-grid">
                       <div className="detail-item">
                         <span className="detail-label">Full Name:</span>
@@ -493,7 +497,7 @@ const UserManagement: React.FC = () => {
                   </div>
 
                   <div className="detail-section">
-                    <h4 className="section-title">💰 Financial Summary</h4>
+                    <h4 className="section-title">Financial Summary</h4>
                     <div className="detail-grid">
                       <div className="detail-item">
                         <span className="detail-label">Total Payments:</span>
@@ -528,7 +532,7 @@ const UserManagement: React.FC = () => {
                   </div>
 
                   <div className="detail-section">
-                    <h4 className="section-title">📋 Subscription & Queue</h4>
+                    <h4 className="section-title">Subscription & Queue</h4>
                     <div className="detail-grid">
                       <div className="detail-item">
                         <span className="detail-label">Subscription:</span>
@@ -552,7 +556,7 @@ const UserManagement: React.FC = () => {
                   </div>
 
                   <div className="detail-section">
-                    <h4 className="section-title">🔐 Verification & Compliance</h4>
+                    <h4 className="section-title">Verification & Compliance</h4>
                     <div className="detail-grid">
                       <div className="detail-item">
                         <span className="detail-label">KYC Status:</span>
@@ -585,4 +589,4 @@ const UserManagement: React.FC = () => {
   )
 }
 
-export default UserManagement
+export default UserManagementClient
