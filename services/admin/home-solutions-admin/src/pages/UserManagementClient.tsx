@@ -1,5 +1,28 @@
 'use client'
 import React, { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
+
+// Dynamically import the MembershipAnalytics component to avoid SSR issues
+const MembershipAnalytics = dynamic(
+  () => import('../components/MembershipAnalytics'),
+  { 
+    ssr: false,
+    loading: () => (
+      <div style={{ textAlign: 'center', padding: '40px' }}>
+        <div className="loading-spinner" style={{
+          width: '40px',
+          height: '40px',
+          border: '4px solid #f3f3f3',
+          borderTop: '4px solid #2196f3',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+          margin: '0 auto 16px'
+        }}></div>
+        <p>Loading analytics...</p>
+      </div>
+    )
+  }
+)
 
 interface UserData {
   id: string
@@ -409,6 +432,8 @@ const UserManagementClient: React.FC = () => {
           </div>
         </div>
       )}
+
+      <MembershipAnalytics />
 
       <div className="content-section">
         <div className="users-panel">
