@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { useSupabaseClient } from '@supabase/auth-helpers-react';
 
 interface SQLExecutionResult {
   success: boolean;
@@ -17,23 +16,28 @@ interface UseSQLExecutionReturn {
 export const useSQLExecution = (): UseSQLExecutionReturn => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const supabase = useSupabaseClient();
 
   const executeSQL = useCallback(async (sql: string): Promise<SQLExecutionResult> => {
     setLoading(true);
     setError(null);
 
     try {
-      const { data, error: rpcError } = await supabase.rpc('exec_sql', {
-        sql_query: sql
+      // Route through API endpoint with Better Auth session
+      const response = await fetch('/api/admin/execute-sql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Include Better Auth session cookie
+        body: JSON.stringify({ sql_query: sql })
       });
 
-      if (rpcError) {
-        setError(rpcError.message);
-        return { success: false, error: rpcError.message };
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        setError(data.error || 'SQL execution failed');
+        return { success: false, error: data.error || 'SQL execution failed' };
       }
 
-      return { success: true, result: data };
+      return { success: true, result: data.result };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
@@ -41,7 +45,7 @@ export const useSQLExecution = (): UseSQLExecutionReturn => {
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   const executeMultipleSQL = useCallback(async (sqlStatements: string[]): Promise<SQLExecutionResult[]> => {
     setLoading(true);

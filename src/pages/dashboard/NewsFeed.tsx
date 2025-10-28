@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Megaphone, 
-  Calendar, 
-  DollarSign, 
-  Award, 
+import {
+  Megaphone,
+  Calendar,
+  DollarSign,
+  Award,
   TrendingUp,
   RefreshCw,
   AlertCircle,
@@ -14,7 +14,8 @@ import {
   Info,
   Users
 } from "lucide-react";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { useSession } from "@/lib/auth-client";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { toast } from "sonner";
 
 interface NewsPost {
@@ -47,7 +48,8 @@ const NewsFeed = () => {
   });
 
   const supabase = useSupabaseClient();
-  const user = useUser();
+  const { data: session } = useSession();
+  const user = session?.user;
 
   // Load news feed data
   const loadNewsFeedData = async () => {

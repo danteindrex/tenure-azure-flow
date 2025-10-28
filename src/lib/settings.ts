@@ -201,8 +201,9 @@ export interface AppearanceSettings {
 class SettingsService {
   private supabase: ReturnType<typeof SupabaseClientSingleton.getInstance>;
 
-  constructor(supabaseClient?: ReturnType<typeof SupabaseClientSingleton.getInstance>) {
-    this.supabase = supabaseClient || SupabaseClientSingleton.getInstance();
+  constructor() {
+    // Always use singleton for database operations (not auth)
+    this.supabase = SupabaseClientSingleton.getInstance();
   }
 
   // Get all user settings

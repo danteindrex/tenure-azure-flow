@@ -3,11 +3,13 @@ import { Crown, Calendar, DollarSign, Users, Clock, TrendingUp, Award } from "lu
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { useSession } from "@/lib/auth-client";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 
 const DashboardSimple = () => {
   const supabase = useSupabaseClient();
-  const user = useUser();
+  const { data: session } = useSession();
+  const user = session?.user;
 
   const [totalRevenue, setTotalRevenue] = useState<number>(0);
   const [queuePosition, setQueuePosition] = useState<number | null>(null);

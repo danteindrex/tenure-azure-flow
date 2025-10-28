@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  BarChart3, 
-  TrendingUp, 
+import {
+  BarChart3,
+  TrendingUp,
   TrendingDown,
   DollarSign,
   Users,
@@ -14,11 +14,13 @@ import {
   Clock,
   Activity
 } from "lucide-react";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { useSession } from "@/lib/auth-client";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 
 const Analytics = () => {
   const supabase = useSupabaseClient();
-  const user = useUser();
+  const { data: session } = useSession();
+  const user = session?.user;
   const [timeRange, setTimeRange] = useState("6months");
 
   const [overview, setOverview] = useState({

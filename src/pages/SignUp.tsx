@@ -384,17 +384,7 @@ const SignUp = () => {
       setLoading(true);
       const formattedPhone = formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode);
 
-      // Update user metadata with phone
-      await supabase.auth.updateUser({
-        data: {
-          phone: formattedPhone,
-          phone_country_code: formData.phoneCountryCode,
-          phone_verified: false,
-          signup_step: 3
-        }
-      });
-
-      // Send phone OTP
+      // Send phone OTP via Twilio (Better Auth)
       await sendPhoneOtp();
 
     } catch (err: unknown) {
@@ -408,25 +398,30 @@ const SignUp = () => {
   // Send Phone OTP code
   const sendPhoneOtp = async (): Promise<void> => {
     try {
-      setStep(4);
-
       const formattedPhone = formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode);
 
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
-        options: {
-          data: {
-            verification_type: 'phone_signup'
-          }
-        }
+      // Send verification code via Twilio
+      const response = await fetch('/api/verify/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          phone: formattedPhone,
+          countryCode: formData.phoneCountryCode
+        })
       });
 
-      if (error) {
-        console.error('Phone OTP error:', error);
-        toast.error(`Failed to send verification code: ${error.message}`);
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        console.error('Phone OTP error:', result.error);
+        toast.error(`Failed to send verification code: ${result.error}`);
         setStep(3); // Go back to step 3
         return;
       }
+
+      // Move to verification step
+      setStep(4);
 
       toast.success("OTP sent to your phone! Please check your messages.");
 
@@ -447,48 +442,28 @@ const SignUp = () => {
     try {
       setLoading(true);
 
-      // Verify OTP
+      // Verify OTP via Twilio
       const formattedPhone = formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode);
 
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone: formattedPhone,
-        token: formData.phoneOtpCode,
-        type: 'sms'
+      const response = await fetch('/api/verify/check-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          phone: formattedPhone,
+          code: formData.phoneOtpCode
+        })
       });
 
-      if (error) {
-        console.error('Phone OTP verification error:', error);
-        toast.error(`OTP verification failed: ${error.message}`);
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        console.error('Phone OTP verification error:', result.error);
+        toast.error(`OTP verification failed: ${result.error}`);
         return;
       }
 
-      // Update user metadata
-      if (data.user) {
-        await supabase.auth.updateUser({
-          data: {
-            phone_verified: true,
-            phone_verified_via: 'otp',
-            signup_step: 4,
-            phone_verified_at: new Date().toISOString()
-          }
-        });
-
-        // Update user_contacts table to mark phone as verified
-        const formattedPhone = formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode);
-        await supabase
-          .from('user_contacts')
-          .upsert({
-            user_id: data.user.id,
-            contact_type: 'phone',
-            contact_value: formattedPhone,
-            is_primary: true,
-            is_verified: true,
-          }, {
-            onConflict: 'user_id,contact_type,contact_value'
-          });
-      }
-
-      setUserId(data.user?.id || null);
+      // Phone is now verified in Better Auth and user_contacts table
       setStep(5);
       toast.success("Phone verified successfully! Please complete your profile.");
 

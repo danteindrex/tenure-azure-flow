@@ -20,7 +20,7 @@ import {
   Loader2
 } from "lucide-react";
 import { toast } from "sonner";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { useSession } from "@/lib/auth-client";
 import SettingsService, { UserSettings, NotificationPreferences, SecuritySettings, PaymentSettings, PrivacySettings, AppearanceSettings } from "@/lib/settings";
 import { logError } from "@/lib/audit";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -39,15 +39,17 @@ const Settings = () => {
   // Settings state
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences | null>(null);
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettings | null>(null);
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
+  const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [appearanceSettings, setAppearanceSettings] = useState<AppearanceSettings | null>(null);
 
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const { data: session, isPending } = useSession();
+  const user = session?.user;
   const { theme: currentTheme, setTheme: setCurrentTheme } = useTheme();
-  
+
   // Memoize the settings service to prevent recreation on every render
-  const settingsService = useMemo(() => new SettingsService(supabase), [supabase]);
+  const settingsService = useMemo(() => new SettingsService(), []);
 
   // Load all user settings
   useEffect(() => {
@@ -226,7 +228,7 @@ const Settings = () => {
     }
   };
 
-  if (loading) {
+  if (isPending || loading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center py-12">

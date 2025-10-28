@@ -19,8 +19,7 @@ import {
   DollarSign,
   RefreshCw
 } from "lucide-react";
-import { useUser } from "@supabase/auth-helpers-react";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
+import { useSession } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { useQueueService } from "@/lib/queueService";
 import { QueueMember } from "@/lib/types";
@@ -39,11 +38,11 @@ const Queue = () => {
     receivedPayouts: 0
   });
   const [refreshing, setRefreshing] = useState(false);
-    const [errorMsg, setErrorMsg] = useState<string | null>(null);
-    const supabase = useSupabaseClient();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const queueService = useQueueService();
-  const user = useUser();
+  const { data: session } = useSession();
+  const user = session?.user;
 
   // Load queue data from microservice
   const loadQueueData = async () => {

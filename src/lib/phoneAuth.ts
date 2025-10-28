@@ -1,59 +1,55 @@
-// Phone authentication service with TypeScript support
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { 
-  PhoneSignupStep1Data, 
-  PhoneSignupStep2Data, 
-  PhoneAuthResponse, 
+// Phone authentication service with Better Auth + Twilio
+import { authClient } from './auth-client';
+import {
+  PhoneSignupStep1Data,
+  PhoneSignupStep2Data,
+  PhoneAuthResponse,
   OtpVerificationResult,
   UserCompletionStatus,
-  AuthError 
+  AuthError
 } from '@/types/auth';
 
 export class PhoneAuthService {
-  private supabase: SupabaseClient;
-
-  constructor(supabaseClient: SupabaseClient) {
-    this.supabase = supabaseClient;
-  }
-
   /**
-   * Step 1: Create user account with phone and password
+   * Step 1: Create user account with phone and password (Better Auth)
    */
   async signUpWithPhone(data: PhoneSignupStep1Data): Promise<PhoneAuthResponse> {
     try {
-      // Validate phone number format
+      // Format phone number
       const formattedPhone = this.formatPhoneNumber(data.phone, data.countryCode);
-      
-      // Create user with phone and password
-      const { data: authData, error } = await this.supabase.auth.signUp({
-        phone: formattedPhone,
+
+      // Create user with Better Auth (email/password)
+      // We'll use phone as email temporarily, or require email
+      const { data: authData, error } = await authClient.signUp.email({
+        email: data.email || `${formattedPhone.replace(/\+/g, '')}@temp.tenure.com`, // Temp email if not provided
         password: data.password,
-        options: {
-          data: {
-            signup_step: 1,
-            phone_country_code: data.countryCode,
-            terms_agreed: data.agreeToTerms,
-            signup_method: 'phone_first'
-          }
-        }
+        name: data.name || 'User',
       });
 
       if (error) {
         return {
           success: false,
           error: {
-            message: error.message,
+            message: error.message || 'Signup failed',
             code: error.message,
             details: error
           }
         };
       }
 
+      // Store phone in Better Auth user (will be verified in next step)
+      if (authData?.user) {
+        await authClient.updateUser({
+          phone: formattedPhone,
+          phoneVerified: false
+        });
+      }
+
       return {
         success: true,
         data: {
-          user: authData.user,
-          session: authData.session
+          user: authData?.user,
+          session: authData?.session
         }
       };
     } catch (err: any) {
@@ -68,35 +64,42 @@ export class PhoneAuthService {
   }
 
   /**
-   * Step 2: Send OTP to phone number
+   * Step 2: Send OTP to phone number via Twilio
    */
   async sendOtp(phone: string, countryCode: string): Promise<PhoneAuthResponse> {
     try {
       const formattedPhone = this.formatPhoneNumber(phone, countryCode);
-      
-      const { data, error } = await this.supabase.auth.signInWithOtp({
-        phone: formattedPhone,
-        options: {
-          data: {
-            verification_type: 'phone_signup'
-          }
-        }
+
+      // Call our API endpoint to send verification code
+      const response = await fetch('/api/verify/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          phone: formattedPhone,
+          countryCode
+        })
       });
 
-      if (error) {
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
         return {
           success: false,
           error: {
-            message: error.message,
-            code: error.message,
-            details: error
+            message: result.error || 'Failed to send verification code',
+            code: result.code || 'SEND_OTP_FAILED',
+            details: result
           }
         };
       }
 
       return {
         success: true,
-        data
+        data: {
+          message: 'Verification code sent successfully',
+          expiresAt: result.expiresAt
+        }
       };
     } catch (err: any) {
       return {
@@ -110,48 +113,46 @@ export class PhoneAuthService {
   }
 
   /**
-   * Step 2: Verify OTP code
+   * Verify OTP code
    */
   async verifyOtp(data: PhoneSignupStep2Data): Promise<OtpVerificationResult> {
     try {
-      const { data: authData, error } = await this.supabase.auth.verifyOtp({
-        phone: data.phone,
-        token: data.otp,
-        type: 'sms'
+      // Call our API endpoint to verify code
+      const response = await fetch('/api/verify/check-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          phone: data.phone,
+          code: data.otp
+        })
       });
 
-      if (error) {
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
         return {
           success: false,
+          verified: false,
           error: {
-            message: error.message,
-            code: error.message,
-            details: error
+            message: result.error || 'Invalid or expired code',
+            code: result.code || 'INVALID_OTP',
+            details: result
           }
         };
       }
 
-      // Update user metadata to mark phone as verified
-      if (authData.user) {
-        await this.supabase.auth.updateUser({
-          data: {
-            phone_verified: true,
-            signup_step: 2,
-            phone_verified_at: new Date().toISOString()
-          }
-        });
-      }
-
       return {
         success: true,
-        session: authData.session,
-        user: authData.user
+        verified: true,
+        message: 'Phone number verified successfully'
       };
     } catch (err: any) {
       return {
         success: false,
+        verified: false,
         error: {
-          message: err.message || 'OTP verification failed',
+          message: err.message || 'Failed to verify OTP',
           details: err
         }
       };
@@ -159,76 +160,55 @@ export class PhoneAuthService {
   }
 
   /**
-   * Check user completion status
+   * Get user completion status
    */
   async getUserCompletionStatus(userId: string): Promise<UserCompletionStatus> {
     try {
-      // Get user from auth
-      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
-      
-      if (authError || !user) {
+      // Get current session
+      const session = await authClient.getSession();
+
+      if (!session?.data?.user) {
         throw new Error('User not authenticated');
       }
 
-      // Get user profile data
-      const { data: userData, error: userError } = await this.supabase
-        .from('users')
-        .select(`
-          *,
-          user_profiles(*),
-          user_contacts(*),
-          user_addresses(*)
-        `)
-        .eq('auth_user_id', userId)
-        .single();
-
-      const metadata = user.user_metadata || {};
-      const hasProfile = userData?.user_profiles?.length > 0;
-      const hasEmail = userData?.email && userData.email_verified;
-      const hasAddress = userData?.user_addresses?.length > 0;
+      const user = session.data.user;
 
       return {
-        hasPhone: !!user.phone,
-        hasPassword: true, // If they're authenticated, they have a password
-        phoneVerified: !!metadata.phone_verified || !!user.phone_confirmed_at,
-        hasPersonalInfo: hasProfile && hasAddress,
-        hasEmail: !!hasEmail,
-        emailVerified: !!userData?.email_verified,
-        canAccessDashboard: !!metadata.phone_verified,
-        canMakePayments: hasProfile && hasEmail && !!metadata.phone_verified
+        userId: user.id,
+        completedSteps: {
+          phoneVerified: user.phoneVerified || false,
+          emailVerified: user.emailVerified || false,
+          profileCompleted: !!(user.name && user.email),
+          paymentCompleted: user.onboardingCompleted || false
+        },
+        currentStep: user.onboardingStep || 1,
+        isComplete: user.onboardingCompleted || false
       };
     } catch (err: any) {
-      // Return default status if error
-      return {
-        hasPhone: false,
-        hasPassword: false,
-        phoneVerified: false,
-        hasPersonalInfo: false,
-        hasEmail: false,
-        emailVerified: false,
-        canAccessDashboard: false,
-        canMakePayments: false
-      };
+      throw new Error(err.message || 'Failed to get user status');
     }
   }
 
   /**
-   * Sign in existing user with phone and password
+   * Login with phone and password
    */
   async signInWithPhone(phone: string, password: string, countryCode: string): Promise<PhoneAuthResponse> {
     try {
       const formattedPhone = this.formatPhoneNumber(phone, countryCode);
-      
-      const { data, error } = await this.supabase.auth.signInWithPassword({
-        phone: formattedPhone,
-        password: password
+
+      // Better Auth doesn't support phone login natively
+      // We need to use email login instead
+      // Convert phone to temp email format or require actual email
+      const { data, error } = await authClient.signIn.email({
+        email: `${formattedPhone.replace(/\+/g, '')}@temp.tenure.com`,
+        password
       });
 
       if (error) {
         return {
           success: false,
           error: {
-            message: error.message,
+            message: error.message || 'Login failed',
             code: error.message,
             details: error
           }
@@ -238,15 +218,15 @@ export class PhoneAuthService {
       return {
         success: true,
         data: {
-          user: data.user,
-          session: data.session
+          user: data?.user,
+          session: data?.session
         }
       };
     } catch (err: any) {
       return {
         success: false,
         error: {
-          message: err.message || 'Sign in failed',
+          message: err.message || 'Unexpected error during login',
           details: err
         }
       };
@@ -254,53 +234,55 @@ export class PhoneAuthService {
   }
 
   /**
-   * Format phone number with country code
+   * Format phone number to E.164 format
    */
-  private formatPhoneNumber(phone: string, countryCode: string): string {
-    // Remove any non-digit characters
-    const cleanPhone = phone.replace(/\D/g, '');
-    
-    // Add country code if not present
-    if (!cleanPhone.startsWith(countryCode.replace('+', ''))) {
-      return `${countryCode}${cleanPhone}`;
+  formatPhoneNumber(phone: string, countryCode: string): string {
+    // Remove all non-digit characters
+    const digitsOnly = phone.replace(/\D/g, '');
+
+    // If already has country code, return as is
+    if (phone.startsWith('+')) {
+      return phone;
     }
-    
-    return `+${cleanPhone}`;
+
+    // Add country code (default +1 for US)
+    const code = countryCode || '+1';
+    return `${code}${digitsOnly}`;
   }
 
   /**
    * Validate phone number format
    */
-  validatePhoneNumber(phone: string, countryCode: string): boolean {
-    const cleanPhone = phone.replace(/\D/g, '');
-    
+  validatePhoneNumber(phone: string): boolean {
     // Basic validation - at least 10 digits
-    if (cleanPhone.length < 10) {
-      return false;
-    }
-    
-    // Country-specific validation can be added here
-    return true;
+    const digitsOnly = phone.replace(/\D/g, '');
+    return digitsOnly.length >= 10;
   }
 
   /**
    * Get current user session
    */
   async getCurrentSession() {
-    const { data: { session }, error } = await this.supabase.auth.getSession();
-    return { session, error };
+    const session = await authClient.getSession();
+    return {
+      session: session.data,
+      error: session.error
+    };
   }
 
   /**
    * Sign out user
    */
   async signOut() {
-    const { error } = await this.supabase.auth.signOut();
-    return { error };
+    await authClient.signOut();
+    return { error: null };
   }
 }
 
 // Export singleton instance
-export const createPhoneAuthService = (supabaseClient: SupabaseClient) => {
-  return new PhoneAuthService(supabaseClient);
-};
+export const phoneAuthService = new PhoneAuthService();
+
+// Export factory function for compatibility
+export const createPhoneAuthService = () => phoneAuthService;
+
+export default phoneAuthService;
