@@ -53,7 +53,7 @@ const PasskeyManager = () => {
     try {
       setRegistering(true);
       
-      const result = await authClient.passkey.register({
+      const result = await authClient.passkey.addPasskey({
         name: newPasskeyName.trim()
       });
 
@@ -76,7 +76,9 @@ const PasskeyManager = () => {
 
   const deletePasskey = async (passkeyId: string) => {
     try {
-      const result = await authClient.passkey.delete({ id: passkeyId });
+      const result = await authClient.passkey.deletePasskey({ 
+        passkeyId: passkeyId 
+      });
 
       if (result.error) {
         toast.error("Failed to delete passkey");

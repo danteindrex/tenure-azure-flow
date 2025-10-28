@@ -25,7 +25,6 @@ const SignUp = () => {
     confirmPassword: "",
     agreeToTerms: false,
     // Step 2: Email Verification
-    emailVerificationCode: "",
     emailOtpCode: "",
     // Step 3: Personal Info + Phone
     firstName: "",
@@ -188,7 +187,7 @@ const SignUp = () => {
   // Special handler for verification code input with auto-submit
   const handleVerificationCodeChange = (value: string): void => {
     const cleanValue = value.replace(/\D/g, '').slice(0, 6);
-    setFormData((prev) => ({ ...prev, emailVerificationCode: cleanValue }));
+    setFormData((prev) => ({ ...prev, emailOtpCode: cleanValue }));
 
     // Auto-submit when 6 digits are entered
     if (cleanValue.length === 6 && !loading && !autoSubmitting) {
@@ -348,7 +347,7 @@ const SignUp = () => {
 
   // Step 2: Handle email verification
   const handleEmailVerification = async (): Promise<void> => {
-    if (!formData.emailVerificationCode || formData.emailVerificationCode.length !== 6) {
+    if (!formData.emailOtpCode || formData.emailOtpCode.length !== 6) {
       toast.error("Please enter the 6-digit verification code");
       return;
     }
@@ -359,7 +358,7 @@ const SignUp = () => {
       // Verify email with Better Auth
       const result = await authClient.verifyEmail({
         email: formData.email.trim(),
-        token: formData.emailVerificationCode
+        token: formData.emailOtpCode
       });
 
       if (result.error) {
@@ -871,7 +870,7 @@ const SignUp = () => {
             <form onSubmit={(e) => {
               e.preventDefault();
               if (formData.emailOtpCode.length === 6) {
-                handleEmailOtpVerification();
+                handleEmailVerification();
               }
             }}>
               <div className="space-y-4">
@@ -912,7 +911,7 @@ const SignUp = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={sendEmailOtp}
+                    onClick={resendEmailVerification}
                     disabled={loading}
                     className="text-accent"
                   >

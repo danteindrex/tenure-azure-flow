@@ -24,6 +24,7 @@ import { useSession } from "@/lib/auth-client";
 import SettingsService, { UserSettings, NotificationPreferences, SecuritySettings, PaymentSettings, PrivacySettings, AppearanceSettings } from "@/lib/settings";
 import { logError } from "@/lib/audit";
 import { useTheme } from "@/contexts/ThemeContext";
+import Security from "./Security";
 
 const Settings = () => {
   const [loading, setLoading] = useState(true);
@@ -277,12 +278,12 @@ const Settings = () => {
                 Notifications
               </Button>
               <Button 
-                variant={activeTab === 'privacy' ? 'default' : 'ghost'} 
+                variant={activeTab === 'security' ? 'default' : 'ghost'} 
                 className="w-full justify-start"
-                onClick={() => setActiveTab('privacy')}
+                onClick={() => setActiveTab('security')}
               >
-                <Globe className="w-4 h-4 mr-2" />
-                Privacy
+                <Shield className="w-4 h-4 mr-2" />
+                Security
               </Button>
               <Button 
                 variant={activeTab === 'appearance' ? 'default' : 'ghost'} 
@@ -366,6 +367,11 @@ const Settings = () => {
           )}
 
           {/* Security Tab */}
+          {activeTab === 'security' && (
+            <div className="space-y-6">
+              <Security />
+            </div>
+          )}
 
           {/* Privacy Tab */}
 

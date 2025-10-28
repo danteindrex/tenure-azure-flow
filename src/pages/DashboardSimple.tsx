@@ -40,10 +40,9 @@ const DashboardSimple = () => {
     const fetchQueueAndUsers = async () => {
       try {
         // Total revenue from completed payments using normalized schema
-        const { data: payments, error: paymentsError } = await supabase
-          .from('user_payments')
-          .select('amount, payment_date, user_id, status')
-          .eq('status', 'succeeded');
+        // Temporarily disabled - TODO: Replace with Better Auth API calls
+        const payments = []
+        const paymentsError = null
         if (!paymentsError && payments) {
           const sum = payments.reduce((s, p: any) => s + (p.amount || 0), 0);
           setTotalRevenue(sum);
@@ -53,17 +52,23 @@ const DashboardSimple = () => {
         let currentUserId: string | null = null;
         if (user?.id) {
           // Find user by auth_user_id in normalized users table
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('id')
-            .eq('auth_user_id', user.id)
-            .maybeSingle();
+          // Temporarily disabled - TODO: Replace with Better Auth API calls
+          const userData = null
+          const userError = null
           if (!userError && userData?.id) {
             currentUserId = userData.id;
           }
         }
 
         // Fetch queue ordered by position using normalized schema
+        // Temporarily disabled - TODO: Replace with Better Auth API calls
+        const queue = []
+        const queueError = null
+      } catch (e) {
+        // console.error('Error in fetchQueueAndUsers:', e);
+      }
+    };
+    /*
         const { data: queue, error: queueError } = await supabase
           .from('membership_queue')
           .select('user_id, queue_position, total_months_subscribed, subscription_active')
@@ -202,6 +207,7 @@ const DashboardSimple = () => {
       console.warn('Realtime subscription failed, falling back to polling:', e);
       pollRef.current = window.setInterval(() => fetchQueueAndUsers(), 5000);
     }
+    */
 
     return () => {
       // cleanup realtime subscription or polling
@@ -217,7 +223,7 @@ const DashboardSimple = () => {
         pollRef.current = null;
       }
     };
-  }, [supabase, user?.id, BUSINESS_LAUNCH_DATE, totalRevenue]);
+  }, [user?.id, BUSINESS_LAUNCH_DATE, totalRevenue]);
 
   const userData = {
     memberId: queuePosition ? `#${queuePosition.toString().padStart(3, '0')}` : "Not in queue",

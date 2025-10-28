@@ -24,13 +24,7 @@ export {
   session,
   account,
   verification,
-  passkey,
-  twoFactor,
-  userRelations,
-  sessionRelations,
-  accountRelations,
-  passkeyRelations,
-  twoFactorRelations
+  twoFactor
 } from './auth'
 
 // ============================================================================

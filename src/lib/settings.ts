@@ -1,5 +1,5 @@
 // Settings management service for user preferences
-import SupabaseClientSingleton from './supabase';
+// TODO: Replace with Better Auth API calls
 
 export interface UserSettings {
   id?: string;
@@ -199,275 +199,159 @@ export interface AppearanceSettings {
 }
 
 class SettingsService {
-  private supabase: ReturnType<typeof SupabaseClientSingleton.getInstance>;
-
   constructor() {
-    // Always use singleton for database operations (not auth)
-    this.supabase = SupabaseClientSingleton.getInstance();
+    // TODO: Initialize with Better Auth API client
   }
 
   // Get all user settings
   async getUserSettings(userId: string): Promise<UserSettings | null> {
-    try {
-      const { data, error } = await this.supabase
-        .from('user_settings')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching user settings:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in getUserSettings:', error);
-      return null;
-    }
+    // TODO: Replace with Better Auth API call
+    return {
+      email_notifications: true,
+      sms_notifications: false,
+      push_notifications: true,
+      marketing_emails: false,
+      two_factor_auth: false,
+      login_alerts: true,
+      session_timeout: 30,
+      profile_visibility: 'private',
+      data_sharing: false,
+      theme: 'light',
+      language: 'en',
+      auto_renewal: true,
+      payment_method: 'card',
+      billing_cycle: 'monthly',
+      timezone: 'UTC',
+      date_format: 'MM/DD/YYYY',
+      currency: 'USD'
+    };
   }
 
   // Create or update user settings
   async upsertUserSettings(userId: string, settings: Partial<UserSettings>): Promise<boolean> {
-    try {
-      const { error } = await this.supabase
-        .from('user_settings')
-        .upsert({
-          user_id: userId,
-          ...settings,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) {
-        console.error('Error upserting user settings:', error);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error in upsertUserSettings:', error);
-      return false;
-    }
+    // TODO: Replace with Better Auth API call
+    console.log('Settings updated:', settings);
+    return true;
   }
 
-  // Get notification preferences
+  // All methods below are temporarily stubbed - TODO: Replace with Better Auth API calls
+  
   async getNotificationPreferences(userId: string): Promise<NotificationPreferences | null> {
-    try {
-      const { data, error } = await this.supabase
-        .from('user_notification_preferences')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching notification preferences:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in getNotificationPreferences:', error);
-      return null;
-    }
+    return {
+      email_payment_reminders: true,
+      email_tenure_updates: true,
+      email_security_alerts: true,
+      email_system_updates: false,
+      email_newsletter: false,
+      sms_payment_reminders: false,
+      sms_security_alerts: true,
+      sms_urgent_updates: true,
+      push_payment_reminders: true,
+      push_tenure_updates: true,
+      push_security_alerts: true,
+      push_system_updates: false,
+      email_frequency: 'immediate',
+      sms_frequency: 'urgent_only',
+      push_frequency: 'immediate'
+    };
   }
 
-  // Update notification preferences
   async updateNotificationPreferences(userId: string, preferences: Partial<NotificationPreferences>): Promise<boolean> {
-    try {
-      const { error } = await this.supabase
-        .from('user_notification_preferences')
-        .upsert({
-          user_id: userId,
-          ...preferences,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) {
-        console.error('Error updating notification preferences:', error);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error in updateNotificationPreferences:', error);
-      return false;
-    }
+    console.log('Notification preferences updated:', preferences);
+    return true;
   }
 
-  // Get security settings
   async getSecuritySettings(userId: string): Promise<SecuritySettings | null> {
-    try {
-      const { data, error } = await this.supabase
-        .from('user_security_settings')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching security settings:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in getSecuritySettings:', error);
-      return null;
-    }
+    return {
+      two_factor_enabled: false,
+      login_alerts: true,
+      session_timeout: 30,
+      max_concurrent_sessions: 3,
+      password_strength_score: 0,
+      require_password_change: false,
+      trusted_devices: [],
+      device_fingerprint_required: false,
+      security_questions: []
+    };
   }
 
-  // Update security settings
   async updateSecuritySettings(userId: string, settings: Partial<SecuritySettings>): Promise<boolean> {
-    try {
-      const { error } = await this.supabase
-        .from('user_security_settings')
-        .upsert({
-          user_id: userId,
-          ...settings,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) {
-        console.error('Error updating security settings:', error);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error in updateSecuritySettings:', error);
-      return false;
-    }
+    console.log('Security settings updated:', settings);
+    return true;
   }
 
-  // Get payment settings
   async getPaymentSettings(userId: string): Promise<PaymentSettings | null> {
-    try {
-      const { data, error } = await this.supabase
-        .from('user_payment_settings')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching payment settings:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in getPaymentSettings:', error);
-      return null;
-    }
+    return {
+      auto_renewal: true,
+      payment_method: 'card',
+      billing_cycle: 'monthly',
+      saved_payment_methods: [],
+      invoice_delivery: 'email',
+      payment_reminders: true,
+      payment_reminder_days: 3,
+      currency: 'USD',
+      tax_rate: 0.0000
+    };
   }
 
-  // Update payment settings
   async updatePaymentSettings(userId: string, settings: Partial<PaymentSettings>): Promise<boolean> {
-    try {
-      const { error } = await this.supabase
-        .from('user_payment_settings')
-        .upsert({
-          user_id: userId,
-          ...settings,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) {
-        console.error('Error updating payment settings:', error);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error in updatePaymentSettings:', error);
-      return false;
-    }
+    console.log('Payment settings updated:', settings);
+    return true;
   }
 
-  // Get privacy settings
   async getPrivacySettings(userId: string): Promise<PrivacySettings | null> {
-    try {
-      const { data, error } = await this.supabase
-        .from('user_privacy_settings')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching privacy settings:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in getPrivacySettings:', error);
-      return null;
-    }
+    return {
+      profile_visibility: 'private',
+      show_tenure_months: true,
+      show_join_date: true,
+      show_activity_status: true,
+      data_sharing: false,
+      analytics_consent: false,
+      marketing_consent: false,
+      third_party_sharing: false,
+      show_email: false,
+      show_phone: false,
+      show_address: false,
+      show_login_activity: false,
+      show_payment_history: false,
+      show_tenure_progress: true,
+      searchable: true,
+      appear_in_leaderboards: true,
+      show_in_member_directory: false,
+      data_retention_period: 365,
+      auto_delete_inactive: false,
+      inactive_period: 730
+    };
   }
 
-  // Update privacy settings
   async updatePrivacySettings(userId: string, settings: Partial<PrivacySettings>): Promise<boolean> {
-    try {
-      const { error } = await this.supabase
-        .from('user_privacy_settings')
-        .upsert({
-          user_id: userId,
-          ...settings,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) {
-        console.error('Error updating privacy settings:', error);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error in updatePrivacySettings:', error);
-      return false;
-    }
+    console.log('Privacy settings updated:', settings);
+    return true;
   }
 
-  // Get appearance settings
   async getAppearanceSettings(userId: string): Promise<AppearanceSettings | null> {
-    try {
-      const { data, error } = await this.supabase
-        .from('user_appearance_settings')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching appearance settings:', error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in getAppearanceSettings:', error);
-      return null;
-    }
+    return {
+      theme: 'light',
+      accent_color: 'blue',
+      language: 'en',
+      timezone: 'UTC',
+      date_format: 'MM/DD/YYYY',
+      time_format: '12',
+      font_size: 'medium',
+      compact_mode: false,
+      show_animations: true,
+      reduce_motion: false,
+      dashboard_layout: 'default',
+      sidebar_collapsed: false,
+      show_tooltips: true,
+      notification_position: 'top-right',
+      notification_duration: 5000
+    };
   }
 
-  // Update appearance settings
   async updateAppearanceSettings(userId: string, settings: Partial<AppearanceSettings>): Promise<boolean> {
-    try {
-      const { error } = await this.supabase
-        .from('user_appearance_settings')
-        .upsert({
-          user_id: userId,
-          ...settings,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) {
-        console.error('Error updating appearance settings:', error);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error in updateAppearanceSettings:', error);
-      return false;
-    }
+    console.log('Appearance settings updated:', settings);
+    return true;
   }
 
   // Initialize default settings for new user

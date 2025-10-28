@@ -14,6 +14,7 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { nextCookies } from 'better-auth/next-js'
 import { twoFactor, organization } from 'better-auth/plugins'
+import { passkey } from 'better-auth/plugins/passkey'
 import { db } from '@/drizzle/db'
 import { Resend } from 'resend'
 
@@ -22,7 +23,9 @@ const resend = new Resend(process.env.RESEND_API_KEY!)
 
 export const auth = betterAuth({
   // Database adapter
-  database: drizzleAdapter(db, { provider: 'pg' }),
+  database: drizzleAdapter(db, { 
+    provider: 'pg'
+  }),
 
   // Base URL for authentication
   baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
@@ -34,45 +37,6 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
-
-    // Send verification email using Resend
-    sendVerificationEmail: async ({ user, url, token }) => {
-      try {
-        await resend.emails.send({
-          from: process.env.EMAIL_FROM || 'noreply@yourdomain.com',
-          to: user.email,
-          subject: 'Verify your email address',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h1 style="color: #333;">Welcome to Tenure!</h1>
-              <p style="color: #666; font-size: 16px;">
-                Please verify your email address by clicking the button below:
-              </p>
-              <a href="${url}" style="
-                display: inline-block;
-                padding: 12px 24px;
-                background-color: #0070f3;
-                color: white;
-                text-decoration: none;
-                border-radius: 5px;
-                margin: 20px 0;
-              ">Verify Email</a>
-              <p style="color: #999; font-size: 14px;">
-                Or use this code: <strong>${token}</strong>
-              </p>
-              <p style="color: #999; font-size: 12px;">
-                If you didn't request this email, you can safely ignore it.
-              </p>
-            </div>
-          `
-        })
-      } catch (error) {
-        console.error('Failed to send verification email:', error)
-        throw error
-      }
-    },
-
-    // Send password reset email
     sendResetPasswordEmail: async ({ user, url, token }) => {
       try {
         await resend.emails.send({
@@ -110,6 +74,54 @@ export const auth = betterAuth({
     }
   },
 
+  // Email verification configuration (separate from emailAndPassword)
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url, token }) => {
+      console.log('📧 Better Auth: Attempting to send verification email...')
+      console.log('   User:', user.email)
+      console.log('   URL:', url)
+      console.log('   Token:', token)
+      
+      try {
+        const result = await resend.emails.send({
+          from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+          to: user.email,
+          subject: 'Verify your email address',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h1 style="color: #333;">Welcome to Tenure!</h1>
+              <p style="color: #666; font-size: 16px;">
+                Please verify your email address by clicking the button below:
+              </p>
+              <a href="${url}" style="
+                display: inline-block;
+                padding: 12px 24px;
+                background-color: #0070f3;
+                color: white;
+                text-decoration: none;
+                border-radius: 5px;
+                margin: 20px 0;
+              ">Verify Email</a>
+              <p style="color: #999; font-size: 14px;">
+                Or use this code: <strong>${token}</strong>
+              </p>
+              <p style="color: #999; font-size: 12px;">
+                If you didn't request this email, you can safely ignore it.
+              </p>
+            </div>
+          `
+        })
+        
+        console.log('✅ Better Auth: Email sent successfully!')
+        console.log('   Email ID:', result.data?.id)
+        
+      } catch (error) {
+        console.error('❌ Better Auth: Failed to send verification email:', error)
+        throw error
+      }
+    }
+  },
+
   // Social authentication providers
   socialProviders: {
     google: {
@@ -124,7 +136,11 @@ export const auth = betterAuth({
   plugins: [
     nextCookies(),  // Required for Next.js cookie management
 
-    // Passkey plugin temporarily disabled - not available in current Better Auth version
+    // Passkey plugin (WebAuthn support)
+    passkey({
+      rpName: 'Tenure',
+      rpID: process.env.NODE_ENV === 'production' ? 'yourdomain.com' : 'localhost'
+    }),
 
     // Two-Factor Authentication plugin (TOTP + backup codes)
     twoFactor({
@@ -156,7 +172,7 @@ export const auth = betterAuth({
   // Advanced configuration
   advanced: {
     database: {
-      generateId: false,  // Let PostgreSQL handle UUID generation
+      generateId: () => crypto.randomUUID(), // Generate UUIDs for Better Auth
     },
     useSecureCookies: process.env.NODE_ENV === 'production',
     // Cross-origin settings for API
