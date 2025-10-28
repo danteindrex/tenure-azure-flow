@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Crown, Check, ChevronRight, ChevronLeft, Loader2, Mail, Phone, Fingerprint, Shield } from "lucide-react";
 import { toast } from "sonner";
-import { authClient, useSession } from "@/lib/auth-client";
+import { authClient, useSession, signUp, updateUser, signIn } from "@/lib/auth-client";
 import { logPageVisit, logSignup, logError } from "@/lib/audit";
 import { COUNTRY_DIAL_CODES } from "@/lib/countryDialCodes";
+import baseLogger from "@/lib/baseLogger";
 
 const SignUp = () => {
   const navigate = useRouter();
@@ -275,7 +276,6 @@ const SignUp = () => {
       toast.error("Please enter your email address");
       return;
     }
-
     if (formData.password !== formData.confirmPassword) {
       toast.error("Passwords do not match");
       return;
@@ -287,15 +287,26 @@ const SignUp = () => {
     }
 
     try {
+
+      console.log("The current formdata extracted from the form",formData)
       setLoading(true);
       const email = formData.email.trim();
+      const username = `${formData.firstName} ${formData.lastName}`
+      baseLogger("authentication","WillCreateAccount");
+
+
+      let currentProviededEmail = formData.email;
+      let currentProvidedPassword = formData.password
 
       // Create user with Better Auth
-      const result = await authClient.signUp.email({
-        email: email,
-        password: formData.password,
+      const result = await signUp.email({
+        email: currentProviededEmail,
+        password: currentProvidedPassword,
         name: "User", // Temporary name, will be updated in step 3
       });
+
+      console.log("The current credentials",result.data)
+      baseLogger("authentication","DidCreateAccount")
 
       if (result.error) {
         console.error("Account creation error:", result.error);
@@ -524,7 +535,7 @@ const SignUp = () => {
       // Update user profile with Better Auth
       const fullName = `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim();
       
-      const result = await authClient.updateUser({
+      const result = await updateUser({
         name: fullName,
         // Store additional profile data in user metadata
         metadata: {
@@ -681,7 +692,7 @@ const SignUp = () => {
       await logSignup("google_oauth", false);
 
       // Use Better Auth for Google OAuth
-      const result = await authClient.signIn.social({
+      const result = await signIn.social({
         provider: 'google',
         callbackURL: `${window.location.origin}/signup/complete-profile`
       });
