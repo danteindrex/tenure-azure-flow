@@ -43,16 +43,20 @@ if (!process.env.DATABASE_URL) {
   )
 }
 
-// Create PostgreSQL connection pool
+// Create PostgreSQL connection pool optimized for Supabase
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
-  // Connection pool settings optimized for Supabase
-  max: 10, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
-  connectionTimeoutMillis: 10000, // Increased timeout for Supabase (10 seconds)
-  query_timeout: 30000, // Query timeout (30 seconds)
-  statement_timeout: 30000, // Statement timeout (30 seconds)
+  ssl: { rejectUnauthorized: false }, // Always use SSL for Supabase
+  // Optimized settings for Supabase connection pooler
+  max: 5, // Reduced pool size for better connection management
+  min: 1, // Keep at least 1 connection alive
+  idleTimeoutMillis: 60000, // Keep connections alive longer
+  connectionTimeoutMillis: 15000, // Increased timeout for Supabase
+  acquireTimeoutMillis: 15000, // Time to wait for connection from pool
+  createTimeoutMillis: 15000, // Time to wait for new connection creation
+  destroyTimeoutMillis: 5000, // Time to wait for connection destruction
+  reapIntervalMillis: 1000, // How often to check for idle connections
+  createRetryIntervalMillis: 200, // Retry interval for failed connections
 })
 
 // Log pool errors
@@ -65,6 +69,16 @@ pool.on('error', (err) => {
 export const db = drizzle(pool, {
   schema,
   logger: process.env.NODE_ENV === 'development' // Enable query logging in development
+})
+
+// Test connection on startup
+pool.on('connect', (client) => {
+  console.log('✅ Database connected successfully')
+})
+
+pool.on('error', (err, client) => {
+  console.error('❌ Database connection error:', err.message)
+  // Don't exit process, let the pool handle reconnection
 })
 
 // Export pool for advanced usage
