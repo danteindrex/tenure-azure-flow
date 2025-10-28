@@ -1,5 +1,3 @@
-import SupabaseClientSingleton from './supabase';
-
 // Types for audit logging
 export interface AuditLogEntry {
   user_id?: string;
@@ -32,18 +30,11 @@ export interface AuditLogFilters {
 }
 
 class AuditLogger {
-  private supabase: ReturnType<typeof SupabaseClientSingleton.getInstance>;
   private sessionId: string;
   private static instance: AuditLogger;
 
   constructor() {
-    this.supabase = SupabaseClientSingleton.getInstance();
     this.sessionId = this.generateSessionId();
-    
-    // If we're on server side and supabase is null, skip initialization
-    if (typeof window === 'undefined' && !this.supabase) {
-      return;
-    }
   }
 
   static getInstance(): AuditLogger {
@@ -94,29 +85,11 @@ class AuditLogger {
 
   async log(entry: Omit<AuditLogEntry, 'user_agent' | 'ip_address' | 'location'>) {
     try {
-      // Don't throw when audit can't be recorded. Logging should be best-effort only.
-      if (!this.supabase) {
-        // If supabase is not initialized (likely server-side during build), just skip.
-        console.warn('Supabase client not available, skipping audit log');
-        return;
-      }
-
-      // Safely attempt to get session, but don't fail hard if auth is unavailable.
-      let userIdFromSession: string | undefined = undefined;
-      try {
-        // Some environments may not have auth configured; guard against unexpected shapes.
-        const sessionResp: any = await this.supabase?.auth?.getSession?.();
-        userIdFromSession = sessionResp?.data?.session?.user?.id;
-      } catch (e) {
-        // Non-fatal: continue with provided entry.user_id if available
-        console.warn('Could not retrieve session for audit log:', e);
-      }
-
       const auditData = {
         ...entry,
         session_id: this.sessionId,
-        user_id: userIdFromSession || entry.user_id,
-        user_type: userIdFromSession ? 'authenticated' : entry.user_type || 'guest'
+        user_id: entry.user_id,
+        user_type: entry.user_type || 'guest'
       };
 
       // Fire-and-forget POST to the API route. We intentionally do not rethrow errors
@@ -253,99 +226,43 @@ class AuditLogger {
     });
   }
 
-  // Query audit logs
+  // Query audit logs via API
   async getAuditLogs(filters: AuditLogFilters = {}) {
     try {
-      if (!this.supabase) {
-        console.warn('Supabase client not available');
-        return { data: [], error: null };
-      }
-      
-      let query = this.supabase
-        .from('system_audit_logs')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) {
+          params.append(key, String(value));
+        }
+      });
 
-      if (filters.user_id) {
-        query = query.eq('user_id', filters.user_id);
-      }
-      if (filters.user_type) {
-        query = query.eq('user_type', filters.user_type);
-      }
-      if (filters.action) {
-        query = query.eq('action', filters.action);
-      }
-      if (filters.resource_type) {
-        query = query.eq('resource_type', filters.resource_type);
-      }
-      if (filters.start_date) {
-        query = query.gte('created_at', filters.start_date);
-      }
-      if (filters.end_date) {
-        query = query.lte('created_at', filters.end_date);
-      }
-      if (filters.limit) {
-        query = query.limit(filters.limit);
-      }
-      if (filters.offset) {
-        query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
+      const response = await fetch(`/api/audit/logs?${params}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
 
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Failed to fetch audit logs:', error);
-        return { data: [], error };
-      }
-
-      return { data, error: null };
+      const result = await response.json();
+      return { data: result.data || [], error: null };
     } catch (error) {
       console.error('Error fetching audit logs:', error);
       return { data: [], error };
     }
   }
 
-  // Get audit statistics
+  // Get audit statistics via API
   async getAuditStats(startDate?: string, endDate?: string) {
     try {
-      if (!this.supabase) {
-        console.warn('Supabase client not available');
-        return { data: null, error: null };
-      }
-      
-      let query = this.supabase
-        .from('system_audit_logs')
-        .select('action, user_type, created_at');
+      const params = new URLSearchParams();
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
 
-      if (startDate) {
-        query = query.gte('created_at', startDate);
-      }
-      if (endDate) {
-        query = query.lte('created_at', endDate);
+      const response = await fetch(`/api/audit/stats?${params}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
 
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Failed to fetch audit stats:', error);
-        return { data: null, error };
-      }
-
-      // Process data to get statistics
-      const stats = {
-        total_actions: data.length,
-        actions_by_type: data.reduce((acc: any, log: any) => {
-          acc[log.action] = (acc[log.action] || 0) + 1;
-          return acc;
-        }, {}),
-        users_by_type: data.reduce((acc: any, log: any) => {
-          acc[log.user_type] = (acc[log.user_type] || 0) + 1;
-          return acc;
-        }, {}),
-        unique_users: new Set(data.map((log: any) => log.user_id).filter(Boolean)).size
-      };
-
-      return { data: stats, error: null };
+      const result = await response.json();
+      return { data: result.data || null, error: null };
     } catch (error) {
       console.error('Error fetching audit stats:', error);
       return { data: null, error };

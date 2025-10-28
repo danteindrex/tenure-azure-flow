@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "@/lib/auth-client";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import NotificationService, { Notification, NotificationPreferences } from "@/lib/notifications";
 import { logError } from "@/lib/audit";
 
@@ -30,7 +29,7 @@ const Notifications = () => {
   });
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
 
-  const supabase = useSupabaseClient();
+
   const { data: session } = useSession();
   const user = session?.user;
   

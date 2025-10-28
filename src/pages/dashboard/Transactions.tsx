@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "@/lib/auth-client";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,7 +32,7 @@ const Transactions = () => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [monthlyTotal, setMonthlyTotal] = useState(0);
-  const supabase = useSupabaseClient();
+
   // Memoize service so it doesn't trigger useEffect re-runs
   const historyServiceRef = useRef<InstanceType<typeof HistoryService> | null>(null);
   if (!historyServiceRef.current) historyServiceRef.current = new HistoryService();

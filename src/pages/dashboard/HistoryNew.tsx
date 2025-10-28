@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "@/lib/auth-client";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import HistoryService, { UserActivityHistory, TransactionHistory, QueueHistory, MilestoneHistory, HistorySummary } from "@/lib/history";
 import { logError } from "@/lib/audit";
 
@@ -44,7 +43,7 @@ const HistoryNew = () => {
     recent_activities: []
   });
 
-  const supabase = useSupabaseClient();
+
   const { data: session } = useSession();
   const user = session?.user;
 

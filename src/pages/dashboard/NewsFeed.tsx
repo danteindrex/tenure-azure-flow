@@ -15,7 +15,6 @@ import {
   Users
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { toast } from "sonner";
 
 interface NewsPost {
@@ -47,7 +46,7 @@ const NewsFeed = () => {
     nextPayoutDate: 'TBD'
   });
 
-  const supabase = useSupabaseClient();
+
   const { data: session } = useSession();
   const user = session?.user;
 

@@ -15,10 +15,9 @@ import {
   Activity
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
 
 const Analytics = () => {
-  const supabase = useSupabaseClient();
+
   const { data: session } = useSession();
   const user = session?.user;
   const [timeRange, setTimeRange] = useState("6months");
