@@ -1,5 +1,4 @@
 // Queue Service Adapter - Seamless integration with the Queue microservice
-import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { QueueMember, QueueStatistics as QueueStatsType } from './types';
 
 interface QueueUser {
@@ -56,42 +55,19 @@ interface QueueResponse {
 
 class QueueServiceAdapter {
   private baseUrl: string;
-  private supabase: any;
 
   constructor() {
     // Use Next.js API route instead of direct microservice access from frontend
     this.baseUrl = '';
   }
 
-  setSupabaseClient(supabase: any) {
-    this.supabase = supabase;
-  }
-
-  private async getAuthToken(): Promise<string | null> {
-    if (!this.supabase) {
-      return null;
-    }
-
-    try {
-      const { data: { session } } = await this.supabase.auth.getSession();
-      return session?.access_token || null;
-    } catch (error) {
-      console.error('Failed to get auth token:', error);
-      return null;
-    }
-  }
-
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const token = await this.getAuthToken();
-    
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
     };
 
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    // Better Auth uses cookies, no need for Authorization header
 
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
@@ -201,10 +177,10 @@ class QueueServiceAdapter {
     limit?: number;
     offset?: number;
   }): Promise<QueueResponse> {
-    if (!this.supabase) {
-      throw new Error('Queue service unavailable and no database client available');
-    }
+    throw new Error('Queue service unavailable. Please try again later or contact support.');
 
+    /* REMOVED: Direct Supabase access fallback
+    // With Better Auth, we route all requests through API endpoints
     try {
       console.warn('Queue microservice unavailable, falling back to direct database access');
 
@@ -322,6 +298,7 @@ class QueueServiceAdapter {
     } catch (error) {
       throw new Error(`Fallback database access failed: ${error}`);
     }
+    */
   }
 }
 
@@ -330,11 +307,7 @@ const queueService = new QueueServiceAdapter();
 
 // Hook for React components
 export const useQueueService = () => {
-  const supabase = useSupabaseClient();
-  
-  // Set the supabase client for the service
-  queueService.setSupabaseClient(supabase);
-  
+  // Better Auth uses cookies, no client setup needed
   return queueService;
 };
 

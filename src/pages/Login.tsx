@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Crown } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/router";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
+import { authClient } from "@/lib/auth-client";
 import { logPageVisit, logLogin, logError } from "@/lib/audit";
 
 const Login = () => {
@@ -15,7 +15,6 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = useSupabaseClient();
 
   // Log page visit
   useEffect(() => {
@@ -29,24 +28,24 @@ const Login = () => {
       
       // Log login attempt
       await logLogin(email.trim(), false); // Will update to true if successful
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
+
+      const { data, error } = await authClient.signIn.email({
         email: email.trim(),
         password,
       });
-      
+
       if (error) {
         // Log failed login attempt
         await logLogin(email.trim(), false);
-        await logError(`Login failed: ${error.message}`, undefined, { 
-          email: email.trim(), 
-          error_code: error.message 
+        await logError(`Login failed: ${error.message}`, undefined, {
+          email: email.trim(),
+          error_code: error.message
         });
         throw error;
       }
-      
+
       // Log successful login
-      await logLogin(email.trim(), true, data.user?.id);
+      await logLogin(email.trim(), true, data?.user?.id);
       
       toast.success("Logged in successfully");
       router.replace("/dashboard");
@@ -63,28 +62,22 @@ const Login = () => {
       
       // Log Google login attempt
       await logLogin("google_oauth", false);
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
+
+      const { data, error } = await authClient.signIn.social({
         provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          }
-        },
+        callbackURL: `${window.location.origin}/auth/callback`,
       });
-      
+
       if (error) {
         await logLogin("google_oauth", false);
-        await logError(`Google login failed: ${error.message}`, undefined, { 
+        await logError(`Google login failed: ${error.message}`, undefined, {
           provider: 'google',
-          error_code: error.message 
+          error_code: error.message
         });
         toast.error("Google login failed");
         return;
       }
-      
+
       // Log successful Google login attempt (will be completed after redirect)
       await logLogin("google_oauth", true);
       

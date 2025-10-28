@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useUser, useSupabaseClient } from "@supabase/auth-helpers-react";
+import { useSession } from "@/lib/auth-client";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,11 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import HistoryService from "@/lib/history";
-import { 
-  CreditCard, 
-  Search, 
-  Filter, 
-  Download, 
+import {
+  CreditCard,
+  Search,
+  Filter,
+  Download,
   Calendar,
   DollarSign,
   ArrowUpRight,
@@ -20,10 +21,11 @@ import {
   CheckCircle,
   XCircle
 } from "lucide-react";
- 
+
 
 const Transactions = () => {
-  const user = useUser();
+  const { data: session } = useSession();
+  const user = session?.user;
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");

@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useCounterAnimation } from "@/hooks/use-counter-animation";
 import { QueueRow } from "@/components/QueueRow";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { useSession } from "@/lib/auth-client";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import PaymentNotificationBanner from "@/components/PaymentNotificationBanner";
 import BusinessLogicService, { BUSINESS_RULES } from "@/lib/business-logic";
 
@@ -35,7 +36,8 @@ const Dashboard = () => {
   });
 
   const supabase = useSupabaseClient();
-  const user = useUser();
+  const { data: session } = useSession();
+  const user = session?.user;
 
   // Animated counters - will be updated with real data
   const daysUntilPayment = useCounterAnimation(dashboardStats.daysUntilPayment, 1200, 100);

@@ -4,9 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  History, 
-  Search, 
+import {
+  History,
+  Search,
   Calendar,
   Clock,
   DollarSign,
@@ -18,7 +18,8 @@ import {
   RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { useSession } from "@/lib/auth-client";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import HistoryService, { UserActivityHistory, TransactionHistory, QueueHistory, MilestoneHistory, HistorySummary } from "@/lib/history";
 import { logError } from "@/lib/audit";
 
@@ -44,7 +45,8 @@ const HistoryNew = () => {
   });
 
   const supabase = useSupabaseClient();
-  const user = useUser();
+  const { data: session } = useSession();
+  const user = session?.user;
 
   // Memoize the history service to prevent recreation on every render
   const historyService = useMemo(() => new HistoryService(supabase), [supabase]);

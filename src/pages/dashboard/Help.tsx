@@ -7,12 +7,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { 
-  HelpCircle, 
-  Search, 
-  MessageCircle, 
-  Mail, 
-  Phone, 
+import {
+  HelpCircle,
+  Search,
+  MessageCircle,
+  Mail,
+  Phone,
   FileText,
   ChevronRight,
   Send,
@@ -21,7 +21,8 @@ import {
   Loader2
 } from "lucide-react";
 import { toast } from "sonner";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { useSession } from "@/lib/auth-client";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import HelpService, { SupportTicket, FAQCategory, FAQItem, KnowledgeBaseArticle } from "@/lib/help";
 import { logError } from "@/lib/audit";
 
@@ -49,7 +50,8 @@ const Help = () => {
   }>({ faqItems: [], articles: [], totalResults: 0 });
 
   const supabase = useSupabaseClient();
-  const user = useUser();
+  const { data: session } = useSession();
+  const user = session?.user;
   
   // Memoize the help service to prevent recreation on every render
   const helpService = useMemo(() => new HelpService(supabase), [supabase]);

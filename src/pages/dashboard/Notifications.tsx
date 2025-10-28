@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Bell, 
-  Check, 
-  Trash2, 
+import {
+  Bell,
+  Check,
+  Trash2,
   Settings,
   AlertCircle,
   Info,
@@ -14,7 +14,8 @@ import {
   Loader2
 } from "lucide-react";
 import { toast } from "sonner";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { useSession } from "@/lib/auth-client";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import NotificationService, { Notification, NotificationPreferences } from "@/lib/notifications";
 import { logError } from "@/lib/audit";
 
@@ -30,7 +31,8 @@ const Notifications = () => {
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
 
   const supabase = useSupabaseClient();
-  const user = useUser();
+  const { data: session } = useSession();
+  const user = session?.user;
   
   // Memoize the notification service to prevent recreation on every render
   const notificationService = useMemo(() => new NotificationService(supabase), [supabase]);

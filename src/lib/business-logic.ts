@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import SupabaseClientSingleton from './supabase';
 import { MemberTenure, MemberPaymentStatus } from './types';
 
 // Business Rules Constants (BR-1 through BR-10)
@@ -45,10 +45,11 @@ export interface UserPaymentStatus {
 }
 
 class BusinessLogicService {
-  private supabase;
+  private supabase: ReturnType<typeof SupabaseClientSingleton.getInstance>;
 
-  constructor(supabaseUrl: string, supabaseKey: string) {
-    this.supabase = createClient(supabaseUrl, supabaseKey);
+  constructor() {
+    // Always use singleton for database operations (not auth)
+    this.supabase = SupabaseClientSingleton.getInstance();
   }
 
   /**

@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Crown, Check, ChevronRight, ChevronLeft, Loader2, Phone } from "lucide-react";
 import { toast } from "sonner";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
+import { useSession } from "@/lib/auth-client";
 import { logPageVisit, logError } from "@/lib/audit";
 import { COUNTRY_DIAL_CODES } from "@/lib/countryDialCodes";
 
@@ -15,8 +15,8 @@ const CompleteProfile = () => {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const router = useRouter();
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const { data: session, isPending } = useSession();
+  const user = session?.user;
 
   // US States data
   const usStates = [
@@ -56,13 +56,13 @@ const CompleteProfile = () => {
     agreeToTerms: false,
   });
 
-  // Log page visit and pre-fill from Google data
+  // Log page visit and pre-fill from Better Auth data
   useEffect(() => {
     logPageVisit('/signup/complete-profile');
 
     if (user) {
-      // Parse Google user data
-      const fullName = user.user_metadata?.full_name || user.user_metadata?.name || "";
+      // Parse user name data
+      const fullName = user.name || "";
       const nameParts = fullName.split(" ");
       const firstName = nameParts[0] || "";
       const lastName = nameParts[nameParts.length - 1] || "";
@@ -185,6 +185,14 @@ const CompleteProfile = () => {
       setLoading(false);
     }
   };
+
+  if (isPending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
+      </div>
+    );
+  }
 
   if (!user) {
     return (
