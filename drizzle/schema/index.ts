@@ -13,6 +13,7 @@
  * - compliance.ts: Compliance tables (tax_forms, transaction_monitoring, verification_codes)
  * - audit.ts: Audit logs (system_audit_logs, user_audit_logs)
  * - organizations.ts: Organization management (organization, organization_member, organization_invitation)
+ * - admin.ts: Admin users and Payload CMS tables (admin, admin_sessions, admin_alerts, payload_*)
  */
 
 // ============================================================================
@@ -129,3 +130,24 @@ export {
   organizationMemberRelations,
   organizationInvitationRelations
 } from './organizations'
+
+// ============================================================================
+// ADMIN & PAYLOAD CMS TABLES
+// ============================================================================
+export {
+  admin,
+  adminSessions,
+  adminAlerts,
+  payloadMigrations,
+  payloadPreferences,
+  payloadPreferencesRels,
+  payloadLockedDocuments,
+  payloadLockedDocumentsRels,
+  adminRelations,
+  adminSessionsRelations,
+  adminAlertsRelations,
+  payloadPreferencesRelations,
+  payloadPreferencesRelsRelations,
+  payloadLockedDocumentsRelations,
+  payloadLockedDocumentsRelsRelations
+} from './admin'

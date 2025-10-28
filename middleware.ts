@@ -1,34 +1,33 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
+import { betterAuth } from "./lib/auth";
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
-  const supabase = createMiddlewareClient({ req, res });
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const { pathname } = req.nextUrl;
 
+  // Get session from Better Auth
+  const session = await betterAuth.api.getSession({
+    headers: req.headers,
+  });
+
   if (pathname.startsWith("/dashboard")) {
-    if (!user) {
+    if (!session) {
       const url = req.nextUrl.clone();
       url.pathname = "/login";
       url.search = "";
       return NextResponse.redirect(url);
     }
-    return res;
+    return NextResponse.next();
   }
 
-  if (user && (pathname === "/login" || pathname === "/signup" || pathname === "/reset-password")) {
+  if (session && (pathname === "/login" || pathname === "/signup" || pathname === "/reset-password")) {
     const url = req.nextUrl.clone();
     url.pathname = "/dashboard";
     url.search = "";
     return NextResponse.redirect(url);
   }
 
-  return res;
+  return NextResponse.next();
 }
 
 export const config = {

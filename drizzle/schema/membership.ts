@@ -12,7 +12,7 @@
  */
 
 import { pgTable, uuid, text, varchar, boolean, timestamp, decimal, integer, date, index, jsonb } from 'drizzle-orm/pg-core'
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import { users } from './users'
 
 // ============================================================================
@@ -30,7 +30,6 @@ export const membershipQueue = pgTable('membership_queue', {
   lastPaymentDate: timestamp('last_payment_date', { withTimezone: true }),
   lifetimePaymentTotal: decimal('lifetime_payment_total', { precision: 10, scale: 2 }).default('0.00'),
   hasReceivedPayout: boolean('has_received_payout').default(false),
-  status: varchar('status', { length: 20 }).default('pending'), // Added from recent migration
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
@@ -45,20 +44,27 @@ export const membershipQueue = pgTable('membership_queue', {
 // ============================================================================
 export const kycVerification = pgTable('kyc_verification', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').unique().references(() => users.id, { onDelete: 'cascade' }),
-  status: varchar('status', { length: 20 }).notNull().default('pending'), // 'pending', 'in_review', 'approved', 'rejected'
-  verificationType: varchar('verification_type', { length: 50 }), // 'identity', 'address', 'financial'
-  documentType: varchar('document_type', { length: 50 }), // 'passport', 'drivers_license', 'national_id'
-  documentNumber: varchar('document_number', { length: 100 }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('pending'),
+  verificationMethod: text('verification_method'),
+  documentType: text('document_type'),
+  documentNumber: text('document_number'),
   documentFrontUrl: text('document_front_url'),
   documentBackUrl: text('document_back_url'),
   selfieUrl: text('selfie_url'),
-  submittedAt: timestamp('submitted_at', { withTimezone: true }),
-  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
-  reviewedBy: integer('reviewed_by'), // References admin(id)
-  rejectionReason: text('rejection_reason'),
+  verificationProvider: text('verification_provider'),
+  providerVerificationId: text('provider_verification_id'),
+  verificationData: jsonb('verification_data').default(sql`'{}'::jsonb`),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
   expiresAt: timestamp('expires_at', { withTimezone: true }),
-  notes: text('notes'),
+  rejectionReason: text('rejection_reason'),
+  reviewerId: integer('reviewer_id'),
+  reviewerNotes: text('reviewer_notes'),
+  riskScore: integer('risk_score'),
+  riskFactors: jsonb('risk_factors').default(sql`'[]'::jsonb`),
+  ipAddress: text('ip_address'), // Using text instead of inet for simplicity
+  userAgent: text('user_agent'),
+  geolocation: jsonb('geolocation'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
@@ -99,24 +105,29 @@ export const payoutManagement = pgTable('payout_management', {
 // ============================================================================
 export const disputes = pgTable('disputes', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  disputeType: varchar('dispute_type', { length: 50 }).notNull(), // 'payment', 'payout', 'membership', 'other'
-  disputeStatus: varchar('dispute_status', { length: 20 }).notNull().default('open'), // 'open', 'in_review', 'resolved', 'closed'
-  subject: varchar('subject', { length: 255 }).notNull(),
-  description: text('description').notNull(),
-  relatedEntityType: varchar('related_entity_type', { length: 50 }), // 'payment', 'payout', 'subscription'
-  relatedEntityId: uuid('related_entity_id'),
-  submittedAt: timestamp('submitted_at', { withTimezone: true }).defaultNow(),
-  assignedTo: integer('assigned_to'), // References admin(id)
-  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
-  resolution: text('resolution'),
-  internalNotes: text('internal_notes'),
+  disputeId: text('dispute_id').notNull(),
+  paymentId: uuid('payment_id'),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(),
+  status: text('status').notNull().default('needs_response'),
+  reason: text('reason').notNull(),
+  amount: decimal('amount').notNull(),
+  currency: text('currency').default('USD'),
+  stripeDisputeId: text('stripe_dispute_id'),
+  customerMessage: text('customer_message'),
+  respondBy: timestamp('respond_by', { withTimezone: true }).notNull(),
+  evidence: jsonb('evidence').default(sql`'{}'::jsonb`),
+  assignedTo: integer('assigned_to'),
+  internalNotes: jsonb('internal_notes').default(sql`'[]'::jsonb`),
+  resolution: jsonb('resolution'),
+  impact: jsonb('impact'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
   userIdIdx: index('idx_disputes_user_id').on(table.userId),
-  statusIdx: index('idx_disputes_status').on(table.disputeStatus),
-  typeIdx: index('idx_disputes_type').on(table.disputeType)
+  statusIdx: index('idx_disputes_status').on(table.status),
+  typeIdx: index('idx_disputes_type').on(table.type),
+  disputeIdIdx: index('idx_disputes_dispute_id').on(table.disputeId)
 }))
 
 // ============================================================================

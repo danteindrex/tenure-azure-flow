@@ -36,11 +36,11 @@ export const users = pgTable('users', {
 // 2. USER PROFILES: Personal Information (EXISTING TABLE - EXACT MAPPING)
 // ============================================================================
 export const userProfiles = pgTable('user_profiles', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').unique().references(() => users.id, { onDelete: 'cascade' }),
-  firstName: varchar('first_name', { length: 100 }),
-  lastName: varchar('last_name', { length: 100 }),
-  middleName: varchar('middle_name', { length: 100 }),
+  id: varchar('id').primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  firstName: varchar('first_name'),
+  lastName: varchar('last_name'),
+  middleName: varchar('middle_name'),
   dateOfBirth: date('date_of_birth'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
@@ -102,7 +102,7 @@ export const userMemberships = pgTable('user_memberships', {
   joinDate: date('join_date').notNull().defaultNow(),
   tenure: numeric('tenure').default('0'),
   verificationStatus: varchar('verification_status', { length: 20 }).default('PENDING'),
-  assignedAdminId: integer('assigned_admin_id'), // References admin(id)
+  assignedAdminIdId: integer('assigned_admin_id_id'), // References admin(id)
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()

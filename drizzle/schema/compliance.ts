@@ -11,7 +11,7 @@
  */
 
 import { pgTable, uuid, text, varchar, boolean, timestamp, decimal, integer, jsonb, index } from 'drizzle-orm/pg-core'
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import { users } from './users'
 
 // ============================================================================
@@ -19,43 +19,19 @@ import { users } from './users'
 // ============================================================================
 export const taxForms = pgTable('tax_forms', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  formType: varchar('form_type', { length: 20 }).notNull(), // '1099', 'W9', 'W8BEN'
+  formId: text('form_id').notNull().default(sql`(gen_random_uuid())::text`),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  formType: text('form_type').notNull(),
   taxYear: integer('tax_year').notNull(),
-  status: varchar('status', { length: 20 }).notNull().default('pending'), // 'pending', 'submitted', 'approved', 'rejected'
-
-  // Tax Information
-  taxIdType: varchar('tax_id_type', { length: 20 }), // 'ssn', 'ein', 'itin'
-  taxIdNumber: varchar('tax_id_number', { length: 50 }), // Encrypted
-  legalName: varchar('legal_name', { length: 255 }),
-  businessName: varchar('business_name', { length: 255 }),
-
-  // Address Information
-  address: text('address'),
-  city: varchar('city', { length: 100 }),
-  state: varchar('state', { length: 50 }),
-  zipCode: varchar('zip_code', { length: 20 }),
-  country: varchar('country', { length: 2 }).default('US'),
-
-  // Form Data
-  formData: jsonb('form_data'), // Full form data as JSON
-  documentUrl: text('document_url'), // S3/storage URL for signed form
-
-  // Income Information (for 1099)
-  totalIncome: decimal('total_income', { precision: 10, scale: 2 }),
-  federalTaxWithheld: decimal('federal_tax_withheld', { precision: 10, scale: 2 }),
-
-  // Submission Tracking
-  submittedAt: timestamp('submitted_at', { withTimezone: true }),
-  submittedBy: uuid('submitted_by'),
-  approvedAt: timestamp('approved_at', { withTimezone: true }),
-  approvedBy: integer('approved_by'), // References admin(id)
-
-  // IRS Filing
-  filedWithIrs: boolean('filed_with_irs').default(false),
-  irsFilingDate: timestamp('irs_filing_date', { withTimezone: true }),
-  irsConfirmationNumber: varchar('irs_confirmation_number', { length: 100 }),
-
+  status: text('status').notNull().default('pending'),
+  recipientInfo: jsonb('recipient_info').notNull().default(sql`'{}'::jsonb`),
+  payerInfo: jsonb('payer_info').default(sql`'{}'::jsonb`),
+  incomeDetails: jsonb('income_details').default(sql`'{}'::jsonb`),
+  w9Data: jsonb('w9_data').default(sql`'{}'::jsonb`),
+  generation: jsonb('generation').default(sql`'{}'::jsonb`),
+  delivery: jsonb('delivery').default(sql`'{}'::jsonb`),
+  irsFiling: jsonb('irs_filing').default(sql`'{}'::jsonb`),
+  corrections: jsonb('corrections').default(sql`'[]'::jsonb`),
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
@@ -63,7 +39,8 @@ export const taxForms = pgTable('tax_forms', {
   userIdIdx: index('idx_tax_forms_user_id').on(table.userId),
   statusIdx: index('idx_tax_forms_status').on(table.status),
   taxYearIdx: index('idx_tax_forms_tax_year').on(table.taxYear),
-  formTypeIdx: index('idx_tax_forms_form_type').on(table.formType)
+  formTypeIdx: index('idx_tax_forms_form_type').on(table.formType),
+  formIdIdx: index('idx_tax_forms_form_id').on(table.formId)
 }))
 
 // ============================================================================
@@ -71,52 +48,32 @@ export const taxForms = pgTable('tax_forms', {
 // ============================================================================
 export const transactionMonitoring = pgTable('transaction_monitoring', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  transactionType: varchar('transaction_type', { length: 50 }).notNull(), // 'payment', 'payout', 'refund'
-  transactionId: uuid('transaction_id'), // References payment or payout id
-  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
-  currency: varchar('currency', { length: 3 }).default('USD'),
-
-  // Risk Assessment
-  riskScore: integer('risk_score').default(0), // 0-100
-  riskLevel: varchar('risk_level', { length: 20 }).default('low'), // 'low', 'medium', 'high', 'critical'
-  riskFactors: jsonb('risk_factors').default([]), // Array of risk indicators
-
-  // Flags
-  flagged: boolean('flagged').default(false),
-  flagReason: text('flag_reason'),
-  flaggedAt: timestamp('flagged_at', { withTimezone: true }),
-  flaggedBy: integer('flagged_by'), // References admin(id)
-
-  // Review Status
-  reviewStatus: varchar('review_status', { length: 20 }).default('pending'), // 'pending', 'in_review', 'cleared', 'blocked'
+  transactionId: uuid('transaction_id').notNull(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  transactionType: text('transaction_type').notNull(),
+  amount: decimal('amount', { precision: 12, scale: 2 }).notNull(),
+  currency: text('currency').default('USD'),
+  riskLevel: text('risk_level').notNull().default('low'),
+  riskScore: integer('risk_score'),
+  status: text('status').notNull().default('pending_review'),
+  flags: jsonb('flags').default(sql`'[]'::jsonb`),
+  amlCheck: jsonb('aml_check').default(sql`'{}'::jsonb`),
+  velocityCheck: jsonb('velocity_check').default(sql`'{}'::jsonb`),
+  deviceFingerprint: jsonb('device_fingerprint').default(sql`'{}'::jsonb`),
+  geographicData: jsonb('geographic_data').default(sql`'{}'::jsonb`),
+  reviewerId: integer('reviewer_id'),
+  reviewerNotes: text('reviewer_notes'),
   reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
-  reviewedBy: integer('reviewed_by'), // References admin(id)
-  reviewNotes: text('review_notes'),
-
-  // AML/KYC Compliance
-  amlCheck: boolean('aml_check').default(false),
-  amlCheckDate: timestamp('aml_check_date', { withTimezone: true }),
-  sanctionScreening: boolean('sanction_screening').default(false),
-  sanctionScreeningDate: timestamp('sanction_screening_date', { withTimezone: true }),
-
-  // Metadata
-  ipAddress: text('ip_address'),
-  userAgent: text('user_agent'),
-  location: jsonb('location'), // { country, city, lat, lng }
-  deviceFingerprint: text('device_fingerprint'),
-
-  // Transaction Details
-  transactionDetails: jsonb('transaction_details'),
-
+  actionTaken: text('action_taken'),
+  sarFiled: boolean('sar_filed').default(false),
+  sarFiledAt: timestamp('sar_filed_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
   userIdIdx: index('idx_transaction_monitoring_user_id').on(table.userId),
   transactionIdIdx: index('idx_transaction_monitoring_transaction_id').on(table.transactionId),
   riskLevelIdx: index('idx_transaction_monitoring_risk_level').on(table.riskLevel),
-  flaggedIdx: index('idx_transaction_monitoring_flagged').on(table.flagged),
-  reviewStatusIdx: index('idx_transaction_monitoring_review_status').on(table.reviewStatus)
+  statusIdx: index('idx_transaction_monitoring_status').on(table.status)
 }))
 
 // ============================================================================

@@ -13,7 +13,7 @@
  */
 
 import { pgTable, uuid, text, varchar, boolean, timestamp, decimal, integer, jsonb, index, unique, char } from 'drizzle-orm/pg-core'
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import { users } from './users'
 
 // ============================================================================
@@ -52,9 +52,9 @@ export const userSubscriptions = pgTable('user_subscriptions', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
   provider: varchar('provider', { length: 20 }).notNull().default('stripe'),
-  providerSubscriptionId: varchar('provider_subscription_id', { length: 255 }).unique().notNull(),
+  providerSubscriptionId: varchar('provider_subscription_id', { length: 255 }).notNull(),
   providerCustomerId: varchar('provider_customer_id', { length: 255 }).notNull(),
-  status: varchar('status', { length: 20 }).notNull(), // 'active', 'past_due', 'canceled', 'incomplete', 'trialing', 'unpaid'
+  status: varchar('status', { length: 20 }).notNull(),
   currentPeriodStart: timestamp('current_period_start', { withTimezone: true }).notNull(),
   currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
   cancelAtPeriodEnd: boolean('cancel_at_period_end').default(false),
@@ -74,21 +74,21 @@ export const userSubscriptions = pgTable('user_subscriptions', {
 export const userPayments = pgTable('user_payments', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  subscriptionId: uuid('subscription_id').references(() => userSubscriptions.id, { onDelete: 'set null' }),
-  paymentMethodId: uuid('payment_method_id').references(() => userPaymentMethods.id, { onDelete: 'set null' }),
+  subscriptionId: uuid('subscription_id'),
+  paymentMethodId: uuid('payment_method_id'),
   provider: varchar('provider', { length: 20 }).notNull().default('stripe'),
   providerPaymentId: varchar('provider_payment_id', { length: 255 }),
   providerInvoiceId: varchar('provider_invoice_id', { length: 255 }),
   providerChargeId: varchar('provider_charge_id', { length: 255 }),
   amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
   currency: char('currency', { length: 3 }).default('USD'),
-  paymentType: varchar('payment_type', { length: 20 }).notNull(), // 'initial', 'recurring', 'one_time'
+  paymentType: varchar('payment_type', { length: 20 }).notNull(),
   paymentDate: timestamp('payment_date', { withTimezone: true }).notNull(),
-  status: varchar('status', { length: 20 }).notNull(), // 'succeeded', 'pending', 'failed', 'refunded', 'canceled'
+  status: varchar('status', { length: 20 }).notNull(),
   isFirstPayment: boolean('is_first_payment').default(false),
   failureReason: text('failure_reason'),
   receiptUrl: text('receipt_url'),
-  metadata: jsonb('metadata').default({}),
+  metadata: jsonb('metadata').default(sql`'{}'::jsonb`),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 }, (table) => ({

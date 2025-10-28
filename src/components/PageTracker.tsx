@@ -1,27 +1,21 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { useSession } from '@/lib/auth-client';
 import { logPageVisit } from '@/lib/audit';
 
 export default function PageTracker() {
   const router = useRouter();
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const { data: session } = useSession();
 
   useEffect(() => {
-    // Store the Supabase client globally to avoid multiple instances
-    if (typeof window !== 'undefined') {
-      (window as any).__supabaseClient = supabase;
-    }
-
     const handleRouteChange = (url: string) => {
       // Log page visit with user context
-      logPageVisit(url, user?.id);
+      logPageVisit(url, session?.user?.id);
     };
 
     // Log initial page load
     if (router.isReady) {
-      logPageVisit(router.asPath, user?.id);
+      logPageVisit(router.asPath, session?.user?.id);
     }
 
     // Listen for route changes
@@ -30,7 +24,7 @@ export default function PageTracker() {
     return () => {
       router.events.off('routeChangeComplete', handleRouteChange);
     };
-  }, [router, user, supabase]);
+  }, [router, session]);
 
   // This component doesn't render anything
   return null;
