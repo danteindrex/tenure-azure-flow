@@ -13,7 +13,7 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { nextCookies } from 'better-auth/next-js'
-import { passkey, twoFactor, organization } from 'better-auth/plugins'
+import { twoFactor, organization } from 'better-auth/plugins'
 import { db } from '@/drizzle/db'
 import { Resend } from 'resend'
 
@@ -124,15 +124,7 @@ export const auth = betterAuth({
   plugins: [
     nextCookies(),  // Required for Next.js cookie management
 
-    // Passkey plugin (WebAuthn - Face ID, Touch ID, Windows Hello)
-    passkey({
-      // Relying Party name (your app name)
-      rpName: 'Tenure',
-      // Relying Party ID (your domain)
-      rpID: process.env.NODE_ENV === 'production'
-        ? 'yourdomain.com'
-        : 'localhost'
-    }),
+    // Passkey plugin temporarily disabled - not available in current Better Auth version
 
     // Two-Factor Authentication plugin (TOTP + backup codes)
     twoFactor({

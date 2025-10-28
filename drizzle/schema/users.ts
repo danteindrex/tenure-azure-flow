@@ -116,11 +116,11 @@ export const userMemberships = pgTable('user_memberships', {
 // ============================================================================
 
 export const usersRelations = relations(users, ({ one, many }) => ({
-  // Link to Better Auth user
-  betterAuthUser: one(user, {
-    fields: [users.userId],
-    references: [user.id]
-  }),
+  // Link to Better Auth user - temporarily disabled due to import issues
+  // betterAuthUser: one(user, {
+  //   fields: [users.userId],
+  //   references: [user.id]
+  // }),
   // One-to-one relationships
   profile: one(userProfiles, {
     fields: [users.id],

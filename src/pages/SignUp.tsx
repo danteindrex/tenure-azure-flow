@@ -476,8 +476,8 @@ const SignUp = () => {
     }
   };
 
-  // Step 3: Complete personal information
-  const handleStep3Submit = async (): Promise<void> => {
+  // Step 5: Complete personal information
+  const handleStep5Submit = async (): Promise<void> => {
     if (!formData.firstName || !formData.lastName) {
       toast.error("Please enter your first and last name");
       return;
