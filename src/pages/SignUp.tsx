@@ -800,7 +800,7 @@ const SignUp = () => {
               </div>
             </div>
 
-            <div className="flex justify-end mt-6">
+            <div className="flex justify-center mt-6">
               <Button
                 onClick={handleStep1Submit}
                 disabled={loading || !formData.email || !formData.password || !formData.confirmPassword || !formData.agreeToTerms}
