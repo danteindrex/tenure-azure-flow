@@ -155,7 +155,9 @@ export const auth = betterAuth({
 
   // Advanced configuration
   advanced: {
-    generateId: false,  // Let PostgreSQL handle UUID generation
+    database: {
+      generateId: false,  // Let PostgreSQL handle UUID generation
+    },
     useSecureCookies: process.env.NODE_ENV === 'production',
     // Cross-origin settings for API
     crossSubDomainCookies: {

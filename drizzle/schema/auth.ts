@@ -25,6 +25,7 @@ export const user = pgTable('user', {
   image: text('image'),
   phone: text('phone'), // Added for Better Auth phone support
   phoneVerified: boolean('phoneVerified').notNull().default(false),
+  twoFactorEnabled: boolean('twoFactorEnabled').notNull().default(false), // Required by Better Auth 2FA plugin
   onboardingStep: integer('onboardingStep').notNull().default(1),
   onboardingCompleted: boolean('onboardingCompleted').notNull().default(false),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
