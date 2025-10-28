@@ -16,7 +16,7 @@ import { COUNTRY_DIAL_CODES } from "@/lib/countryDialCodes";
 const SignUp = () => {
   const navigate = useRouter();
   const { data: session, isPending } = useSession();
-  const [step, setStep] = useState(1); // 1: Email+Password, 2: Email Verification, 3: Personal Info, 4: Advanced Security, 5: Payment
+  const [step, setStep] = useState(1); // 1: Email+Password, 2: Email Verification, 3: Personal Info, 4: Phone Verification, 5: Advanced Security, 6: Payment
   const [formData, setFormData] = useState({
     // Step 1: Email + Password
     email: "",
@@ -25,19 +25,21 @@ const SignUp = () => {
     agreeToTerms: false,
     // Step 2: Email Verification
     emailVerificationCode: "",
-    // Step 3: Personal Info
+    emailOtpCode: "",
+    // Step 3: Personal Info + Phone
     firstName: "",
     lastName: "",
     middleName: "",
     dateOfBirth: "",
-    phoneCountryCode: "+1",
+    phoneCountryCode: "+256", // Default to Uganda
     phoneNumber: "",
+    phoneOtpCode: "",
     streetAddress: "",
     addressLine2: "",
     city: "",
     state: "",
     zipCode: "",
-    country: "US",
+    country: "UG", // Default to Uganda
     // Step 4: Advanced Security
     enablePasskey: false,
     enable2FA: false,
@@ -196,6 +198,25 @@ const SignUp = () => {
         }
         setAutoSubmitting(false);
       }, 800); // Small delay to show the complete code before submitting
+    }
+  };
+
+  // Generic OTP input handler for both email and phone verification
+  const handleOtpInputChange = (field: string, value: string): void => {
+    const cleanValue = value.replace(/\D/g, '').slice(0, 6);
+    setFormData((prev) => ({ ...prev, [field]: cleanValue }));
+
+    // Auto-submit when 6 digits are entered
+    if (cleanValue.length === 6 && !loading && !autoSubmitting) {
+      setAutoSubmitting(true);
+      setTimeout(() => {
+        if (field === 'emailOtpCode' && step === 2) {
+          handleEmailVerification();
+        } else if (field === 'phoneOtpCode' && step === 4) {
+          handlePhoneOtpVerification();
+        }
+        setAutoSubmitting(false);
+      }, 800);
     }
   };
 
@@ -370,11 +391,26 @@ const SignUp = () => {
     }
   };
 
-  // Step 3: Collect phone number and send OTP
+  // Step 3: Collect personal info and phone number
   const handleStep3Submit = async (): Promise<void> => {
+    if (!formData.firstName || !formData.lastName) {
+      toast.error("Please enter your first and last name");
+      return;
+    }
+
+    if (!formData.dateOfBirth) {
+      toast.error("Please enter your date of birth");
+      return;
+    }
+
+    if (dateValidation && !dateValidation.isValid) {
+      toast.error(dateValidation.message);
+      return;
+    }
+
     if (!validatePhoneNumber(formData.phoneNumber)) {
-      const errorMessage = formData.phoneCountryCode === '+1'
-        ? "Please enter a valid 10-digit US phone number"
+      const errorMessage = formData.phoneCountryCode === '+256'
+        ? "Please enter a valid Ugandan phone number"
         : "Please enter a valid phone number";
       toast.error(errorMessage);
       return;
@@ -382,13 +418,12 @@ const SignUp = () => {
 
     try {
       setLoading(true);
-      const formattedPhone = formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode);
-
-      // Send phone OTP via Twilio (Better Auth)
+      
+      // Send phone OTP via Twilio
       await sendPhoneOtp();
 
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to save phone number";
+      const errorMessage = err instanceof Error ? err.message : "Failed to send verification code";
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -420,10 +455,10 @@ const SignUp = () => {
         return;
       }
 
-      // Move to verification step
+      // Move to phone verification step
       setStep(4);
 
-      toast.success("OTP sent to your phone! Please check your messages.");
+      toast.success("Verification code sent to your phone! Please check your messages.");
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to send verification code";
@@ -463,9 +498,9 @@ const SignUp = () => {
         return;
       }
 
-      // Phone is now verified in Better Auth and user_contacts table
+      // Phone is now verified, move to address info
       setStep(5);
-      toast.success("Phone verified successfully! Please complete your profile.");
+      toast.success("Phone verified successfully! Please complete your address information.");
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "OTP verification failed";
@@ -476,24 +511,9 @@ const SignUp = () => {
     }
   };
 
-  // Step 5: Complete personal information
+  // Step 5: Complete address information
   const handleStep5Submit = async (): Promise<void> => {
-    if (!formData.firstName || !formData.lastName) {
-      toast.error("Please enter your first and last name");
-      return;
-    }
-
-    if (!formData.dateOfBirth) {
-      toast.error("Please enter your date of birth");
-      return;
-    }
-
-    if (dateValidation && !dateValidation.isValid) {
-      toast.error(dateValidation.message);
-      return;
-    }
-
-    if (!formData.streetAddress || !formData.city || !formData.state || !formData.zipCode) {
+    if (!formData.streetAddress || !formData.city || !formData.zipCode) {
       toast.error("Please complete your address information");
       return;
     }
@@ -549,7 +569,7 @@ const SignUp = () => {
       });
 
       // Move to advanced security step
-      setStep(4);
+      setStep(6);
       toast.success("Profile completed! Let's set up advanced security features.");
 
     } catch (err: unknown) {
@@ -561,8 +581,8 @@ const SignUp = () => {
     }
   };
 
-  // Step 4: Advanced Security Setup
-  const handleStep4Submit = async (): Promise<void> => {
+  // Step 6: Advanced Security Setup
+  const handleStep6Submit = async (): Promise<void> => {
     try {
       setLoading(true);
 
@@ -601,7 +621,7 @@ const SignUp = () => {
       }
 
       // Move to payment step
-      setStep(5);
+      setStep(7);
       toast.success("Security features configured! Please proceed to payment.");
 
     } catch (err: unknown) {
@@ -612,7 +632,7 @@ const SignUp = () => {
     }
   };
 
-  // Step 5: Payment
+  // Step 7: Payment
   const handlePayment = async (): Promise<void> => {
     try {
       setLoading(true);
@@ -707,20 +727,20 @@ const SignUp = () => {
         </div>
 
         {/* Progress Indicator */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          {[1, 2, 3, 4, 5].map((i) => (
+        <div className="flex items-center justify-center gap-1 mb-8">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="flex items-center">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ${step >= i
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${step >= i
                   ? "bg-accent text-background"
                   : "bg-card border border-border text-muted-foreground"
                   }`}
               >
-                {step > i ? <Check className="w-5 h-5" /> : i}
+                {step > i ? <Check className="w-4 h-4" /> : i}
               </div>
-              {i < 5 && (
+              {i < 6 && (
                 <div
-                  className={`w-8 h-1 mx-1 transition-all duration-300 ${step > i ? "bg-accent" : "bg-border"
+                  className={`w-6 h-1 mx-1 transition-all duration-300 ${step > i ? "bg-accent" : "bg-border"
                     }`}
                 />
               )}
@@ -924,18 +944,76 @@ const SignUp = () => {
           </>
         )}
 
-        {/* Step 3: Phone Number Collection */}
+        {/* Step 3: Personal Information */}
         {step === 3 && (
           <>
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Phone className="w-8 h-8 text-accent" />
-              </div>
-              <h1 className="text-2xl font-bold mb-2">Add Your Phone Number</h1>
-              <p className="text-muted-foreground">We'll send you a code to verify your number</p>
+              <h1 className="text-2xl font-bold mb-2">Personal Information</h1>
+              <p className="text-muted-foreground">Tell us about yourself</p>
             </div>
 
             <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name *</Label>
+                  <Input
+                    id="firstName"
+                    placeholder="John"
+                    value={formData.firstName}
+                    onChange={(e) => handleInputChange("firstName", e.target.value)}
+                    className="bg-background/50 border-border focus:border-accent transition-colors"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="middleName">Middle Name</Label>
+                  <Input
+                    id="middleName"
+                    placeholder="Michael"
+                    value={formData.middleName}
+                    onChange={(e) => handleInputChange("middleName", e.target.value)}
+                    className="bg-background/50 border-border focus:border-accent transition-colors"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name *</Label>
+                  <Input
+                    id="lastName"
+                    placeholder="Doe"
+                    value={formData.lastName}
+                    onChange={(e) => handleInputChange("lastName", e.target.value)}
+                    className="bg-background/50 border-border focus:border-accent transition-colors"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dateOfBirth">Date of Birth *</Label>
+                <Input
+                  id="dateOfBirth"
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={(e) => handleDateOfBirthChange(e.target.value)}
+                  className={`bg-background/50 border-border focus:border-accent transition-colors ${
+                    dateValidation && !dateValidation.isValid
+                      ? 'border-red-500 focus:border-red-500'
+                      : dateValidation && dateValidation.isValid
+                        ? 'border-green-500 focus:border-green-500'
+                        : ''
+                  }`}
+                  required
+                  max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
+                />
+                {dateValidation && (
+                  <p className={`text-xs ${dateValidation.isValid ? 'text-green-600' : 'text-red-600'}`}>
+                    {dateValidation.message || 'Age verified: You are eligible to join'}
+                  </p>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="phoneNumber">Phone Number *</Label>
                 <div className="flex gap-2">
@@ -945,8 +1023,8 @@ const SignUp = () => {
                       handleInputChange("phoneCountryCode", value);
                       if (formData.phoneNumber) {
                         const cleanPhone = getCleanPhoneNumber(formData.phoneNumber);
-                        if (value === '+1') {
-                          setFormData(prev => ({ ...prev, phoneNumber: formatPhoneForDisplay(cleanPhone) }));
+                        if (value === '+256') {
+                          setFormData(prev => ({ ...prev, phoneNumber: cleanPhone }));
                         } else {
                           setFormData(prev => ({ ...prev, phoneNumber: cleanPhone }));
                         }
@@ -967,18 +1045,16 @@ const SignUp = () => {
                   <Input
                     id="phoneNumber"
                     type="tel"
-                    placeholder={formData.phoneCountryCode === '+1' ? '(555) 123-4567' : 'Enter phone number'}
+                    placeholder={formData.phoneCountryCode === '+256' ? '745315809' : 'Enter phone number'}
                     value={formData.phoneNumber}
                     onChange={(e) => handlePhoneInputChange(e.target.value)}
                     className="flex-1 bg-background/50 border-border focus:border-accent transition-colors"
-                    maxLength={formData.phoneCountryCode === '+1' ? 14 : 20}
+                    maxLength={20}
                     required
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {formData.phoneCountryCode === '+1'
-                    ? "Enter your 10-digit US phone number"
-                    : "Enter your phone number"}
+                  We'll send you a verification code to confirm your number
                 </p>
               </div>
             </div>
@@ -995,7 +1071,7 @@ const SignUp = () => {
               </Button>
               <Button
                 onClick={handleStep3Submit}
-                disabled={loading || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber)}
+                disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber)}
                 className="bg-primary hover:glow-blue-lg px-8 py-2"
                 size="lg"
               >
