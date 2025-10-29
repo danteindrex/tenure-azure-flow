@@ -24,7 +24,17 @@ export {
   session,
   account,
   verification,
-  twoFactor
+  twoFactor,
+  organization,
+  member,
+  invitation,
+  userRelations,
+  sessionRelations,
+  accountRelations,
+  twoFactorRelations,
+  organizationRelations,
+  memberRelations,
+  invitationRelations
 } from './auth'
 
 // ============================================================================
@@ -114,16 +124,8 @@ export {
 } from './audit'
 
 // ============================================================================
-// ORGANIZATION TABLES (BETTER AUTH)
+// ORGANIZATION TABLES (BETTER AUTH) - Now exported from auth.ts
 // ============================================================================
-export {
-  organization,
-  organizationMember,
-  organizationInvitation,
-  organizationRelations,
-  organizationMemberRelations,
-  organizationInvitationRelations
-} from './organizations'
 
 // ============================================================================
 // ADMIN & PAYLOAD CMS TABLES
