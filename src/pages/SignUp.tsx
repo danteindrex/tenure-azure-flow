@@ -49,7 +49,7 @@ const SignUp = () => {
   // Log page visit and check for existing session
   useEffect(() => {
     logPageVisit('/signup');
-    
+
     // Check URL parameters for step and OAuth info
     const urlParams = new URLSearchParams(window.location.search);
     const stepParam = urlParams.get('step');
@@ -83,6 +83,7 @@ const SignUp = () => {
           if (data.success && data.status) {
             if (data.status.canAccessDashboard) {
               // User completed everything, go to dashboard
+              // User completed everything, go to dashboard
               navigate.push('/dashboard');
             } else {
               // Set step based on database state, not URL parameter
@@ -108,6 +109,24 @@ const SignUp = () => {
         })
         .catch(error => {
           console.error('Error checking onboarding status:', error);
+          // Fallback to URL parameter if API fails
+          if (stepParam) {
+            const stepNumber = parseInt(stepParam, 10);
+            if (stepNumber === 5) {
+              setStep(3);
+            } else if (stepNumber >= 1 && stepNumber <= 5) {
+              setStep(stepNumber);
+            }
+          }
+        });
+    } else if (!session?.user && stepParam) {
+      // Not authenticated, use URL parameter
+      const stepNumber = parseInt(stepParam, 10);
+      if (stepNumber === 5) {
+        setStep(3);
+      } else if (stepNumber >= 1 && stepNumber <= 5) {
+        setStep(stepNumber);
+      }
           // Fallback to URL parameter if API fails
           if (stepParam) {
             const stepNumber = parseInt(stepParam, 10);
@@ -357,11 +376,11 @@ const SignUp = () => {
 
     try {
 
-      console.log("The current formdata extracted from the form",formData)
+      console.log("The current formdata extracted from the form", formData)
       setLoading(true);
       const email = formData.email.trim();
       const username = `${formData.firstName} ${formData.lastName}`
-      baseLogger("authentication","WillCreateAccount");
+      baseLogger("authentication", "WillCreateAccount");
 
 
       const currentProviededEmail = formData.email;
@@ -374,8 +393,8 @@ const SignUp = () => {
         name: "User", // Temporary name, will be updated in step 3
       });
 
-      console.log("The current credentials",result.data)
-      baseLogger("authentication","DidCreateAccount")
+      console.log("The current credentials", result.data)
+      baseLogger("authentication", "DidCreateAccount")
 
       if (result.error) {
         console.error("Account creation error:", result.error);
@@ -436,6 +455,16 @@ const SignUp = () => {
         toast.error(`Verification failed: ${result.error.message}`);
         return;
       }
+
+      // Update progress in database
+      await fetch('/api/onboarding/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          step: 'email-verified'
+        })
+      });
 
       // Update progress in database
       await fetch('/api/onboarding/update-progress', {
@@ -513,7 +542,7 @@ const SignUp = () => {
 
     try {
       setLoading(true);
-      
+
       // Send phone OTP via Twilio
       await sendPhoneOtp();
 
@@ -624,8 +653,9 @@ const SignUp = () => {
     try {
       // Update user profile with Better Auth
       const fullName = `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim();
-      
+
       const result = await updateUser({
+        name: fullName
         name: fullName
       });
 
@@ -652,6 +682,16 @@ const SignUp = () => {
           zip_code: formData.zipCode,
           country_code: formData.country,
         }),
+      });
+
+      // Update progress in database
+      await fetch('/api/onboarding/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          step: 'profile-completed'
+        })
       });
 
       // Update progress in database
@@ -761,7 +801,7 @@ const SignUp = () => {
         <div className="flex justify-center mb-6">
           <div className="flex items-center gap-2 text-accent">
             <Crown className="w-8 h-8" />
-            <span className="text-2xl font-bold">Tenure</span>
+            <span className="text-2xl font-bold">Home Solutions</span>
           </div>
         </div>
 
@@ -916,9 +956,8 @@ const SignUp = () => {
                       const otpCode = pastedText.replace(/\D/g, '').slice(0, 6);
                       handleOtpInputChange('emailOtpCode', otpCode);
                     }}
-                    className={`text-center text-2xl tracking-widest bg-background/50 border-border focus:border-accent transition-colors ${
-                      autoSubmitting ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''
-                    }`}
+                    className={`text-center text-2xl tracking-widest bg-background/50 border-border focus:border-accent transition-colors ${autoSubmitting ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''
+                      }`}
                     placeholder="000000"
                     maxLength={6}
                     autoComplete="one-time-code"
@@ -989,8 +1028,8 @@ const SignUp = () => {
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold mb-2">Complete Your Profile</h1>
               <p className="text-muted-foreground">
-                {new URLSearchParams(window.location.search).get('oauth') 
-                  ? "Complete your profile to continue" 
+                {new URLSearchParams(window.location.search).get('oauth')
+                  ? "Complete your profile to continue"
                   : "Tell us about yourself and your address"
                 }
               </p>
@@ -1006,7 +1045,7 @@ const SignUp = () => {
               {/* Personal Information Section */}
               <div className="space-y-4 p-4 bg-background/30 rounded-lg border">
                 <h3 className="font-semibold text-foreground">Personal Information</h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="firstName">First Name *</Label>
@@ -1051,13 +1090,12 @@ const SignUp = () => {
                     type="date"
                     value={formData.dateOfBirth}
                     onChange={(e) => handleDateOfBirthChange(e.target.value)}
-                    className={`bg-background/50 border-border focus:border-accent transition-colors ${
-                      dateValidation && !dateValidation.isValid
-                        ? 'border-red-500 focus:border-red-500'
-                        : dateValidation && dateValidation.isValid
-                          ? 'border-green-500 focus:border-green-500'
-                          : ''
-                    }`}
+                    className={`bg-background/50 border-border focus:border-accent transition-colors ${dateValidation && !dateValidation.isValid
+                      ? 'border-red-500 focus:border-red-500'
+                      : dateValidation && dateValidation.isValid
+                        ? 'border-green-500 focus:border-green-500'
+                        : ''
+                      }`}
                     required
                     max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
                   />
@@ -1116,7 +1154,7 @@ const SignUp = () => {
               {/* Address Information Section */}
               <div className="space-y-4 p-4 bg-background/30 rounded-lg border">
                 <h3 className="font-semibold text-foreground">Address Information</h3>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="streetAddress">Street Address *</Label>
                   <Input
@@ -1253,9 +1291,8 @@ const SignUp = () => {
                       const otpCode = pastedText.replace(/\D/g, '').slice(0, 6);
                       handleOtpInputChange('phoneOtpCode', otpCode);
                     }}
-                    className={`text-center text-2xl tracking-widest bg-background/50 border-border focus:border-accent transition-colors ${
-                      autoSubmitting ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''
-                    }`}
+                    className={`text-center text-2xl tracking-widest bg-background/50 border-border focus:border-accent transition-colors ${autoSubmitting ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''
+                      }`}
                     placeholder="000000"
                     maxLength={6}
                     autoComplete="one-time-code"

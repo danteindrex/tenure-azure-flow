@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useCallback } from "react";
+import { useSession } from "@/lib/auth-client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,7 @@ import {
   DollarSign,
   RefreshCw
 } from "lucide-react";
-import { useSession } from "@/lib/auth-client";
+
 import { toast } from "sonner";
 // Queue service moved to API endpoints - using fetch calls instead
 import { QueueMember } from "@/lib/types";
@@ -38,7 +39,7 @@ const Queue = () => {
     receivedPayouts: 0
   });
   const [refreshing, setRefreshing] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Queue service moved to API endpoints - using fetch calls instead
   const { data: session } = useSession();

@@ -4,6 +4,7 @@
  * This file configures Better Auth with:
  * - Drizzle ORM adapter for database
  * - Gmail SMTP for email verification
+ * - Gmail SMTP for email verification
  * - Google OAuth provider
  * - Passkey (WebAuthn) support
  * - Two-factor authentication (TOTP + backup codes)
@@ -17,7 +18,10 @@ import { twoFactor, organization, emailOTP } from 'better-auth/plugins'
 import { passkey } from 'better-auth/plugins/passkey'
 import { db } from '../drizzle/db'
 import { emailService } from '../src/lib/email'
+import { db } from '../drizzle/db'
+import { emailService } from '../src/lib/email'
 
+// SMTP email service initialized
 // SMTP email service initialized
 
 export const auth = betterAuth({
@@ -111,6 +115,7 @@ export const auth = betterAuth({
     // Two-Factor Authentication plugin (TOTP + backup codes)
     twoFactor({
       // Issuer name shown in authenticator apps
+      issuer: 'Tenure'
       issuer: 'Tenure'
     }),
 
