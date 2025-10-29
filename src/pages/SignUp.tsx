@@ -990,7 +990,7 @@ const SignUp = () => {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-cyan-500/5 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      <Card className="w-full max-w-lg p-8 relative z-10 bg-gray-900/80 backdrop-blur-xl border border-gray-800 shadow-2xl">
+      <Card className="w-full max-w-lg p-8 relative z-10 backdrop-blur-xl border border-gray-800 shadow-2xl" style={{ backgroundColor: '#171717' }}>
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <div className="flex items-center gap-2 text-blue-400">
