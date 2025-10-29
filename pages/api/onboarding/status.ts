@@ -9,8 +9,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Get current user session
-    const session = await auth.api.getSession({ headers: req.headers });
+    // Get current user session - fix headers compatibility
+    const session = await auth.api.getSession({ 
+      headers: new Headers(req.headers as any)
+    });
     
     if (!session?.user) {
       return res.status(401).json({ error: "Not authenticated" });

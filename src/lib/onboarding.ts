@@ -11,7 +11,7 @@
  */
 
 import { db } from '../../drizzle/db'
-import { users, userProfiles } from '../../drizzle/schema/users'
+import { users, userProfiles, userContacts } from '../../drizzle/schema/users'
 import { userSubscriptions } from '../../drizzle/schema/financial'
 import { eq, and } from 'drizzle-orm'
 
@@ -63,6 +63,20 @@ export class OnboardingService {
         .limit(1)
         .then(rows => rows[0])
 
+      // Check if phone is verified by looking at user_contacts
+      const phoneContact = await db
+        .select()
+        .from(userContacts)
+        .where(
+          and(
+            eq(userContacts.userId, userId),
+            eq(userContacts.contactType, 'phone'),
+            eq(userContacts.isVerified, true)
+          )
+        )
+        .limit(1)
+        .then(rows => rows[0])
+
       // Get active subscription
       const subscription = await db
         .select()
@@ -78,9 +92,9 @@ export class OnboardingService {
 
       const status: UserOnboardingStatus = {
         step: 'email-verification',
-        isEmailVerified: user.emailVerified || isOAuthUser || false, // OAuth users have verified emails
+        isEmailVerified: user.emailVerified || isOAuthUser || false,
         hasProfile: !!profile,
-        isPhoneVerified: profile?.phoneVerified || false,
+        isPhoneVerified: !!phoneContact,
         hasActiveSubscription: !!subscription,
         canAccessDashboard: false,
         userId: user.id,
@@ -89,8 +103,14 @@ export class OnboardingService {
         nextStep: 1
       }
 
-      // Determine current step and dashboard access
-      if (!status.isEmailVerified && !isOAuthUser) {
+      // Determine current step based on actual database state
+      // Users with status 'Active' can access dashboard regardless of other checks
+      if (user.status === 'Active' && status.hasActiveSubscription) {
+        status.step = 'dashboard'
+        status.canAccessDashboard = true
+        status.nextRoute = '/dashboard'
+        status.nextStep = 6 // Completed
+      } else if (!status.isEmailVerified && !isOAuthUser) {
         status.step = 'email-verification'
         status.nextStep = 2
         status.nextRoute = '/signup?step=2'
@@ -104,13 +124,14 @@ export class OnboardingService {
         status.nextRoute = '/signup?step=4'
       } else if (!status.hasActiveSubscription) {
         status.step = 'payment'
-        status.nextStep = 7
-        status.nextRoute = '/signup?step=7'
+        status.nextStep = 5
+        status.nextRoute = '/signup?step=5'
       } else {
+        // All steps completed but status not yet Active - this shouldn't happen
         status.step = 'dashboard'
         status.canAccessDashboard = true
         status.nextRoute = '/dashboard'
-        status.nextStep = 8 // Completed
+        status.nextStep = 6 // Completed
       }
 
       return status

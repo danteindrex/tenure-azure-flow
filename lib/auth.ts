@@ -15,7 +15,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { nextCookies } from 'better-auth/next-js'
 import { twoFactor, organization } from 'better-auth/plugins'
 import { passkey } from 'better-auth/plugins/passkey'
-import { db } from '@/drizzle/db'
+import { db } from '../drizzle/db'
 import { Resend } from 'resend'
 
 // Initialize Resend for email
@@ -145,9 +145,7 @@ export const auth = betterAuth({
     // Two-Factor Authentication plugin (TOTP + backup codes)
     twoFactor({
       // Issuer name shown in authenticator apps
-      issuer: 'Tenure',
-      // Number of backup codes to generate
-      backupCodeLength: 10
+      issuer: 'Tenure'
     }),
 
     // Organization plugin (team management)
@@ -191,4 +189,3 @@ export const auth = betterAuth({
 
 // Export types for use in application
 export type Session = typeof auth.$Infer.Session
-export type User = typeof auth.$Infer.User

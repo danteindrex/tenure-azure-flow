@@ -442,7 +442,7 @@ export const systemAuditLogs = pgTable("system_audit_logs", {
 
 export const payoutManagement = pgTable("payout_management", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	payoutId: text("payout_id").default((gen_random_uuid())).notNull(),
+	payoutId: text("payout_id").default(sql`gen_random_uuid()`).notNull(),
 	userId: uuid("user_id").notNull(),
 	queuePosition: integer("queue_position").notNull(),
 	amount: numeric({ precision: 12, scale:  2 }).default('100000.00').notNull(),
