@@ -36,13 +36,24 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
+    // Generate 6-digit reset codes
+    generateResetPasswordToken: () => {
+      return Math.floor(100000 + Math.random() * 900000).toString()
+    },
     sendResetPasswordEmail: async ({ user, url, token }) => {
+      console.log('📧 Better Auth: Sending password reset email...')
+      console.log('   User:', user.email)
+      console.log('   Token (6-digit):', token)
+      
       try {
         await emailService.sendPasswordResetEmail({
           to: user.email,
           token,
           url
         })
+        
+        console.log('✅ Better Auth: Password reset email sent successfully!')
+        
       } catch (error) {
         console.error('Failed to send reset password email:', error)
         throw error
@@ -52,11 +63,15 @@ export const auth = betterAuth({
 
   // Email verification configuration (separate from emailAndPassword)
   emailVerification: {
+    // Generate 6-digit verification codes
+    generateVerificationToken: () => {
+      return Math.floor(100000 + Math.random() * 900000).toString()
+    },
     sendVerificationEmail: async ({ user, url, token }) => {
       console.log('📧 Better Auth: Attempting to send verification email...')
       console.log('   User:', user.email)
       console.log('   URL:', url)
-      console.log('   Token:', token)
+      console.log('   Token (6-digit):', token)
       
       try {
         await emailService.sendVerificationEmail({
