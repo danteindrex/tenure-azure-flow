@@ -789,19 +789,20 @@ const SignUp = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
-      {/* Animated Background */}
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-black">
+      {/* Next.js Dark Theme Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent/5 rounded-full blur-[100px] animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-cyan-500/5 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      <Card className="glass-card w-full max-w-lg p-8 hover-float relative z-10">
+      <Card className="w-full max-w-lg p-8 relative z-10 bg-gray-900/80 backdrop-blur-xl border border-gray-800 shadow-2xl">
         {/* Logo */}
         <div className="flex justify-center mb-6">
-          <div className="flex items-center gap-2 text-accent">
-            <Crown className="w-8 h-8" />
-            <span className="text-2xl font-bold">Home Solutions</span>
+          <div className="flex items-center gap-2 text-blue-400">
+            <Crown className="w-8 h-8 text-blue-400" />
+            <span className="text-2xl font-bold text-white">Home Solutions</span>
           </div>
         </div>
 
@@ -811,15 +812,15 @@ const SignUp = () => {
             <div key={i} className="flex items-center">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${step >= i
-                  ? "bg-accent text-background"
-                  : "bg-card border border-border text-muted-foreground"
+                  ? "bg-blue-500 text-white shadow-lg shadow-blue-500/25"
+                  : "bg-gray-800 border border-gray-700 text-gray-400"
                   }`}
               >
                 {step > i ? <Check className="w-4 h-4" /> : i}
               </div>
               {i < 5 && (
                 <div
-                  className={`w-6 h-1 mx-1 transition-all duration-300 ${step > i ? "bg-accent" : "bg-border"
+                  className={`w-6 h-1 mx-1 transition-all duration-300 ${step > i ? "bg-blue-500" : "bg-gray-700"
                     }`}
                 />
               )}
@@ -831,50 +832,50 @@ const SignUp = () => {
         {step === 1 && (
           <>
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold mb-2">Create Your Account</h1>
-              <p className="text-muted-foreground">Enter your email and create a password</p>
+              <h1 className="text-2xl font-bold mb-2 text-white">Create Your Account</h1>
+              <p className="text-gray-400">Enter your email and create a password</p>
             </div>
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
+                <Label htmlFor="email" className="text-gray-200">Email Address *</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@example.com"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
-                  className="bg-background/50 border-border focus:border-accent transition-colors"
+                  className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                   required
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-gray-400">
                   We'll send you a verification code to confirm your email
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password *</Label>
+                  <Label htmlFor="password" className="text-gray-200">Password *</Label>
                   <Input
                     id="password"
                     type="password"
                     placeholder="At least 8 characters"
                     value={formData.password}
                     onChange={(e) => handleInputChange("password", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
+                    className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                  <Label htmlFor="confirmPassword" className="text-gray-200">Confirm Password *</Label>
                   <Input
                     id="confirmPassword"
                     type="password"
                     placeholder="Confirm your password"
                     value={formData.confirmPassword}
                     onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
+                    className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                     required
                   />
                 </div>
@@ -886,13 +887,13 @@ const SignUp = () => {
                   checked={formData.agreeToTerms}
                   onCheckedChange={(checked: boolean) => handleInputChange("agreeToTerms", checked)}
                 />
-                <Label htmlFor="agreeToTerms" className="text-sm">
+                <Label htmlFor="agreeToTerms" className="text-sm text-gray-200">
                   I agree to the{" "}
-                  <a href="#" className="text-accent hover:underline">
+                  <a href="#" className="text-blue-400 hover:text-blue-300 hover:underline transition-colors">
                     Terms & Conditions
                   </a>{" "}
                   and{" "}
-                  <a href="#" className="text-accent hover:underline">
+                  <a href="#" className="text-blue-400 hover:text-blue-300 hover:underline transition-colors">
                     Privacy Policy
                   </a>
                 </Label>
@@ -903,7 +904,7 @@ const SignUp = () => {
               <Button
                 onClick={handleStep1Submit}
                 disabled={loading || !formData.email || !formData.password || !formData.confirmPassword || !formData.agreeToTerms}
-                className="bg-primary hover:glow-blue-lg px-8 py-2"
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 px-8 py-2 transition-all duration-200"
                 size="lg"
               >
                 {loading ? (
@@ -926,13 +927,13 @@ const SignUp = () => {
         {step === 2 && (
           <>
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Mail className="w-8 h-8 text-accent" />
+              <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mail className="w-8 h-8 text-blue-400" />
               </div>
-              <h1 className="text-2xl font-bold mb-2">Verify Your Email</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl font-bold mb-2 text-white">Verify Your Email</h1>
+              <p className="text-gray-400">
                 Enter the verification code sent to<br />
-                <span className="font-medium text-foreground">{formData.email}</span>
+                <span className="font-medium text-white">{formData.email}</span>
               </p>
             </div>
 
@@ -944,7 +945,7 @@ const SignUp = () => {
             }}>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="emailOtpCode">Verification Code *</Label>
+                  <Label htmlFor="emailOtpCode" className="text-gray-200">Verification Code *</Label>
                   <Input
                     id="emailOtpCode"
                     type="text"
@@ -956,7 +957,7 @@ const SignUp = () => {
                       const otpCode = pastedText.replace(/\D/g, '').slice(0, 6);
                       handleOtpInputChange('emailOtpCode', otpCode);
                     }}
-                    className={`text-center text-2xl tracking-widest bg-background/50 border-border focus:border-accent transition-colors ${autoSubmitting ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''
+                    className={`text-center text-2xl tracking-widest bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${autoSubmitting ? 'border-green-500 bg-green-900/20' : ''
                       }`}
                     placeholder="000000"
                     maxLength={6}
@@ -966,11 +967,11 @@ const SignUp = () => {
                     autoFocus
                     disabled={autoSubmitting}
                   />
-                  <div className="text-xs text-muted-foreground space-y-1">
+                  <div className="text-xs text-gray-400 space-y-1">
                     {autoSubmitting ? (
-                      <p className="text-green-600 dark:text-green-400">Verifying code...</p>
+                      <p className="text-green-400">Verifying code...</p>
                     ) : (
-                      <p>Enter the 6-digit code from your email</p>
+                      <p className="text-gray-400">Enter the 6-digit code from your email</p>
                     )}
                   </div>
                 </div>
@@ -978,10 +979,10 @@ const SignUp = () => {
                 <div className="text-center">
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                     onClick={resendEmailVerification}
                     disabled={loading}
-                    className="text-accent"
+                    className="text-blue-400 hover:text-blue-300 border-gray-700 hover:border-blue-500"
                   >
                     Resend Code
                   </Button>
@@ -991,7 +992,7 @@ const SignUp = () => {
               <div className="flex justify-between mt-6">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                   onClick={() => setStep(1)}
                   className="px-8 py-2"
                   disabled={loading || autoSubmitting}
@@ -1026,15 +1027,15 @@ const SignUp = () => {
         {step === 3 && (
           <>
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold mb-2">Complete Your Profile</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl font-bold mb-2 text-white">Complete Your Profile</h1>
+              <p className="text-gray-400">
                 {new URLSearchParams(window.location.search).get('oauth')
                   ? "Complete your profile to continue"
                   : "Tell us about yourself and your address"
                 }
               </p>
               {new URLSearchParams(window.location.search).get('oauth') && (
-                <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-green-900/20 text-green-400 rounded-full text-sm border border-green-700">
                   <Check className="w-4 h-4" />
                   Email verified via {new URLSearchParams(window.location.search).get('oauth')}
                 </div>
@@ -1043,54 +1044,54 @@ const SignUp = () => {
 
             <div className="space-y-4">
               {/* Personal Information Section */}
-              <div className="space-y-4 p-4 bg-background/30 rounded-lg border">
-                <h3 className="font-semibold text-foreground">Personal Information</h3>
+              <div className="space-y-4 p-4 bg-gray-800/30 rounded-lg border border-gray-700">
+                <h3 className="font-semibold text-white">Personal Information</h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name *</Label>
+                    <Label htmlFor="firstName" className="text-gray-200">First Name *</Label>
                     <Input
                       id="firstName"
                       placeholder="John"
                       value={formData.firstName}
                       onChange={(e) => handleInputChange("firstName", e.target.value)}
-                      className="bg-background/50 border-border focus:border-accent transition-colors"
+                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                       required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="middleName">Middle Name</Label>
+                    <Label htmlFor="middleName" className="text-gray-200">Middle Name</Label>
                     <Input
                       id="middleName"
                       placeholder="Michael"
                       value={formData.middleName}
                       onChange={(e) => handleInputChange("middleName", e.target.value)}
-                      className="bg-background/50 border-border focus:border-accent transition-colors"
+                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name *</Label>
+                    <Label htmlFor="lastName" className="text-gray-200">Last Name *</Label>
                     <Input
                       id="lastName"
                       placeholder="Doe"
                       value={formData.lastName}
                       onChange={(e) => handleInputChange("lastName", e.target.value)}
-                      className="bg-background/50 border-border focus:border-accent transition-colors"
+                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                       required
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="dateOfBirth">Date of Birth *</Label>
+                  <Label htmlFor="dateOfBirth" className="text-gray-200">Date of Birth *</Label>
                   <Input
                     id="dateOfBirth"
                     type="date"
                     value={formData.dateOfBirth}
                     onChange={(e) => handleDateOfBirthChange(e.target.value)}
-                    className={`bg-background/50 border-border focus:border-accent transition-colors ${dateValidation && !dateValidation.isValid
+                    className={`bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${dateValidation && !dateValidation.isValid
                       ? 'border-red-500 focus:border-red-500'
                       : dateValidation && dateValidation.isValid
                         ? 'border-green-500 focus:border-green-500'
@@ -1107,7 +1108,7 @@ const SignUp = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">Phone Number *</Label>
+                  <Label htmlFor="phoneNumber" className="text-gray-200">Phone Number *</Label>
                   <div className="flex gap-2">
                     <Select
                       value={formData.phoneCountryCode}
@@ -1123,7 +1124,7 @@ const SignUp = () => {
                         }
                       }}
                     >
-                      <SelectTrigger className="w-24 bg-background/50 border-border focus:border-accent">
+                      <SelectTrigger className="w-24 bg-gray-800/50 border-gray-700 focus:border-blue-500">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1140,64 +1141,64 @@ const SignUp = () => {
                       placeholder={formData.phoneCountryCode === '+256' ? '745315809' : 'Enter phone number'}
                       value={formData.phoneNumber}
                       onChange={(e) => handlePhoneInputChange(e.target.value)}
-                      className="flex-1 bg-background/50 border-border focus:border-accent transition-colors"
+                      className="flex-1 bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                       maxLength={20}
                       required
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-gray-400">
                     We'll send you a verification code to confirm your number
                   </p>
                 </div>
               </div>
 
               {/* Address Information Section */}
-              <div className="space-y-4 p-4 bg-background/30 rounded-lg border">
-                <h3 className="font-semibold text-foreground">Address Information</h3>
+              <div className="space-y-4 p-4 bg-gray-800/30 rounded-lg border border-gray-700">
+                <h3 className="font-semibold text-white">Address Information</h3>
 
                 <div className="space-y-2">
-                  <Label htmlFor="streetAddress">Street Address *</Label>
+                  <Label htmlFor="streetAddress" className="text-gray-200">Street Address *</Label>
                   <Input
                     id="streetAddress"
                     placeholder="123 Main St"
                     value={formData.streetAddress}
                     onChange={(e) => handleInputChange("streetAddress", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
+                    className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="addressLine2">Address Line 2 (Optional)</Label>
+                  <Label htmlFor="addressLine2" className="text-gray-200">Address Line 2 (Optional)</Label>
                   <Input
                     id="addressLine2"
                     placeholder="Apt, Suite, Unit, etc."
                     value={formData.addressLine2}
                     onChange={(e) => handleInputChange("addressLine2", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
+                    className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="city">City *</Label>
+                    <Label htmlFor="city" className="text-gray-200">City *</Label>
                     <Input
                       id="city"
                       placeholder="New York"
                       value={formData.city}
                       onChange={(e) => handleInputChange("city", e.target.value)}
-                      className="bg-background/50 border-border focus:border-accent transition-colors"
+                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                       required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="state">State *</Label>
+                    <Label htmlFor="state" className="text-gray-200">State *</Label>
                     <Select
                       value={formData.state}
                       onValueChange={(value) => handleInputChange("state", value)}
                     >
-                      <SelectTrigger className="bg-background/50 border-border focus:border-accent">
+                      <SelectTrigger className="bg-gray-800/50 border-gray-700 focus:border-blue-500">
                         <SelectValue placeholder="Select state" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1211,13 +1212,13 @@ const SignUp = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="zipCode">ZIP Code *</Label>
+                    <Label htmlFor="zipCode" className="text-gray-200">ZIP Code *</Label>
                     <Input
                       id="zipCode"
                       placeholder="10001"
                       value={formData.zipCode}
                       onChange={(e) => handleInputChange("zipCode", e.target.value)}
-                      className="bg-background/50 border-border focus:border-accent transition-colors"
+                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                       required
                     />
                   </div>
@@ -1227,7 +1228,7 @@ const SignUp = () => {
 
             <div className="flex justify-between mt-6">
               <Button
-                variant="outline"
+                variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                 onClick={() => setStep(2)}
                 className="px-8 py-2"
                 disabled={loading}
@@ -1265,9 +1266,9 @@ const SignUp = () => {
                 <Phone className="w-8 h-8 text-accent" />
               </div>
               <h1 className="text-2xl font-bold mb-2">Verify Your Phone</h1>
-              <p className="text-muted-foreground">
+              <p className="text-gray-400">
                 Enter the code sent to<br />
-                <span className="font-medium text-foreground">{formData.phoneCountryCode} {formData.phoneNumber}</span>
+                <span className="font-medium text-white">{formData.phoneCountryCode} {formData.phoneNumber}</span>
               </p>
             </div>
 
@@ -1279,7 +1280,7 @@ const SignUp = () => {
             }}>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="phoneOtpCode">Verification Code *</Label>
+                  <Label htmlFor="phoneOtpCode" className="text-gray-200">Verification Code *</Label>
                   <Input
                     id="phoneOtpCode"
                     type="text"
@@ -1291,7 +1292,7 @@ const SignUp = () => {
                       const otpCode = pastedText.replace(/\D/g, '').slice(0, 6);
                       handleOtpInputChange('phoneOtpCode', otpCode);
                     }}
-                    className={`text-center text-2xl tracking-widest bg-background/50 border-border focus:border-accent transition-colors ${autoSubmitting ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''
+                    className={`text-center text-2xl tracking-widest bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${autoSubmitting ? 'border-green-500 bg-green-900/20' : ''
                       }`}
                     placeholder="000000"
                     maxLength={6}
@@ -1301,7 +1302,7 @@ const SignUp = () => {
                     autoFocus
                     disabled={autoSubmitting}
                   />
-                  <div className="text-xs text-muted-foreground space-y-1">
+                  <div className="text-xs text-gray-400 space-y-1">
                     {autoSubmitting ? (
                       <p className="text-green-600 dark:text-green-400">Verifying code...</p>
                     ) : (
@@ -1313,7 +1314,7 @@ const SignUp = () => {
                 <div className="text-center">
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                     onClick={sendPhoneOtp}
                     disabled={loading}
                     className="text-accent"
@@ -1326,7 +1327,7 @@ const SignUp = () => {
               <div className="flex justify-between mt-6">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                   onClick={() => setStep(3)}
                   className="px-8 py-2"
                   disabled={loading || autoSubmitting}
@@ -1362,28 +1363,28 @@ const SignUp = () => {
           <>
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold mb-2">Complete Your Membership</h1>
-              <p className="text-muted-foreground">Choose your payment plan to join the queue</p>
+              <p className="text-gray-400">Choose your payment plan to join the queue</p>
             </div>
 
             <div className="space-y-6">
               <Card className="p-6 border-2 border-accent glow-blue">
                 <div className="text-center space-y-4">
                   <div>
-                    <p className="text-muted-foreground">Initial Payment</p>
+                    <p className="text-gray-400">Initial Payment</p>
                     <p className="text-4xl font-bold text-accent">$300</p>
-                    <p className="text-sm text-muted-foreground">Includes first month</p>
+                    <p className="text-sm text-gray-400">Includes first month</p>
                   </div>
                   <div className="border-t pt-4">
-                    <p className="text-muted-foreground">Then Monthly</p>
-                    <p className="text-2xl font-semibold text-foreground">$25</p>
-                    <p className="text-sm text-muted-foreground">Starting month 2</p>
+                    <p className="text-gray-400">Then Monthly</p>
+                    <p className="text-2xl font-semibold text-white">$25</p>
+                    <p className="text-sm text-gray-400">Starting month 2</p>
                   </div>
                 </div>
               </Card>
 
-              <div className="space-y-4 p-4 bg-background/50 rounded-lg border">
-                <h3 className="font-semibold text-foreground">What happens next:</h3>
-                <ul className="space-y-2 text-sm text-muted-foreground">
+              <div className="space-y-4 p-4 bg-gray-800/50 rounded-lg border">
+                <h3 className="font-semibold text-white">What happens next:</h3>
+                <ul className="space-y-2 text-sm text-gray-400">
                   <li className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-accent" />
                     You'll be redirected to our secure payment processor
@@ -1406,7 +1407,7 @@ const SignUp = () => {
               <div className="flex gap-3">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                   onClick={() => setStep(4)}
                   className="w-full"
                   disabled={loading}
@@ -1439,17 +1440,16 @@ const SignUp = () => {
           <>
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border"></div>
+                <div className="w-full border-t border-gray-700"></div>
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                <span className="bg-card px-2 text-gray-400">Or continue with</span>
               </div>
             </div>
 
             {/* Google Signup */}
             <Button
-              variant="glass"
-              className="w-full mb-6"
+              className="w-full mb-6 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white transition-colors"
               onClick={handleGoogleSignup}
               disabled={loading}
             >
@@ -1465,9 +1465,9 @@ const SignUp = () => {
         )}
 
         {/* Login Link */}
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="text-center text-sm text-gray-400">
           Already have an account?{" "}
-          <Link href="/login" className="text-accent hover:underline font-medium">
+          <Link href="/login" className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors">
             Back to Login
           </Link>
         </p>
