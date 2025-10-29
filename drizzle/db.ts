@@ -47,14 +47,12 @@ if (!process.env.DATABASE_URL) {
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }, // Always use SSL for Supabase
-  // Optimized settings for Supabase transaction mode (port 6543)
-  max: 20, // Reduced for better stability
-  min: 0, // No idle connections for serverless
-  idleTimeoutMillis: 30000, // Shorter idle timeout
-  connectionTimeoutMillis: 1000, // Faster timeout
-  //acquireTimeoutMillis: 5000, // Timeout for acquiring connection
-  //statement_timeout: 10000, // 10 second query timeout
-  //query_timeout: 10000, // 10 second query timeout
+  // Optimized settings for unstable connections
+  max: 10, // Max number of clients in the pool
+  min: 2, // Minimum number of clients to keep idle
+  idleTimeoutMillis: 60000, // Close idle clients after 60 seconds
+  connectionTimeoutMillis: 10000, // Wait 10 seconds to connect
+  //acquireTimeoutMillis: 10000, // Wait 10 seconds to acquire a client
 })
 
 // Log pool errors but don't exit process

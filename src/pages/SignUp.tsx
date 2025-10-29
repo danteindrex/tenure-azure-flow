@@ -45,6 +45,7 @@ const SignUp = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [dateValidation, setDateValidation] = useState<{ isValid: boolean; message: string } | null>(null);
   const [autoSubmitting, setAutoSubmitting] = useState(false);
+  const [bypassed, setBypassed] = useState(false);
 
   // Log page visit and check for existing session
   useEffect(() => {
@@ -73,7 +74,7 @@ const SignUp = () => {
     }
     
     // If user is authenticated, check their database state to determine correct step
-    if (session?.user && !isPending) {
+    if (session?.user && !isPending && !bypassed) {
       fetch('/api/onboarding/status', {
         method: 'GET',
         credentials: 'include'
@@ -694,6 +695,51 @@ const SignUp = () => {
         })
       });
 
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Unexpected error during profile completion";
+      await logError(`Profile completion error: ${errorMessage}`, userId || undefined);
+      throw new Error(errorMessage);
+    }
+  };
+
+  // Bypass Phone OTP verification for development
+  const handlePhoneBypass = async (): Promise<void> => {
+    try {
+      setLoading(true);
+
+      // Update user profile with Better Auth
+      const fullName = `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim();
+
+      const result = await updateUser({
+        name: fullName
+      });
+
+      if (result.error) {
+        toast.error("Failed to save profile information");
+        setLoading(false);
+        return;
+      }
+
+      // Also save to normalized tables via API
+      await fetch("/api/profiles/upsert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          middle_name: formData.middleName,
+          date_of_birth: formData.dateOfBirth,
+          phone: formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode),
+          street_address: formData.streetAddress,
+          address_line_2: formData.addressLine2,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zipCode,
+          country_code: formData.country,
+        }),
+      });
+
       // Update progress in database
       await fetch('/api/onboarding/update-progress', {
         method: 'POST',
@@ -703,11 +749,30 @@ const SignUp = () => {
           step: 'profile-completed'
         })
       });
+      
+      const formattedPhone = formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode);
+
+      // Update progress in database
+      await fetch('/api/onboarding/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          step: 'phone-verified',
+          data: { phone: formattedPhone }
+        })
+      });
+
+      setBypassed(true);
+      setStep(5);
+      toast.success("Phone bypassed for development! Please proceed to payment.");
 
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unexpected error during profile completion";
-      await logError(`Profile completion error: ${errorMessage}`, userId || undefined);
-      throw new Error(errorMessage);
+      const errorMessage = err instanceof Error ? err.message : "Bypass failed";
+      console.error('Phone bypass error:', err);
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1253,6 +1318,15 @@ const SignUp = () => {
                   </>
                 )}
               </Button>
+              <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePhoneBypass}
+                  className="px-8 py-2"
+                  disabled={loading}
+                >
+                  Bypass for Dev
+                </Button>
             </div>
           </>
         )}
