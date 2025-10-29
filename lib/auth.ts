@@ -13,7 +13,7 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { nextCookies } from 'better-auth/next-js'
-import { twoFactor, organization } from 'better-auth/plugins'
+import { twoFactor, organization, emailOTP } from 'better-auth/plugins'
 import { passkey } from 'better-auth/plugins/passkey'
 import { db } from '../drizzle/db'
 import { emailService } from '../src/lib/email'
@@ -36,57 +36,6 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
-    // Generate 6-digit reset codes
-    generateResetPasswordToken: () => {
-      return Math.floor(100000 + Math.random() * 900000).toString()
-    },
-    sendResetPasswordEmail: async ({ user, url, token }) => {
-      console.log('📧 Better Auth: Sending password reset email...')
-      console.log('   User:', user.email)
-      console.log('   Token (6-digit):', token)
-      
-      try {
-        await emailService.sendPasswordResetEmail({
-          to: user.email,
-          token,
-          url
-        })
-        
-        console.log('✅ Better Auth: Password reset email sent successfully!')
-        
-      } catch (error) {
-        console.error('Failed to send reset password email:', error)
-        throw error
-      }
-    }
-  },
-
-  // Email verification configuration (separate from emailAndPassword)
-  emailVerification: {
-    // Generate 6-digit verification codes
-    generateVerificationToken: () => {
-      return Math.floor(100000 + Math.random() * 900000).toString()
-    },
-    sendVerificationEmail: async ({ user, url, token }) => {
-      console.log('📧 Better Auth: Attempting to send verification email...')
-      console.log('   User:', user.email)
-      console.log('   URL:', url)
-      console.log('   Token (6-digit):', token)
-      
-      try {
-        await emailService.sendVerificationEmail({
-          to: user.email,
-          token,
-          url
-        })
-        
-        console.log('✅ Better Auth: Email sent successfully via SMTP!')
-        
-      } catch (error) {
-        console.error('❌ Better Auth: Failed to send verification email:', error)
-        throw error
-      }
-    }
   },
 
   // Social authentication providers
@@ -102,6 +51,56 @@ export const auth = betterAuth({
   // Plugins
   plugins: [
     nextCookies(),  // Required for Next.js cookie management
+
+    // Email OTP plugin for 6-digit verification codes
+    emailOTP({
+      // Override default email verification to use OTP instead of links
+      overrideDefaultEmailVerification: true,
+      // 6-digit OTP (default)
+      otpLength: 6,
+      // OTP expires in 10 minutes
+      expiresIn: 600,
+      // Send verification OTP when user signs up
+      sendVerificationOnSignUp: true,
+      // Allow 3 attempts before invalidating OTP
+      allowedAttempts: 3,
+      // Send OTP via our email service
+      async sendVerificationOTP({ email, otp, type }) {
+        console.log('📧 Better Auth: Sending OTP email...')
+        console.log('   Email:', email)
+        console.log('   OTP (6-digit):', otp)
+        console.log('   Type:', type)
+        
+        try {
+          if (type === 'email-verification') {
+            await emailService.sendVerificationEmail({
+              to: email,
+              token: otp,
+              url: `${process.env.BETTER_AUTH_URL}/verify-email?email=${email}&otp=${otp}`
+            })
+          } else if (type === 'forget-password') {
+            await emailService.sendPasswordResetEmail({
+              to: email,
+              token: otp,
+              url: `${process.env.BETTER_AUTH_URL}/reset-password?email=${email}&otp=${otp}`
+            })
+          } else if (type === 'sign-in') {
+            // For sign-in OTP, we can use the verification template
+            await emailService.sendVerificationEmail({
+              to: email,
+              token: otp,
+              url: `${process.env.BETTER_AUTH_URL}/sign-in?email=${email}&otp=${otp}`
+            })
+          }
+          
+          console.log('✅ Better Auth: OTP email sent successfully!')
+          
+        } catch (error) {
+          console.error('❌ Better Auth: Failed to send OTP email:', error)
+          throw error
+        }
+      }
+    }),
 
     // Passkey plugin (WebAuthn support)
     passkey({
