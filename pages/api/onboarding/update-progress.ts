@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // No additional database updates needed here
         break;
 
-      case 'phone-verified':
+      case 'phone-verified': {
         // Update or create phone contact record as verified
         const { phone } = data;
         if (phone) {
@@ -78,6 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
         break;
+      }
 
       case 'payment-completed':
         // Update user status to Active when payment is completed

@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import BusinessLogicService from '@/lib/business-logic';
+import { businessLogicService } from '@/lib/business-logic';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -7,47 +7,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Initialize business logic service
-    const businessLogic = new BusinessLogicService(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Use business logic service singleton
+    const businessLogic = businessLogicService;
 
     console.log('Starting business rule enforcement...');
 
     // 1. Enforce payment defaults (BR-8)
     const defaultEnforcement = await businessLogic.enforcePaymentDefaults();
-    console.log(`Default enforcement: ${defaultEnforcement.updated} members updated, ${defaultEnforcement.removed} removed from queue`);
+    console.log(`Default enforcement: ${defaultEnforcement.processed} members processed, ${defaultEnforcement.defaulted} members defaulted`);
 
-    // 2. Update queue positions based on tenure (BR-5, BR-9, BR-10)
-    const queueUpdate = await businessLogic.updateQueuePositions();
-    console.log(`Queue positions updated: ${queueUpdate ? 'Success' : 'Failed'}`);
-
-    // 3. Get current payout status (BR-3, BR-4, BR-6)
-    const payoutStatus = await businessLogic.getPayoutStatus();
+    // 2. Check payout conditions (BR-3, BR-4, BR-6)
+    const payoutStatus = await businessLogic.checkPayoutConditions();
     console.log(`Payout status: Fund Ready: ${payoutStatus.fundReady}, Time Ready: ${payoutStatus.timeReady}, Payout Ready: ${payoutStatus.payoutReady}`);
 
-    // 4. Get winner order for validation (BR-5, BR-6, BR-10)
-    const winnerOrder = await businessLogic.getWinnerOrder();
-    console.log(`Winner order calculated: ${winnerOrder.length} eligible members`);
+    // 3. Get members with continuous tenure (BR-5, BR-6, BR-10)
+    const membersWithTenure = await businessLogic.getMembersWithContinuousTenure();
+    console.log(`Members with continuous tenure: ${membersWithTenure.length} eligible members`);
 
     const results = {
       timestamp: new Date().toISOString(),
       defaultEnforcement,
-      queueUpdateSuccess: queueUpdate,
       payoutStatus: {
         fundReady: payoutStatus.fundReady,
         timeReady: payoutStatus.timeReady,
         payoutReady: payoutStatus.payoutReady,
         totalRevenue: payoutStatus.totalRevenue,
-        potentialWinners: payoutStatus.potentialWinners,
-        fundStatus: payoutStatus.fundStatus,
-        timeStatus: payoutStatus.timeStatus
+        potentialWinners: payoutStatus.potentialWinners
       },
-      eligibleMembers: winnerOrder.length,
-      topWinners: winnerOrder.slice(0, 5).map(w => ({
-        position: w.queuePosition,
+      eligibleMembers: membersWithTenure.length,
+      topMembers: membersWithTenure.slice(0, 5).map(w => ({
+        position: w.position,
         userId: w.memberId,
+        memberName: w.memberName,
         tenureStart: w.tenureStart,
         continuousTenure: w.continuousTenure
       }))

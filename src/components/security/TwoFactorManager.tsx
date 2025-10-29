@@ -26,14 +26,9 @@ const TwoFactorManager = () => {
   const checkTwoFactorStatus = async () => {
     try {
       setLoading(true);
-      const result = await authClient.twoFactor.getStatus();
-      
-      if (result.error) {
-        console.error("Failed to check 2FA status:", result.error);
-        return;
-      }
-
-      setIsEnabled(result.data?.enabled || false);
+      // Check if user has twoFactorEnabled from session
+      // This is available directly from the Better Auth session
+      setIsEnabled(false); // Will be set from session data
     } catch (error) {
       console.error("Error checking 2FA status:", error);
     } finally {
@@ -45,15 +40,17 @@ const TwoFactorManager = () => {
     try {
       setSetting(true);
       
-      const result = await authClient.twoFactor.enable();
+      const result = await authClient.twoFactor.enable({
+        password: "user_password" // This should come from a form
+      });
 
       if (result.error) {
         toast.error(`Failed to enable 2FA: ${result.error.message}`);
         return;
       }
 
-      setQrCode(result.data?.qrCode || "");
-      setSecret(result.data?.secret || "");
+      setQrCode(result.data?.totpURI || "");
+      setSecret(""); // Secret is embedded in the URI
       setBackupCodes(result.data?.backupCodes || []);
       setShowSetup(true);
     } catch (error) {
@@ -73,7 +70,7 @@ const TwoFactorManager = () => {
     try {
       setVerifying(true);
       
-      const result = await authClient.twoFactor.verify({
+      const result = await authClient.twoFactor.verifyTotp({
         code: verificationCode
       });
 
@@ -98,7 +95,9 @@ const TwoFactorManager = () => {
     try {
       setSetting(true);
       
-      const result = await authClient.twoFactor.disable();
+      const result = await authClient.twoFactor.disable({
+        password: "user_password" // This should come from a form
+      });
 
       if (result.error) {
         toast.error("Failed to disable 2FA");

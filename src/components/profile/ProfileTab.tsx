@@ -1,15 +1,19 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { User, Mail, Phone, MapPin, Edit3, Save, X, Loader2, Upload } from "lucide-react"
+import { User, Mail, Phone, Edit3, Save, X, Loader2, Upload } from "lucide-react"
 import { toast } from "sonner"
 import { useSession, updateUser } from "@/lib/auth-client"
+
+interface UserContact {
+  contact_value: string;
+  is_verified: boolean;
+}
 
 export default function ProfileTab() {
   const { data: session } = useSession()
@@ -17,22 +21,72 @@ export default function ProfileTab() {
 
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [phoneContact, setPhoneContact] = useState<UserContact | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const [formData, setFormData] = useState({
     name: user?.name || "",
-    phone: user?.phone || "",
     image: user?.image || "",
+    phone: "",
   })
+
+  // Fetch user phone contact
+  useEffect(() => {
+    const fetchUserContacts = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const response = await fetch('/api/user/contacts');
+        if (response.ok) {
+          const contacts = await response.json();
+          const phoneContact = contacts.find((c: any) => c.contact_type === 'phone');
+          if (phoneContact) {
+            setPhoneContact(phoneContact);
+            setFormData(prev => ({ ...prev, phone: phoneContact.contact_value }));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching contacts:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserContacts();
+  }, [user?.id]);
 
   const handleSave = async () => {
     try {
       setSaving(true)
 
+      // Update user profile
       await updateUser({
         name: formData.name,
-        phone: formData.phone,
         image: formData.image,
       })
+
+      // Update phone contact if changed
+      if (formData.phone !== phoneContact?.contact_value) {
+        const response = await fetch('/api/user/contacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contact_type: 'phone',
+            contact_value: formData.phone,
+            is_primary: true,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update phone number');
+        }
+
+        // Update local state
+        setPhoneContact({ 
+          contact_value: formData.phone, 
+          is_verified: false // New phone numbers need verification
+        });
+      }
 
       toast.success("Profile updated successfully!")
       setIsEditing(false)
@@ -47,8 +101,8 @@ export default function ProfileTab() {
   const handleCancel = () => {
     setFormData({
       name: user?.name || "",
-      phone: user?.phone || "",
       image: user?.image || "",
+      phone: phoneContact?.contact_value || "",
     })
     setIsEditing(false)
   }
@@ -105,10 +159,10 @@ export default function ProfileTab() {
                   <span className="text-yellow-600 font-medium">Not Verified</span>
                 )}
               </div>
-              {formData.phone && (
+              {phoneContact && (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Phone</span>
-                  {user?.phoneVerified ? (
+                  {phoneContact.is_verified ? (
                     <span className="text-green-600 font-medium">Verified</span>
                   ) : (
                     <span className="text-yellow-600 font-medium">Not Verified</span>

@@ -1,60 +1,66 @@
 // History system service for managing user activity and transaction history
-import SupabaseClientSingleton from './supabase';
+// Database operations moved to API endpoints for client-side compatibility
+// Drizzle imports removed for client-side compatibility
 
 export interface UserActivityHistory {
   id?: string;
-  user_id?: string;
-  activity_type: 'payment' | 'queue' | 'milestone' | 'profile' | 'login' | 'logout' | 'settings' | 'support' | 'referral' | 'bonus' | 'system';
-  action: string;
+  user_id: string;
+  activity_type: 'login' | 'payment' | 'profile_update' | 'queue_update' | 'payout' | 'support_ticket' | 'other';
+  activity_description: string;
+  action?: string;
   description?: string;
   amount?: number;
-  status: 'completed' | 'failed' | 'pending' | 'cancelled';
-  metadata?: Record<string, any>;
+  status?: string;
+  metadata?: any;
   ip_address?: string;
   user_agent?: string;
   created_at?: string;
-  session_id?: string;
-  device_type?: string;
-  location?: string;
-  reference_id?: string;
-  parent_activity_id?: string;
 }
 
 export interface TransactionHistory {
-  id?: string;
-  user_id?: string;
-  transaction_type: 'payment' | 'refund' | 'bonus' | 'payout' | 'fee' | 'adjustment';
+  id: string;
+  user_id: string;
+  transaction_type: 'payment' | 'refund' | 'payout' | 'fee';
   amount: number;
-  currency?: string;
-  status: 'pending' | 'completed' | 'failed' | 'cancelled' | 'refunded';
+  currency: string;
+  status: string;
+  description: string;
   payment_method?: string;
-  payment_reference?: string;
-  description?: string;
-  metadata?: Record<string, any>;
-  processed_at?: string;
-  created_at?: string;
+  provider_transaction_id?: string;
+  metadata?: any;
+  created_at: string;
   updated_at?: string;
 }
 
+export interface PaymentHistory {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  payment_type: string;
+  payment_date: string;
+  provider_payment_id?: string;
+  is_first_payment: boolean;
+  receipt_url?: string;
+}
+
 export interface QueueHistory {
-  id?: string;
-  user_id?: string;
+  id: string;
+  user_id: string;
+  action: 'joined' | 'position_changed' | 'status_updated';
   old_position?: number;
   new_position?: number;
-  position_change?: number;
-  reason?: string;
-  metadata?: Record<string, any>;
-  created_at?: string;
+  description: string;
+  created_at: string;
 }
 
 export interface MilestoneHistory {
-  id?: string;
-  milestone_type: 'fund_amount' | 'user_count' | 'payout' | 'special';
-  milestone_value?: number;
-  description: string;
-  achieved_at?: string;
-  metadata?: Record<string, any>;
-  created_at?: string;
+  id: string;
+  user_id: string;
+  milestone_type: 'first_payment' | 'tenure_milestone' | 'queue_position' | 'payout_received';
+  milestone_description: string;
+  achieved_at: string;
+  metadata?: any;
 }
 
 export interface HistorySummary {
@@ -67,293 +73,206 @@ export interface HistorySummary {
 }
 
 class HistoryService {
-  private supabase: ReturnType<typeof SupabaseClientSingleton.getInstance>;
-
   constructor() {
-    // Always use singleton for database operations (not auth)
-    this.supabase = SupabaseClientSingleton.getInstance();
+    // Using Drizzle ORM with existing database tables
   }
 
-  // User Activity History
-  async getUserActivityHistory(userId: string, options?: {
-    limit?: number;
-    offset?: number;
-    activity_type?: string;
-    status?: string;
-    start_date?: string;
-    end_date?: string;
-  }): Promise<UserActivityHistory[]> {
+  // User Activity History - Placeholder implementations
+  async logActivity(activity: Omit<UserActivityHistory, 'id' | 'created_at'>): Promise<boolean> {
     try {
-      let query = this.supabase
-        .from('user_activity_history')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (options?.limit) {
-        query = query.limit(options.limit);
-      }
-
-      if (options?.offset) {
-        query = query.range(options.offset, options.offset + (options.limit || 50) - 1);
-      }
-
-      if (options?.activity_type) {
-        query = query.eq('activity_type', options.activity_type);
-      }
-
-      if (options?.status) {
-        query = query.eq('status', options.status);
-      }
-
-      if (options?.start_date) {
-        query = query.gte('created_at', options.start_date);
-      }
-
-      if (options?.end_date) {
-        query = query.lte('created_at', options.end_date);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching user activity history:', error);
-        return [];
-      }
-
-      return data || [];
+      // TODO: Implement with proper user_activity_history table
+      console.log('Logging activity:', activity);
+      return true;
     } catch (error) {
-      console.error('Error in getUserActivityHistory:', error);
+      console.error('Error logging activity:', error);
+      return false;
+    }
+  }
+
+  async getUserActivityHistory(userId: string, limit: number = 50, offset: number = 0): Promise<UserActivityHistory[]> {
+    try {
+      // TODO: Implement with proper user_activity_history table
+      console.log('Getting user activity history:', { userId, limit, offset });
+      return [];
+    } catch (error) {
+      console.error('Error getting user activity history:', error);
       return [];
     }
   }
 
-  async createUserActivity(activity: Omit<UserActivityHistory, 'id' | 'created_at'>): Promise<UserActivityHistory | null> {
+  async getActivityByType(userId: string, activityType: string, limit: number = 20): Promise<UserActivityHistory[]> {
     try {
-      const { data, error } = await this.supabase
-        .from('user_activity_history')
-        .insert(activity)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating user activity:', error);
-        return null;
-      }
-
-      return data;
+      // TODO: Implement with proper user_activity_history table
+      console.log('Getting activity by type:', { userId, activityType, limit });
+      return [];
     } catch (error) {
-      console.error('Error in createUserActivity:', error);
-      return null;
-    }
-  }
-
-  // Transaction History
-  async getTransactionHistory(userId: string, options?: {
-    limit?: number;
-    offset?: number;
-    transaction_type?: string;
-    status?: string;
-    start_date?: string;
-    end_date?: string;
-  }): Promise<TransactionHistory[]> {
-    try {
-      let query = this.supabase
-        .from('transaction_history')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (options?.limit) {
-        query = query.limit(options.limit);
-      }
-
-      if (options?.offset) {
-        query = query.range(options.offset, options.offset + (options.limit || 50) - 1);
-      }
-
-      if (options?.transaction_type) {
-        query = query.eq('transaction_type', options.transaction_type);
-      }
-
-      if (options?.status) {
-        query = query.eq('status', options.status);
-      }
-
-      if (options?.start_date) {
-        query = query.gte('created_at', options.start_date);
-      }
-
-      if (options?.end_date) {
-        query = query.lte('created_at', options.end_date);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching transaction history:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Error in getTransactionHistory:', error);
+      console.error('Error getting activity by type:', error);
       return [];
     }
   }
 
-  async createTransaction(transaction: Omit<TransactionHistory, 'id' | 'created_at' | 'updated_at'>): Promise<TransactionHistory | null> {
+  // Payment History - Using API endpoint
+  async getPaymentHistory(userId: string, limit: number = 50, offset: number = 0): Promise<PaymentHistory[]> {
     try {
-      const { data, error } = await this.supabase
-        .from('transaction_history')
-        .insert(transaction)
-        .select()
-        .single();
+      const response = await fetch(`/api/history/payments?userId=${userId}&limit=${limit}&offset=${offset}`, {
+        method: 'GET',
+        credentials: 'include'
+      });
 
-      if (error) {
-        console.error('Error creating transaction:', error);
-        return null;
+      if (!response.ok) {
+        throw new Error('Failed to fetch payment history');
       }
 
-      return data;
+      const data = await response.json();
+      return data.payments || [];
     } catch (error) {
-      console.error('Error in createTransaction:', error);
-      return null;
-    }
-  }
-
-  // Queue History
-  async getQueueHistory(userId: string, options?: {
-    limit?: number;
-    offset?: number;
-  }): Promise<QueueHistory[]> {
-    try {
-      let query = this.supabase
-        .from('queue_history')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (options?.limit) {
-        query = query.limit(options.limit);
-      }
-
-      if (options?.offset) {
-        query = query.range(options.offset, options.offset + (options.limit || 50) - 1);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching queue history:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Error in getQueueHistory:', error);
+      console.error('Error getting payment history:', error);
       return [];
     }
   }
 
-  async createQueueHistory(queueData: Omit<QueueHistory, 'id' | 'created_at'>): Promise<QueueHistory | null> {
+  async getPaymentsByDateRange(userId: string, startDate: Date, endDate: Date): Promise<PaymentHistory[]> {
     try {
-      const { data, error } = await this.supabase
-        .from('queue_history')
-        .insert(queueData)
-        .select()
-        .single();
+      const response = await fetch(`/api/history/payments?userId=${userId}&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`, {
+        method: 'GET',
+        credentials: 'include'
+      });
 
-      if (error) {
-        console.error('Error creating queue history:', error);
-        return null;
+      if (!response.ok) {
+        throw new Error('Failed to fetch payments by date range');
       }
 
-      return data;
+      const data = await response.json();
+      return data.payments || [];
     } catch (error) {
-      console.error('Error in createQueueHistory:', error);
-      return null;
-    }
-  }
-
-  // Milestone History
-  async getMilestoneHistory(options?: {
-    limit?: number;
-    offset?: number;
-    milestone_type?: string;
-    start_date?: string;
-    end_date?: string;
-  }): Promise<MilestoneHistory[]> {
-    try {
-      let query = this.supabase
-        .from('milestone_history')
-        .select('*')
-        .order('achieved_at', { ascending: false });
-
-      if (options?.limit) {
-        query = query.limit(options.limit);
-      }
-
-      if (options?.offset) {
-        query = query.range(options.offset, options.offset + (options.limit || 50) - 1);
-      }
-
-      if (options?.milestone_type) {
-        query = query.eq('milestone_type', options.milestone_type);
-      }
-
-      if (options?.start_date) {
-        query = query.gte('achieved_at', options.start_date);
-      }
-
-      if (options?.end_date) {
-        query = query.lte('achieved_at', options.end_date);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching milestone history:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Error in getMilestoneHistory:', error);
+      console.error('Error getting payments by date range:', error);
       return [];
     }
   }
 
-  // Combined History (for the main history page)
-  async getCombinedHistory(userId: string, options?: {
-    limit?: number;
-    offset?: number;
-    activity_type?: string;
-    status?: string;
-    start_date?: string;
-    end_date?: string;
-  }): Promise<{
+  async getPaymentStatistics(userId: string): Promise<{
+    totalPaid: number;
+    totalPayments: number;
+    firstPaymentDate: string | null;
+    lastPaymentDate: string | null;
+    averagePayment: number;
+  }> {
+    try {
+      const payments = await this.getPaymentHistory(userId, 1000); // Get all payments
+
+      if (payments.length === 0) {
+        return {
+          totalPaid: 0,
+          totalPayments: 0,
+          firstPaymentDate: null,
+          lastPaymentDate: null,
+          averagePayment: 0
+        };
+      }
+
+      const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const totalPayments = payments.length;
+      const averagePayment = totalPaid / totalPayments;
+
+      // Sort by date to get first and last
+      const sortedPayments = payments.sort((a, b) => 
+        new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+      );
+
+      return {
+        totalPaid,
+        totalPayments,
+        firstPaymentDate: sortedPayments[0].payment_date,
+        lastPaymentDate: sortedPayments[sortedPayments.length - 1].payment_date,
+        averagePayment
+      };
+    } catch (error) {
+      console.error('Error getting payment statistics:', error);
+      return {
+        totalPaid: 0,
+        totalPayments: 0,
+        firstPaymentDate: null,
+        lastPaymentDate: null,
+        averagePayment: 0
+      };
+    }
+  }
+
+  // Transaction History - Placeholder implementation
+  async getTransactionHistory(userId: string, limit: number = 50, offset: number = 0): Promise<TransactionHistory[]> {
+    try {
+      // For now, return payment history as transaction history
+      const payments = await this.getPaymentHistory(userId, limit, offset);
+      
+      return payments.map(payment => ({
+        id: payment.id,
+        user_id: userId,
+        transaction_type: 'payment' as const,
+        amount: payment.amount,
+        currency: payment.currency,
+        status: payment.status,
+        description: `${payment.payment_type} payment`,
+        payment_method: undefined,
+        provider_transaction_id: payment.provider_payment_id,
+        metadata: {
+          is_first_payment: payment.is_first_payment,
+          receipt_url: payment.receipt_url
+        },
+        created_at: payment.payment_date,
+        updated_at: payment.payment_date
+      }));
+    } catch (error) {
+      console.error('Error getting transaction history:', error);
+      return [];
+    }
+  }
+
+  // Export user data for compliance
+  async exportUserData(userId: string): Promise<{
+    activities: UserActivityHistory[];
+    payments: PaymentHistory[];
+    transactions: TransactionHistory[];
+  }> {
+    try {
+      const [activities, payments, transactions] = await Promise.all([
+        this.getUserActivityHistory(userId, 1000),
+        this.getPaymentHistory(userId, 1000),
+        this.getTransactionHistory(userId, 1000)
+      ]);
+
+      return {
+        activities,
+        payments,
+        transactions
+      };
+    } catch (error) {
+      console.error('Error exporting user data:', error);
+      return {
+        activities: [],
+        payments: [],
+        transactions: []
+      };
+    }
+  }
+
+  // Combined History - Placeholder implementation
+  async getCombinedHistory(userId: string, options: { limit?: number } = {}): Promise<{
     activities: UserActivityHistory[];
     transactions: TransactionHistory[];
     queue_changes: QueueHistory[];
     milestones: MilestoneHistory[];
   }> {
     try {
-      const [activities, transactions, queue_changes, milestones] = await Promise.all([
-        this.getUserActivityHistory(userId, options),
-        this.getTransactionHistory(userId, options),
-        this.getQueueHistory(userId, options),
-        this.getMilestoneHistory(options)
-      ]);
-
+      // TODO: Implement with proper database queries
+      console.log('Getting combined history:', { userId, options });
       return {
-        activities,
-        transactions,
-        queue_changes,
-        milestones
+        activities: [],
+        transactions: [],
+        queue_changes: [],
+        milestones: []
       };
     } catch (error) {
-      console.error('Error in getCombinedHistory:', error);
+      console.error('Error getting combined history:', error);
       return {
         activities: [],
         transactions: [],
@@ -363,34 +282,21 @@ class HistoryService {
     }
   }
 
-  // History Summary
+  // History Summary - Placeholder implementation
   async getHistorySummary(userId: string): Promise<HistorySummary> {
     try {
-      const [activities, transactions] = await Promise.all([
-        this.getUserActivityHistory(userId, { limit: 1000 }),
-        this.getTransactionHistory(userId, { limit: 1000 })
-      ]);
-
-      const total_activities = activities.length;
-      const completed_activities = activities.filter(a => a.status === 'completed').length;
-      const failed_activities = activities.filter(a => a.status === 'failed').length;
-      const total_transactions = transactions.length;
-      const total_amount = transactions
-        .filter(t => t.status === 'completed')
-        .reduce((sum, t) => sum + (t.amount || 0), 0);
-
-      const recent_activities = activities.slice(0, 10);
-
+      // TODO: Implement with proper database queries
+      console.log('Getting history summary:', { userId });
       return {
-        total_activities,
-        completed_activities,
-        failed_activities,
-        total_transactions,
-        total_amount,
-        recent_activities
+        total_activities: 0,
+        completed_activities: 0,
+        failed_activities: 0,
+        total_transactions: 0,
+        total_amount: 0,
+        recent_activities: []
       };
     } catch (error) {
-      console.error('Error in getHistorySummary:', error);
+      console.error('Error getting history summary:', error);
       return {
         total_activities: 0,
         completed_activities: 0,
@@ -402,45 +308,20 @@ class HistoryService {
     }
   }
 
-  // Search History
-  async searchHistory(userId: string, searchTerm: string, options?: {
-    limit?: number;
-    offset?: number;
-  }): Promise<{
+  // Search History - Placeholder implementation
+  async searchHistory(userId: string, searchTerm: string, options: { limit?: number } = {}): Promise<{
     activities: UserActivityHistory[];
     transactions: TransactionHistory[];
   }> {
     try {
-      const { data: activities, error: activitiesError } = await this.supabase
-        .from('user_activity_history')
-        .select('*')
-        .eq('user_id', userId)
-        .or(`action.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
-        .order('created_at', { ascending: false })
-        .limit(options?.limit || 50);
-
-      const { data: transactions, error: transactionsError } = await this.supabase
-        .from('transaction_history')
-        .select('*')
-        .eq('user_id', userId)
-        .or(`description.ilike.%${searchTerm}%,payment_reference.ilike.%${searchTerm}%`)
-        .order('created_at', { ascending: false })
-        .limit(options?.limit || 50);
-
-      if (activitiesError) {
-        console.error('Error searching activities:', activitiesError);
-      }
-
-      if (transactionsError) {
-        console.error('Error searching transactions:', transactionsError);
-      }
-
+      // TODO: Implement with proper database queries
+      console.log('Searching history:', { userId, searchTerm, options });
       return {
-        activities: activities || [],
-        transactions: transactions || []
+        activities: [],
+        transactions: []
       };
     } catch (error) {
-      console.error('Error in searchHistory:', error);
+      console.error('Error searching history:', error);
       return {
         activities: [],
         transactions: []

@@ -125,7 +125,7 @@ const LoginNew = () => {
     try {
       setLoading(true);
 
-      const result = await authClient.twoFactor.verify({
+      const result = await authClient.twoFactor.verifyTotp({
         code: formData.twoFactorCode
       });
 
@@ -152,7 +152,7 @@ const LoginNew = () => {
     try {
       setLoading(true);
 
-      const result = await authClient.passkey.authenticate();
+      const result = await authClient.signIn.passkey();
 
       if (result.error) {
         console.error("Passkey login error:", result.error);
@@ -219,7 +219,7 @@ const LoginNew = () => {
     try {
       setLoading(true);
 
-      const result = await authClient.forgetPassword({
+      const result = await authClient.requestPasswordReset({
         email: formData.email.trim(),
         redirectTo: `${window.location.origin}/reset-password`
       });

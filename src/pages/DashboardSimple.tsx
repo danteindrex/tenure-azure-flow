@@ -185,7 +185,6 @@ const DashboardSimple = () => {
     fetchQueueAndUsers();
 
     // Subscribe to realtime changes in membership_queue to update the UI live
-    let channel: any = null;
     try {
       if ((supabase as any)?.channel) {
         channel = (supabase as any)
@@ -210,14 +209,7 @@ const DashboardSimple = () => {
     */
 
     return () => {
-      // cleanup realtime subscription or polling
-      try {
-        if (channel && typeof channel.unsubscribe === 'function') {
-          channel.unsubscribe();
-        }
-      } catch (e) {
-        // ignore
-      }
+      // cleanup polling
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
