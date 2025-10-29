@@ -127,24 +127,6 @@ const SignUp = () => {
       } else if (stepNumber >= 1 && stepNumber <= 5) {
         setStep(stepNumber);
       }
-          // Fallback to URL parameter if API fails
-          if (stepParam) {
-            const stepNumber = parseInt(stepParam, 10);
-            if (stepNumber === 5) {
-              setStep(3);
-            } else if (stepNumber >= 1 && stepNumber <= 5) {
-              setStep(stepNumber);
-            }
-          }
-        });
-    } else if (!session?.user && stepParam) {
-      // Not authenticated, use URL parameter
-      const stepNumber = parseInt(stepParam, 10);
-      if (stepNumber === 5) {
-        setStep(3);
-      } else if (stepNumber >= 1 && stepNumber <= 5) {
-        setStep(stepNumber);
-      }
     }
   }, [session, isPending, navigate]);
 
@@ -418,9 +400,27 @@ const SignUp = () => {
       setUserId(result.data?.user?.id || null);
       await logSignup(email, true, result.data?.user?.id);
 
-      // Move to email verification step
-      setStep(2);
-      toast.success("Account created! Please check your email for verification.");
+      // Send email verification OTP
+      try {
+        const otpResult = await authClient.emailOtp.sendVerificationOtp({
+          email: currentProviededEmail,
+          type: "email-verification"
+        });
+
+        if (otpResult.error) {
+          console.error('Failed to send verification OTP:', otpResult.error);
+          toast.error("Account created but failed to send verification email. Please try again.");
+          return;
+        }
+
+        // Move to email verification step
+        setStep(2);
+        toast.success("Account created! Please check your email for the 6-digit verification code.");
+        
+      } catch (otpError) {
+        console.error('Error sending verification OTP:', otpError);
+        toast.error("Account created but failed to send verification email. Please try again.");
+      }
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Unexpected error during signup";
@@ -444,10 +444,10 @@ const SignUp = () => {
     try {
       setLoading(true);
 
-      // Verify email with Better Auth
-      const result = await authClient.verifyEmail({
+      // Verify email with Better Auth Email OTP plugin
+      const result = await authClient.emailOtp.verifyEmail({
         email: formData.email.trim(),
-        token: formData.emailOtpCode
+        otp: formData.emailOtpCode
       });
 
       if (result.error) {
@@ -655,7 +655,6 @@ const SignUp = () => {
       const fullName = `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim();
 
       const result = await updateUser({
-        name: fullName
         name: fullName
       });
 

@@ -7,7 +7,6 @@
 
 import { pgTable, text, timestamp, boolean, uuid } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { relations } from "drizzle-orm";
 
 // Map to your existing 'users' table structure exactly
 export const user = pgTable("users", {
