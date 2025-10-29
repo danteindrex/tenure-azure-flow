@@ -1,22 +1,11 @@
 import { relations } from "drizzle-orm/relations";
-import { usersInAuth, verificationCodes, admin, payloadLockedDocumentsRels, payloadLockedDocuments, payloadPreferencesRels, payloadPreferences, adminSessions, signupSessions, users, payoutManagement, taxForms, kycVerification, disputes, transactionMonitoring, userSettings, userNotificationPreferences, userSecuritySettings, userPaymentSettings, userPrivacySettings, userAppearanceSettings, user, session, account, passkey, twoFactor, organization, organizationMember, organizationInvitation } from "./schema";
+import { user, verificationCodes, admin, payloadLockedDocumentsRels, payloadLockedDocuments, payloadPreferencesRels, payloadPreferences, adminSessions, signupSessions, users, payoutManagement, taxForms, kycVerification, disputes, transactionMonitoring, userSettings, userNotificationPreferences, userSecuritySettings, userPaymentSettings, userPrivacySettings, userAppearanceSettings, session, account, twoFactor, organization } from "./schema";
 
 export const verificationCodesRelations = relations(verificationCodes, ({one}) => ({
-	usersInAuth: one(usersInAuth, {
+	user: one(user, {
 		fields: [verificationCodes.userId],
-		references: [usersInAuth.id]
+		references: [user.id]
 	}),
-}));
-
-export const usersInAuthRelations = relations(usersInAuth, ({many}) => ({
-	verificationCodes: many(verificationCodes),
-	signupSessions: many(signupSessions),
-	userSettings: many(userSettings),
-	userNotificationPreferences: many(userNotificationPreferences),
-	userSecuritySettings: many(userSecuritySettings),
-	userPaymentSettings: many(userPaymentSettings),
-	userPrivacySettings: many(userPrivacySettings),
-	userAppearanceSettings: many(userAppearanceSettings),
 }));
 
 export const payloadLockedDocumentsRelsRelations = relations(payloadLockedDocumentsRels, ({one}) => ({
@@ -63,9 +52,9 @@ export const adminSessionsRelations = relations(adminSessions, ({one}) => ({
 }));
 
 export const signupSessionsRelations = relations(signupSessions, ({one}) => ({
-	usersInAuth: one(usersInAuth, {
+	user: one(user, {
 		fields: [signupSessions.userId],
-		references: [usersInAuth.id]
+		references: [user.id]
 	}),
 }));
 
@@ -113,107 +102,43 @@ export const transactionMonitoringRelations = relations(transactionMonitoring, (
 }));
 
 export const userSettingsRelations = relations(userSettings, ({one}) => ({
-	usersInAuth: one(usersInAuth, {
+	user: one(user, {
 		fields: [userSettings.userId],
-		references: [usersInAuth.id]
+		references: [user.id]
 	}),
 }));
 
 export const userNotificationPreferencesRelations = relations(userNotificationPreferences, ({one}) => ({
-	usersInAuth: one(usersInAuth, {
+	user: one(user, {
 		fields: [userNotificationPreferences.userId],
-		references: [usersInAuth.id]
+		references: [user.id]
 	}),
 }));
 
 export const userSecuritySettingsRelations = relations(userSecuritySettings, ({one}) => ({
-	usersInAuth: one(usersInAuth, {
+	user: one(user, {
 		fields: [userSecuritySettings.userId],
-		references: [usersInAuth.id]
+		references: [user.id]
 	}),
 }));
 
 export const userPaymentSettingsRelations = relations(userPaymentSettings, ({one}) => ({
-	usersInAuth: one(usersInAuth, {
+	user: one(user, {
 		fields: [userPaymentSettings.userId],
-		references: [usersInAuth.id]
+		references: [user.id]
 	}),
 }));
 
 export const userPrivacySettingsRelations = relations(userPrivacySettings, ({one}) => ({
-	usersInAuth: one(usersInAuth, {
+	user: one(user, {
 		fields: [userPrivacySettings.userId],
-		references: [usersInAuth.id]
+		references: [user.id]
 	}),
 }));
 
 export const userAppearanceSettingsRelations = relations(userAppearanceSettings, ({one}) => ({
-	usersInAuth: one(usersInAuth, {
+	user: one(user, {
 		fields: [userAppearanceSettings.userId],
-		references: [usersInAuth.id]
-	}),
-}));
-
-export const sessionRelations = relations(session, ({one}) => ({
-	user: one(user, {
-		fields: [session.userId],
 		references: [user.id]
-	}),
-}));
-
-export const userRelations = relations(user, ({many}) => ({
-	sessions: many(session),
-	accounts: many(account),
-	passkeys: many(passkey),
-	twoFactors: many(twoFactor),
-	organizationMembers: many(organizationMember),
-	organizationInvitations: many(organizationInvitation),
-}));
-
-export const accountRelations = relations(account, ({one}) => ({
-	user: one(user, {
-		fields: [account.userId],
-		references: [user.id]
-	}),
-}));
-
-export const passkeyRelations = relations(passkey, ({one}) => ({
-	user: one(user, {
-		fields: [passkey.userId],
-		references: [user.id]
-	}),
-}));
-
-export const twoFactorRelations = relations(twoFactor, ({one}) => ({
-	user: one(user, {
-		fields: [twoFactor.userId],
-		references: [user.id]
-	}),
-}));
-
-export const organizationMemberRelations = relations(organizationMember, ({one}) => ({
-	organization: one(organization, {
-		fields: [organizationMember.organizationId],
-		references: [organization.id]
-	}),
-	user: one(user, {
-		fields: [organizationMember.userId],
-		references: [user.id]
-	}),
-}));
-
-export const organizationRelations = relations(organization, ({many}) => ({
-	organizationMembers: many(organizationMember),
-	organizationInvitations: many(organizationInvitation),
-}));
-
-export const organizationInvitationRelations = relations(organizationInvitation, ({one}) => ({
-	user: one(user, {
-		fields: [organizationInvitation.inviterId],
-		references: [user.id]
-	}),
-	organization: one(organization, {
-		fields: [organizationInvitation.organizationId],
-		references: [organization.id]
 	}),
 }));

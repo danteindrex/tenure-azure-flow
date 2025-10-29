@@ -5,7 +5,7 @@
  * DO NOT modify these tables manually - they are managed by Better Auth.
  */
 
-import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // Map to your existing 'users' table structure exactly

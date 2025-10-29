@@ -55,16 +55,6 @@ const SignUp = () => {
     const stepParam = urlParams.get('step');
     const oauthParam = urlParams.get('oauth');
     
-    if (stepParam) {
-      const stepNumber = parseInt(stepParam, 10);
-      // Handle legacy step 5 users by redirecting to step 3 (merged step)
-      if (stepNumber === 5) {
-        setStep(3);
-      } else if (stepNumber >= 1 && stepNumber <= 5) {
-        setStep(stepNumber);
-      }
-    }
-
     // If OAuth user, pre-fill data from session
     if (oauthParam && session?.user) {
       const fullName = session.user.name || "";
@@ -82,9 +72,8 @@ const SignUp = () => {
       }));
     }
     
-    // If user is already authenticated and no step specified, check their status
-    if (session?.user && !isPending && !stepParam) {
-      // Check onboarding status via API
+    // If user is authenticated, check their database state to determine correct step
+    if (session?.user && !isPending) {
       fetch('/api/onboarding/status', {
         method: 'GET',
         credentials: 'include'
@@ -93,18 +82,50 @@ const SignUp = () => {
         .then(data => {
           if (data.success && data.status) {
             if (data.status.canAccessDashboard) {
+              // User completed everything, go to dashboard
               navigate.push('/dashboard');
             } else {
-              // Redirect to appropriate step
-              if (data.status.nextRoute !== '/signup') {
-                navigate.push(data.status.nextRoute);
+              // Set step based on database state, not URL parameter
+              const correctStep = data.status.nextStep;
+              console.log(`User should be on step ${correctStep} based on database state`);
+              
+              // Handle legacy step 5 users by redirecting to step 3 (merged step)
+              if (correctStep === 7) {
+                setStep(5); // Payment step
+              } else if (correctStep >= 1 && correctStep <= 6) {
+                setStep(correctStep);
+              }
+              
+              // Pre-fill email if available
+              if (session.user.email) {
+                setFormData(prev => ({
+                  ...prev,
+                  email: session.user.email || "",
+                }));
               }
             }
           }
         })
         .catch(error => {
           console.error('Error checking onboarding status:', error);
+          // Fallback to URL parameter if API fails
+          if (stepParam) {
+            const stepNumber = parseInt(stepParam, 10);
+            if (stepNumber === 5) {
+              setStep(3);
+            } else if (stepNumber >= 1 && stepNumber <= 5) {
+              setStep(stepNumber);
+            }
+          }
         });
+    } else if (!session?.user && stepParam) {
+      // Not authenticated, use URL parameter
+      const stepNumber = parseInt(stepParam, 10);
+      if (stepNumber === 5) {
+        setStep(3);
+      } else if (stepNumber >= 1 && stepNumber <= 5) {
+        setStep(stepNumber);
+      }
     }
   }, [session, isPending, navigate]);
 
@@ -416,6 +437,16 @@ const SignUp = () => {
         return;
       }
 
+      // Update progress in database
+      await fetch('/api/onboarding/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          step: 'email-verified'
+        })
+      });
+
       setStep(3);
       toast.success("Email verified successfully! Please complete your profile.");
 
@@ -564,6 +595,18 @@ const SignUp = () => {
 
       // Phone is now verified, save profile and move to payment
       await saveCompleteProfile();
+      
+      // Update progress in database
+      await fetch('/api/onboarding/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          step: 'phone-verified',
+          data: { phone: formattedPhone }
+        })
+      });
+
       setStep(5);
       toast.success("Phone verified successfully! Please proceed to payment.");
 
@@ -624,6 +667,16 @@ const SignUp = () => {
           zip_code: formData.zipCode,
           country_code: formData.country,
         }),
+      });
+
+      // Update progress in database
+      await fetch('/api/onboarding/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          step: 'profile-completed'
+        })
       });
 
     } catch (err: unknown) {

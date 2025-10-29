@@ -43,26 +43,21 @@ if (!process.env.DATABASE_URL) {
   )
 }
 
-// Create PostgreSQL connection pool optimized for Supabase
+// Create PostgreSQL connection pool optimized for Supabase Transaction Mode
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }, // Always use SSL for Supabase
-  // Optimized settings for Supabase connection pooler
-  max: 5, // Reduced pool size for better connection management
-  min: 1, // Keep at least 1 connection alive
-  idleTimeoutMillis: 60000, // Keep connections alive longer
-  connectionTimeoutMillis: 15000, // Increased timeout for Supabase
-  acquireTimeoutMillis: 15000, // Time to wait for connection from pool
-  createTimeoutMillis: 15000, // Time to wait for new connection creation
-  destroyTimeoutMillis: 5000, // Time to wait for connection destruction
-  reapIntervalMillis: 1000, // How often to check for idle connections
-  createRetryIntervalMillis: 200, // Retry interval for failed connections
+  // Optimized settings for Supabase transaction mode (port 6543)
+  max: 20, // Higher limit for transaction mode
+  min: 0, // No idle connections for serverless
+  idleTimeoutMillis: 30000, // Short idle timeout for transaction mode
+  connectionTimeoutMillis: 10000, // Quick connection timeout
 })
 
-// Log pool errors
+// Log pool errors but don't exit process
 pool.on('error', (err) => {
   console.error('Unexpected error on idle PostgreSQL client', err)
-  process.exit(-1)
+  // Don't exit process, let the pool handle reconnection
 })
 
 // Create Drizzle instance with schema
