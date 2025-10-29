@@ -493,18 +493,19 @@ const SignUp = () => {
     try {
       setLoading(true);
 
-      const result = await authClient.sendVerificationEmail({
-        email: formData.email.trim()
+      const result = await authClient.emailOtp.sendVerificationOtp({
+        email: formData.email.trim(),
+        type: "email-verification"
       });
 
       if (result.error) {
-        toast.error("Failed to resend verification email");
+        toast.error("Failed to resend verification code");
         return;
       }
 
-      toast.success("Verification email sent! Please check your inbox.");
+      toast.success("New 6-digit verification code sent! Please check your inbox.");
     } catch (err) {
-      toast.error("Failed to resend verification email");
+      toast.error("Failed to resend verification code");
     } finally {
       setLoading(false);
     }
