@@ -23,7 +23,7 @@ import { emailService } from '../src/lib/email'
 
 export const auth = betterAuth({
   // Database adapter
-  database: drizzleAdapter(db, { 
+  database: drizzleAdapter(db, {
     provider: 'pg'
   }),
 
@@ -71,7 +71,7 @@ export const auth = betterAuth({
         console.log('   Email:', email)
         console.log('   OTP (6-digit):', otp)
         console.log('   Type:', type)
-        
+
         try {
           if (type === 'email-verification') {
             await emailService.sendVerificationEmail({
@@ -93,9 +93,9 @@ export const auth = betterAuth({
               url: `${process.env.BETTER_AUTH_URL}/sign-in?email=${email}&otp=${otp}`
             })
           }
-          
+
           console.log('✅ Better Auth: OTP email sent successfully!')
-          
+
         } catch (error) {
           console.error('❌ Better Auth: Failed to send OTP email:', error)
           throw error

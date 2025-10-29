@@ -15,6 +15,40 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  
+  // Field validation states
+  const [fieldValidation, setFieldValidation] = useState({
+    email: { isValid: false, touched: false },
+    password: { isValid: false, touched: false },
+  });
+
+  // Validation helper functions
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password: string): boolean => {
+    return password.length >= 8;
+  };
+
+  const updateFieldValidation = (field: string, value: string, isValid: boolean) => {
+    setFieldValidation(prev => ({
+      ...prev,
+      [field]: { isValid, touched: true }
+    }));
+  };
+
+  // Validation asterisk component (for future required fields)
+  const ValidationAsterisk = ({ isValid, touched }: { isValid: boolean; touched: boolean }) => {
+    let colorClass = 'text-gray-500'; // Default gray for untouched
+    
+    if (touched) {
+      colorClass = isValid ? 'text-green-500' : 'text-red-500';
+    }
+    
+    return <span className={colorClass}>*</span>;
+  };
 
   // Log page visit
   useEffect(() => {
@@ -122,8 +156,18 @@ const Login = () => {
               type="email"
               placeholder="you@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+              onChange={(e) => {
+                setEmail(e.target.value);
+                const isValid = validateEmail(e.target.value);
+                updateFieldValidation('email', e.target.value, isValid);
+              }}
+              className={`bg-gray-800/50 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${
+                fieldValidation.email.touched 
+                  ? fieldValidation.email.isValid 
+                    ? 'border-green-500 focus:border-green-500' 
+                    : 'border-red-500 focus:border-red-500'
+                  : 'border-gray-700 focus:border-blue-500'
+              }`}
               required
             />
           </div>
@@ -135,8 +179,18 @@ const Login = () => {
               type="password"
               placeholder="••••••••"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+              onChange={(e) => {
+                setPassword(e.target.value);
+                const isValid = validatePassword(e.target.value);
+                updateFieldValidation('password', e.target.value, isValid);
+              }}
+              className={`bg-gray-800/50 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${
+                fieldValidation.password.touched 
+                  ? fieldValidation.password.isValid 
+                    ? 'border-green-500 focus:border-green-500' 
+                    : 'border-red-500 focus:border-red-500'
+                  : 'border-gray-700 focus:border-blue-500'
+              }`}
               required
             />
           </div>

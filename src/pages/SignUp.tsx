@@ -45,6 +45,20 @@ const SignUp = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [dateValidation, setDateValidation] = useState<{ isValid: boolean; message: string } | null>(null);
   const [autoSubmitting, setAutoSubmitting] = useState(false);
+  
+  // Field validation states
+  const [fieldValidation, setFieldValidation] = useState({
+    email: { isValid: false, touched: false },
+    password: { isValid: false, touched: false },
+    confirmPassword: { isValid: false, touched: false },
+    firstName: { isValid: false, touched: false },
+    lastName: { isValid: false, touched: false },
+    dateOfBirth: { isValid: false, touched: false },
+    phoneNumber: { isValid: false, touched: false },
+    streetAddress: { isValid: false, touched: false },
+    city: { isValid: false, touched: false },
+    zipCode: { isValid: false, touched: false },
+  });
 
   // Log page visit and check for existing session
   useEffect(() => {
@@ -181,6 +195,78 @@ const SignUp = () => {
     return cleanPhone.length >= 10;
   };
 
+  // Validation helper functions
+  const validateEmail = (email: string): boolean => {
+    // Check if email is empty
+    if (!email || email.trim().length === 0) {
+      return false;
+    }
+    
+    const trimmedEmail = email.trim();
+    
+    // Check if email contains @ symbol
+    if (!trimmedEmail.includes('@')) {
+      return false;
+    }
+    
+    // Split email into local and domain parts
+    const parts = trimmedEmail.split('@');
+    if (parts.length !== 2) {
+      return false;
+    }
+    
+    const [localPart, domainPart] = parts;
+    
+    // Check if both parts exist
+    if (!localPart || !domainPart) {
+      return false;
+    }
+    
+    // Check for consecutive dots
+    if (localPart.includes('..') || domainPart.includes('..')) {
+      return false;
+    }
+    
+    // Domain must contain at least one dot (for TLD)
+    if (!domainPart.includes('.')) {
+      return false;
+    }
+    
+    // Basic email validation regex
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    return emailRegex.test(trimmedEmail);
+  };
+
+  const validatePassword = (password: string): boolean => {
+    return password.length >= 8;
+  };
+
+  const validateConfirmPassword = (password: string, confirmPassword: string): boolean => {
+    return password === confirmPassword && password.length >= 8;
+  };
+
+  const validateRequired = (value: string): boolean => {
+    return value.trim().length > 0;
+  };
+
+  const updateFieldValidation = (field: string, value: string, isValid: boolean) => {
+    setFieldValidation(prev => ({
+      ...prev,
+      [field]: { isValid, touched: true }
+    }));
+  };
+
+  // Validation asterisk component
+  const ValidationAsterisk = ({ isValid, touched }: { isValid: boolean; touched: boolean }) => {
+    let colorClass = 'text-gray-500'; // Default gray for untouched
+    
+    if (touched) {
+      colorClass = isValid ? 'text-green-500' : 'text-red-500';
+    }
+    
+    return <span className={colorClass}>*</span>;
+  };
+
   // US States data
   const usStates = [
     { value: "AL", label: "Alabama" },
@@ -237,6 +323,44 @@ const SignUp = () => {
 
   const handleInputChange = (field: string, value: string | boolean): void => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    
+    // Validate fields and update validation state
+    if (typeof value === 'string') {
+      let isValid = false;
+      
+      switch (field) {
+        case 'email':
+          isValid = validateEmail(value);
+          break;
+        case 'password':
+          isValid = validatePassword(value);
+          // Also revalidate confirm password if it exists
+          if (formData.confirmPassword) {
+            updateFieldValidation('confirmPassword', formData.confirmPassword, validateConfirmPassword(value, formData.confirmPassword));
+          }
+          break;
+        case 'confirmPassword':
+          isValid = validateConfirmPassword(formData.password, value);
+          break;
+        case 'firstName':
+        case 'lastName':
+        case 'streetAddress':
+        case 'city':
+        case 'zipCode':
+          isValid = validateRequired(value);
+          break;
+        case 'dateOfBirth':
+          isValid = value.length > 0 && validateAge(value).isValid;
+          break;
+        case 'phoneNumber':
+          isValid = validatePhoneNumber(value);
+          break;
+        default:
+          return;
+      }
+      
+      updateFieldValidation(field, value, isValid);
+    }
   };
 
   // Special handler for phone number input with formatting
@@ -344,6 +468,11 @@ const SignUp = () => {
 
     if (!formData.email.trim()) {
       toast.error("Please enter your email address");
+      return;
+    }
+
+    if (!validateEmail(formData.email)) {
+      toast.error("Please enter a valid email address with @ symbol (e.g., user@example.com)");
       return;
     }
     if (formData.password !== formData.confirmPassword) {
@@ -838,24 +967,48 @@ const SignUp = () => {
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-gray-200">Email Address *</Label>
+                <Label htmlFor="email" className="text-gray-200">
+                  Email Address <ValidationAsterisk isValid={fieldValidation.email.isValid} touched={fieldValidation.email.touched} />
+                </Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@example.com"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
-                  className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                  className={`bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${
+                    fieldValidation.email.touched 
+                      ? fieldValidation.email.isValid 
+                        ? 'border-green-500 focus:border-green-500' 
+                        : 'border-red-500 focus:border-red-500'
+                      : ''
+                  }`}
                   required
                 />
-                <p className="text-xs text-gray-400">
-                  We'll send you a verification code to confirm your email
-                </p>
+                {fieldValidation.email.touched && !fieldValidation.email.isValid && formData.email.length > 0 && (
+                  <p className="text-xs text-red-400 flex items-center gap-1">
+                    <span>⚠</span>
+                    Please enter a valid email address with @ symbol (e.g., user@example.com)
+                  </p>
+                )}
+                {fieldValidation.email.touched && fieldValidation.email.isValid && (
+                  <p className="text-xs text-green-400 flex items-center gap-1">
+                    <span>✓</span>
+                    Valid email address
+                  </p>
+                )}
+                {!fieldValidation.email.touched && (
+                  <p className="text-xs text-gray-400">
+                    We'll send you a verification code to confirm your email
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-gray-200">Password *</Label>
+                  <Label htmlFor="password" className="text-gray-200">
+                    Password <ValidationAsterisk isValid={fieldValidation.password.isValid} touched={fieldValidation.password.touched} />
+                  </Label>
                   <Input
                     id="password"
                     type="password"
@@ -868,7 +1021,9 @@ const SignUp = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-gray-200">Confirm Password *</Label>
+                  <Label htmlFor="confirmPassword" className="text-gray-200">
+                    Confirm Password <ValidationAsterisk isValid={fieldValidation.confirmPassword.isValid} touched={fieldValidation.confirmPassword.touched} />
+                  </Label>
                   <Input
                     id="confirmPassword"
                     type="password"
@@ -903,7 +1058,7 @@ const SignUp = () => {
             <div className="flex justify-center mt-6">
               <Button
                 onClick={handleStep1Submit}
-                disabled={loading || !formData.email || !formData.password || !formData.confirmPassword || !formData.agreeToTerms}
+                disabled={loading || !formData.email || !validateEmail(formData.email) || !formData.password || !formData.confirmPassword || !formData.agreeToTerms || !fieldValidation.email.isValid || !fieldValidation.password.isValid || !fieldValidation.confirmPassword.isValid}
                 className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 px-8 py-2 transition-all duration-200"
                 size="lg"
               >
@@ -979,7 +1134,7 @@ const SignUp = () => {
                 <div className="text-center">
                   <Button
                     type="button"
-                    variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
+                    variant="outline"
                     onClick={resendEmailVerification}
                     disabled={loading}
                     className="text-blue-400 hover:text-blue-300 border-gray-700 hover:border-blue-500"
@@ -992,9 +1147,9 @@ const SignUp = () => {
               <div className="flex justify-between mt-6">
                 <Button
                   type="button"
-                  variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
+                  variant="outline"
                   onClick={() => setStep(1)}
-                  className="px-8 py-2"
+                  className="px-8 py-2 border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                   disabled={loading || autoSubmitting}
                 >
                   <ChevronLeft className="mr-2 h-4 w-4" />
@@ -1003,7 +1158,7 @@ const SignUp = () => {
                 <Button
                   type="submit"
                   disabled={loading || autoSubmitting || !formData.emailOtpCode || formData.emailOtpCode.length !== 6}
-                  className="bg-primary hover:glow-blue-lg px-8 py-2"
+                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
                   size="lg"
                 >
                   {loading || autoSubmitting ? (
@@ -1049,7 +1204,9 @@ const SignUp = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName" className="text-gray-200">First Name *</Label>
+                    <Label htmlFor="firstName" className="text-gray-200">
+                      First Name <ValidationAsterisk isValid={fieldValidation.firstName.isValid} touched={fieldValidation.firstName.touched} />
+                    </Label>
                     <Input
                       id="firstName"
                       placeholder="John"
@@ -1072,7 +1229,9 @@ const SignUp = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="lastName" className="text-gray-200">Last Name *</Label>
+                    <Label htmlFor="lastName" className="text-gray-200">
+                      Last Name <ValidationAsterisk isValid={fieldValidation.lastName.isValid} touched={fieldValidation.lastName.touched} />
+                    </Label>
                     <Input
                       id="lastName"
                       placeholder="Doe"
@@ -1085,7 +1244,9 @@ const SignUp = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="dateOfBirth" className="text-gray-200">Date of Birth *</Label>
+                  <Label htmlFor="dateOfBirth" className="text-gray-200">
+                    Date of Birth <ValidationAsterisk isValid={fieldValidation.dateOfBirth.isValid} touched={fieldValidation.dateOfBirth.touched} />
+                  </Label>
                   <Input
                     id="dateOfBirth"
                     type="date"
@@ -1108,7 +1269,9 @@ const SignUp = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phoneNumber" className="text-gray-200">Phone Number *</Label>
+                  <Label htmlFor="phoneNumber" className="text-gray-200">
+                    Phone Number <ValidationAsterisk isValid={fieldValidation.phoneNumber.isValid} touched={fieldValidation.phoneNumber.touched} />
+                  </Label>
                   <div className="flex gap-2">
                     <Select
                       value={formData.phoneCountryCode}
@@ -1157,7 +1320,9 @@ const SignUp = () => {
                 <h3 className="font-semibold text-white">Address Information</h3>
 
                 <div className="space-y-2">
-                  <Label htmlFor="streetAddress" className="text-gray-200">Street Address *</Label>
+                  <Label htmlFor="streetAddress" className="text-gray-200">
+                    Street Address <ValidationAsterisk isValid={fieldValidation.streetAddress.isValid} touched={fieldValidation.streetAddress.touched} />
+                  </Label>
                   <Input
                     id="streetAddress"
                     placeholder="123 Main St"
@@ -1181,7 +1346,9 @@ const SignUp = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="city" className="text-gray-200">City *</Label>
+                    <Label htmlFor="city" className="text-gray-200">
+                      City <ValidationAsterisk isValid={fieldValidation.city.isValid} touched={fieldValidation.city.touched} />
+                    </Label>
                     <Input
                       id="city"
                       placeholder="New York"
@@ -1193,7 +1360,7 @@ const SignUp = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="state" className="text-gray-200">State *</Label>
+                    <Label htmlFor="state" className="text-gray-200">State <span className="text-gray-500">*</span></Label>
                     <Select
                       value={formData.state}
                       onValueChange={(value) => handleInputChange("state", value)}
@@ -1212,7 +1379,9 @@ const SignUp = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="zipCode" className="text-gray-200">ZIP Code *</Label>
+                    <Label htmlFor="zipCode" className="text-gray-200">
+                      ZIP Code <ValidationAsterisk isValid={fieldValidation.zipCode.isValid} touched={fieldValidation.zipCode.touched} />
+                    </Label>
                     <Input
                       id="zipCode"
                       placeholder="10001"
@@ -1228,9 +1397,9 @@ const SignUp = () => {
 
             <div className="flex justify-between mt-6">
               <Button
-                variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
+                variant="outline"
                 onClick={() => setStep(2)}
-                className="px-8 py-2"
+                className="px-8 py-2 border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                 disabled={loading}
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
@@ -1239,7 +1408,7 @@ const SignUp = () => {
               <Button
                 onClick={handleStep3Submit}
                 disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
-                className="bg-primary hover:glow-blue-lg px-8 py-2"
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
                 size="lg"
               >
                 {loading ? (
@@ -1314,10 +1483,10 @@ const SignUp = () => {
                 <div className="text-center">
                   <Button
                     type="button"
-                    variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
+                    variant="outline"
                     onClick={sendPhoneOtp}
                     disabled={loading}
-                    className="text-accent"
+                    className="text-blue-400 hover:text-blue-300 border-gray-700 hover:border-blue-500"
                   >
                     Resend Code
                   </Button>
@@ -1327,9 +1496,9 @@ const SignUp = () => {
               <div className="flex justify-between mt-6">
                 <Button
                   type="button"
-                  variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
+                  variant="outline"
                   onClick={() => setStep(3)}
-                  className="px-8 py-2"
+                  className="px-8 py-2 border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                   disabled={loading || autoSubmitting}
                 >
                   <ChevronLeft className="mr-2 h-4 w-4" />
@@ -1338,7 +1507,7 @@ const SignUp = () => {
                 <Button
                   type="submit"
                   disabled={loading || autoSubmitting || !formData.phoneOtpCode || formData.phoneOtpCode.length !== 6}
-                  className="bg-primary hover:glow-blue-lg px-8 py-2"
+                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
                   size="lg"
                 >
                   {loading || autoSubmitting ? (
@@ -1407,9 +1576,9 @@ const SignUp = () => {
               <div className="flex gap-3">
                 <Button
                   type="button"
-                  variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
+                  variant="outline"
                   onClick={() => setStep(4)}
-                  className="w-full"
+                  className="w-full border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                   disabled={loading}
                 >
                   <ChevronLeft className="mr-2 h-4 w-4" />
