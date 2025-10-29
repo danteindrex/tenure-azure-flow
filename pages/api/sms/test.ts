@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { action, phoneNumber, message, code } = req.body
 
     switch (action) {
-      case 'test':
+      case 'test': {
         // Send test SMS to predefined number
         console.log('Testing SMS with predefined test number...')
         const testResult = await testSMS()
@@ -29,8 +29,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             : 'Failed to send test SMS',
           data: testResult
         })
+      }
 
-      case 'send':
+      case 'send': {
         // Send custom SMS
         if (!phoneNumber || !message) {
           return res.status(400).json({ error: 'Phone number and message are required' })
@@ -46,8 +47,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             : 'Failed to send SMS',
           data: sendResult
         })
+      }
 
-      case 'verify':
+      case 'verify': {
         // Send verification code
         if (!phoneNumber) {
           return res.status(400).json({ error: 'Phone number is required' })
@@ -63,6 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             : 'Failed to send verification code',
           data: verifyResult
         })
+      }
 
       default:
         return res.status(400).json({ error: 'Invalid action. Use: test, send, or verify' })

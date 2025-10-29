@@ -10,10 +10,12 @@ import { toast } from "sonner";
 import { useSession } from "@/lib/auth-client";
 import { logPageVisit, logError } from "@/lib/audit";
 import { COUNTRY_DIAL_CODES } from "@/lib/countryDialCodes";
+// OnboardingService removed - using API calls instead
 
 const CompleteProfile = () => {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
+  const [onboardingStatus, setOnboardingStatus] = useState(null);
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const user = session?.user;
@@ -56,27 +58,58 @@ const CompleteProfile = () => {
     agreeToTerms: false,
   });
 
-  // Log page visit and pre-fill from Better Auth data
+  // Log page visit, check onboarding status, and pre-fill from Better Auth data
   useEffect(() => {
-    logPageVisit('/signup/complete-profile');
+    const initializePage = async () => {
+      logPageVisit('/signup/complete-profile');
 
-    if (user) {
-      // Parse user name data
-      const fullName = user.name || "";
-      const nameParts = fullName.split(" ");
-      const firstName = nameParts[0] || "";
-      const lastName = nameParts[nameParts.length - 1] || "";
-      const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(" ") : "";
+      if (user) {
+        try {
+          // Get user's onboarding status via API
+          const response = await fetch('/api/onboarding/status');
+          const data = await response.json();
+          if (data.success) {
+            setOnboardingStatus(data.status);
+          }
 
-      setFormData(prev => ({
-        ...prev,
-        firstName,
-        lastName,
-        middleName,
-        email: user.email || "",
-      }));
-    }
-  }, [user]);
+          // Determine which step to start at based on their progress
+          if (status.hasProfile && !status.hasActiveSubscription) {
+            // Profile exists but no payment - go to payment step
+            setStep(2);
+          } else if (!status.hasProfile) {
+            // No profile - start at step 1
+            setStep(1);
+          } else if (status.hasActiveSubscription) {
+            // Everything complete - redirect to dashboard
+            router.replace('/dashboard');
+            return;
+          }
+
+          // Parse user name data
+          const fullName = user.name || "";
+          const nameParts = fullName.split(" ");
+          const firstName = nameParts[0] || "";
+          const lastName = nameParts[nameParts.length - 1] || "";
+          const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(" ") : "";
+
+          setFormData(prev => ({
+            ...prev,
+            firstName,
+            lastName,
+            middleName,
+            email: user.email || "",
+          }));
+
+        } catch (error) {
+          console.error('Error checking onboarding status:', error);
+          // Default to step 1 if there's an error
+          setStep(1);
+        }
+      }
+    };
+
+    initializePage();
+  }, [user, router]);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));

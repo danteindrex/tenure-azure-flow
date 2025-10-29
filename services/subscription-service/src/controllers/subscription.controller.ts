@@ -3,6 +3,13 @@ import { StripeService } from '../services/stripe.service';
 import { logger } from '../config/logger';
 import { z } from 'zod';
 
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+  };
+}
+
 const CreateCheckoutSchema = z.object({
   userId: z.string().uuid(),
   successUrl: z.string().url().optional(),
@@ -14,7 +21,7 @@ export class SubscriptionController {
    * POST /api/subscriptions/checkout
    * Create a Stripe Checkout session
    */
-  static async createCheckoutSession(req: Request, res: Response): Promise<void> {
+  static async createCheckoutSession(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const validation = CreateCheckoutSchema.safeParse(req.body);
 
@@ -45,9 +52,18 @@ export class SubscriptionController {
    * GET /api/subscriptions/:userId
    * Get subscription details for a user
    */
-  static async getSubscription(req: Request, res: Response): Promise<void> {
+  static async getSubscription(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const userId = req.params.userId;
+      
+      // Ensure user can only access their own subscription
+      if (req.user?.id !== userId) {
+        res.status(403).json({
+          error: 'Access denied',
+          message: 'You can only access your own subscription'
+        });
+        return;
+      }
 
       if (!userId) {
         res.status(400).json({ error: 'Invalid user ID' });
@@ -78,7 +94,7 @@ export class SubscriptionController {
    * POST /api/subscriptions/:memberId/cancel
    * Cancel a subscription
    */
-  static async cancelSubscription(req: Request, res: Response): Promise<void> {
+  static async cancelSubscription(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const memberId = parseInt(req.params.memberId);
       const { immediately = false } = req.body;
@@ -109,7 +125,7 @@ export class SubscriptionController {
    * POST /api/subscriptions/:memberId/reactivate
    * Reactivate a canceled subscription
    */
-  static async reactivateSubscription(req: Request, res: Response): Promise<void> {
+  static async reactivateSubscription(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const memberId = parseInt(req.params.memberId);
 
@@ -137,7 +153,7 @@ export class SubscriptionController {
    * GET /api/subscriptions/:memberId/payments
    * Get payment history for a member
    */
-  static async getPaymentHistory(req: Request, res: Response): Promise<void> {
+  static async getPaymentHistory(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const memberId = parseInt(req.params.memberId);
 

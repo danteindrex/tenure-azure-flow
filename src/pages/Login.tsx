@@ -48,7 +48,7 @@ const Login = () => {
       await logLogin(email.trim(), true, data?.user?.id);
       
       toast.success("Logged in successfully");
-      router.replace("/dashboard");
+      router.replace("/auth/callback");
     } catch (err: any) {
       toast.error(err?.message ?? "Invalid email or password");
     } finally {

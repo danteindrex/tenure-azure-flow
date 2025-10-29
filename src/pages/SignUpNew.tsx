@@ -51,9 +51,9 @@ const SignUpNew = () => {
   useEffect(() => {
     logPageVisit('/signup');
     
-    // If user is already authenticated, redirect to dashboard
+    // If user is already authenticated, redirect to auth callback to check status
     if (session?.user && !isPending) {
-      navigate.push('/dashboard');
+      navigate.push('/auth/callback');
     }
   }, [session, isPending, navigate]);
 

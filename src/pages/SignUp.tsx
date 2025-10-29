@@ -17,7 +17,7 @@ import baseLogger from "@/lib/baseLogger";
 const SignUp = () => {
   const navigate = useRouter();
   const { data: session, isPending } = useSession();
-  const [step, setStep] = useState(1); // 1: Email+Password, 2: Email Verification, 3: Personal Info, 4: Phone Verification, 5: Advanced Security, 6: Payment
+  const [step, setStep] = useState(1); // 1: Email+Password, 2: Email Verification, 3: Personal Info + Address, 4: Phone Verification, 5: Payment
   const [formData, setFormData] = useState({
     // Step 1: Email + Password
     email: "",
@@ -40,9 +40,6 @@ const SignUp = () => {
     state: "",
     zipCode: "",
     country: "UG", // Default to Uganda
-    // Step 4: Advanced Security
-    enablePasskey: false,
-    enable2FA: false,
   });
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -53,9 +50,61 @@ const SignUp = () => {
   useEffect(() => {
     logPageVisit('/signup');
     
-    // If user is already authenticated, redirect to dashboard
-    if (session?.user && !isPending) {
-      navigate.push('/dashboard');
+    // Check URL parameters for step and OAuth info
+    const urlParams = new URLSearchParams(window.location.search);
+    const stepParam = urlParams.get('step');
+    const oauthParam = urlParams.get('oauth');
+    
+    if (stepParam) {
+      const stepNumber = parseInt(stepParam, 10);
+      // Handle legacy step 5 users by redirecting to step 3 (merged step)
+      if (stepNumber === 5) {
+        setStep(3);
+      } else if (stepNumber >= 1 && stepNumber <= 5) {
+        setStep(stepNumber);
+      }
+    }
+
+    // If OAuth user, pre-fill data from session
+    if (oauthParam && session?.user) {
+      const fullName = session.user.name || "";
+      const nameParts = fullName.split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts[nameParts.length - 1] || "";
+      const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(" ") : "";
+
+      setFormData(prev => ({
+        ...prev,
+        email: session.user.email || "",
+        firstName,
+        lastName,
+        middleName,
+      }));
+    }
+    
+    // If user is already authenticated and no step specified, check their status
+    if (session?.user && !isPending && !stepParam) {
+      // Check onboarding status via API
+      fetch('/api/onboarding/status', {
+        method: 'GET',
+        credentials: 'include'
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.status) {
+            if (data.status.canAccessDashboard) {
+              navigate.push('/dashboard');
+            } else {
+              // Redirect to appropriate step
+              if (data.status.nextRoute !== '/signup') {
+                navigate.push(data.status.nextRoute);
+              }
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Error checking onboarding status:', error);
+        });
     }
   }, [session, isPending, navigate]);
 
@@ -294,8 +343,8 @@ const SignUp = () => {
       baseLogger("authentication","WillCreateAccount");
 
 
-      let currentProviededEmail = formData.email;
-      let currentProvidedPassword = formData.password
+      const currentProviededEmail = formData.email;
+      const currentProvidedPassword = formData.password
 
       // Create user with Better Auth
       const result = await signUp.email({
@@ -401,7 +450,7 @@ const SignUp = () => {
     }
   };
 
-  // Step 3: Collect personal info and phone number
+  // Step 3: Collect personal info, address, and phone number
   const handleStep3Submit = async (): Promise<void> => {
     if (!formData.firstName || !formData.lastName) {
       toast.error("Please enter your first and last name");
@@ -415,6 +464,11 @@ const SignUp = () => {
 
     if (dateValidation && !dateValidation.isValid) {
       toast.error(dateValidation.message);
+      return;
+    }
+
+    if (!formData.streetAddress || !formData.city || !formData.zipCode) {
+      toast.error("Please complete your address information");
       return;
     }
 
@@ -508,9 +562,10 @@ const SignUp = () => {
         return;
       }
 
-      // Phone is now verified, move to address info
+      // Phone is now verified, save profile and move to payment
+      await saveCompleteProfile();
       setStep(5);
-      toast.success("Phone verified successfully! Please complete your address information.");
+      toast.success("Phone verified successfully! Please proceed to payment.");
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "OTP verification failed";
@@ -521,16 +576,9 @@ const SignUp = () => {
     }
   };
 
-  // Step 5: Complete address information
-  const handleStep5Submit = async (): Promise<void> => {
-    if (!formData.streetAddress || !formData.city || !formData.zipCode) {
-      toast.error("Please complete your address information");
-      return;
-    }
-
+  // Save complete profile after phone verification
+  const saveCompleteProfile = async (): Promise<void> => {
     try {
-      setLoading(true);
-
       // Update user profile with Better Auth
       const fullName = `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim();
       
@@ -578,71 +626,14 @@ const SignUp = () => {
         }),
       });
 
-      // Move to advanced security step
-      setStep(6);
-      toast.success("Profile completed! Let's set up advanced security features.");
-
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Unexpected error during profile completion";
       await logError(`Profile completion error: ${errorMessage}`, userId || undefined);
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
+      throw new Error(errorMessage);
     }
   };
 
-  // Step 6: Advanced Security Setup
-  const handleStep6Submit = async (): Promise<void> => {
-    try {
-      setLoading(true);
-
-      // Set up passkey if enabled
-      if (formData.enablePasskey) {
-        try {
-          const passkeyResult = await authClient.passkey.register({
-            name: `${formData.firstName}'s Device`
-          });
-
-          if (passkeyResult.error) {
-            toast.error("Failed to set up passkey, but continuing with signup");
-          } else {
-            toast.success("Passkey registered successfully!");
-          }
-        } catch (err) {
-          console.error("Passkey registration error:", err);
-          toast.error("Failed to set up passkey, but continuing with signup");
-        }
-      }
-
-      // Set up 2FA if enabled
-      if (formData.enable2FA) {
-        try {
-          const twoFactorResult = await authClient.twoFactor.enable();
-
-          if (twoFactorResult.error) {
-            toast.error("Failed to set up 2FA, but continuing with signup");
-          } else {
-            toast.success("Two-factor authentication enabled!");
-          }
-        } catch (err) {
-          console.error("2FA setup error:", err);
-          toast.error("Failed to set up 2FA, but continuing with signup");
-        }
-      }
-
-      // Move to payment step
-      setStep(7);
-      toast.success("Security features configured! Please proceed to payment.");
-
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unexpected error during security setup";
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Step 7: Payment
+  // Step 5: Payment
   const handlePayment = async (): Promise<void> => {
     try {
       setLoading(true);
@@ -693,7 +684,7 @@ const SignUp = () => {
       // Use Better Auth for Google OAuth
       const result = await signIn.social({
         provider: 'google',
-        callbackURL: `${window.location.origin}/signup/complete-profile`
+        callbackURL: `${window.location.origin}/signup?step=3&oauth=google`
       });
 
       if (result.error) {
@@ -738,7 +729,7 @@ const SignUp = () => {
 
         {/* Progress Indicator */}
         <div className="flex items-center justify-center gap-1 mb-8">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
+          {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${step >= i
@@ -748,7 +739,7 @@ const SignUp = () => {
               >
                 {step > i ? <Check className="w-4 h-4" /> : i}
               </div>
-              {i < 6 && (
+              {i < 5 && (
                 <div
                   className={`w-6 h-1 mx-1 transition-all duration-300 ${step > i ? "bg-accent" : "bg-border"
                     }`}
@@ -954,118 +945,207 @@ const SignUp = () => {
           </>
         )}
 
-        {/* Step 3: Personal Information */}
+        {/* Step 3: Personal Information & Address */}
         {step === 3 && (
           <>
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold mb-2">Personal Information</h1>
-              <p className="text-muted-foreground">Tell us about yourself</p>
+              <h1 className="text-2xl font-bold mb-2">Complete Your Profile</h1>
+              <p className="text-muted-foreground">
+                {new URLSearchParams(window.location.search).get('oauth') 
+                  ? "Complete your profile to continue" 
+                  : "Tell us about yourself and your address"
+                }
+              </p>
+              {new URLSearchParams(window.location.search).get('oauth') && (
+                <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                  <Check className="w-4 h-4" />
+                  Email verified via {new URLSearchParams(window.location.search).get('oauth')}
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Personal Information Section */}
+              <div className="space-y-4 p-4 bg-background/30 rounded-lg border">
+                <h3 className="font-semibold text-foreground">Personal Information</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name *</Label>
+                    <Input
+                      id="firstName"
+                      placeholder="John"
+                      value={formData.firstName}
+                      onChange={(e) => handleInputChange("firstName", e.target.value)}
+                      className="bg-background/50 border-border focus:border-accent transition-colors"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="middleName">Middle Name</Label>
+                    <Input
+                      id="middleName"
+                      placeholder="Michael"
+                      value={formData.middleName}
+                      onChange={(e) => handleInputChange("middleName", e.target.value)}
+                      className="bg-background/50 border-border focus:border-accent transition-colors"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name *</Label>
+                    <Input
+                      id="lastName"
+                      placeholder="Doe"
+                      value={formData.lastName}
+                      onChange={(e) => handleInputChange("lastName", e.target.value)}
+                      className="bg-background/50 border-border focus:border-accent transition-colors"
+                      required
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name *</Label>
+                  <Label htmlFor="dateOfBirth">Date of Birth *</Label>
                   <Input
-                    id="firstName"
-                    placeholder="John"
-                    value={formData.firstName}
-                    onChange={(e) => handleInputChange("firstName", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
+                    id="dateOfBirth"
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) => handleDateOfBirthChange(e.target.value)}
+                    className={`bg-background/50 border-border focus:border-accent transition-colors ${
+                      dateValidation && !dateValidation.isValid
+                        ? 'border-red-500 focus:border-red-500'
+                        : dateValidation && dateValidation.isValid
+                          ? 'border-green-500 focus:border-green-500'
+                          : ''
+                    }`}
                     required
+                    max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
                   />
+                  {dateValidation && (
+                    <p className={`text-xs ${dateValidation.isValid ? 'text-green-600' : 'text-red-600'}`}>
+                      {dateValidation.message || 'Age verified: You are eligible to join'}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="middleName">Middle Name</Label>
-                  <Input
-                    id="middleName"
-                    placeholder="Michael"
-                    value={formData.middleName}
-                    onChange={(e) => handleInputChange("middleName", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name *</Label>
-                  <Input
-                    id="lastName"
-                    placeholder="Doe"
-                    value={formData.lastName}
-                    onChange={(e) => handleInputChange("lastName", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dateOfBirth">Date of Birth *</Label>
-                <Input
-                  id="dateOfBirth"
-                  type="date"
-                  value={formData.dateOfBirth}
-                  onChange={(e) => handleDateOfBirthChange(e.target.value)}
-                  className={`bg-background/50 border-border focus:border-accent transition-colors ${
-                    dateValidation && !dateValidation.isValid
-                      ? 'border-red-500 focus:border-red-500'
-                      : dateValidation && dateValidation.isValid
-                        ? 'border-green-500 focus:border-green-500'
-                        : ''
-                  }`}
-                  required
-                  max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
-                />
-                {dateValidation && (
-                  <p className={`text-xs ${dateValidation.isValid ? 'text-green-600' : 'text-red-600'}`}>
-                    {dateValidation.message || 'Age verified: You are eligible to join'}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Phone Number *</Label>
-                <div className="flex gap-2">
-                  <Select
-                    value={formData.phoneCountryCode}
-                    onValueChange={(value) => {
-                      handleInputChange("phoneCountryCode", value);
-                      if (formData.phoneNumber) {
-                        const cleanPhone = getCleanPhoneNumber(formData.phoneNumber);
-                        if (value === '+256') {
-                          setFormData(prev => ({ ...prev, phoneNumber: cleanPhone }));
-                        } else {
-                          setFormData(prev => ({ ...prev, phoneNumber: cleanPhone }));
+                  <Label htmlFor="phoneNumber">Phone Number *</Label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={formData.phoneCountryCode}
+                      onValueChange={(value) => {
+                        handleInputChange("phoneCountryCode", value);
+                        if (formData.phoneNumber) {
+                          const cleanPhone = getCleanPhoneNumber(formData.phoneNumber);
+                          if (value === '+256') {
+                            setFormData(prev => ({ ...prev, phoneNumber: cleanPhone }));
+                          } else {
+                            setFormData(prev => ({ ...prev, phoneNumber: cleanPhone }));
+                          }
                         }
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-24 bg-background/50 border-border focus:border-accent">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COUNTRY_DIAL_CODES.map((dialCode) => (
-                        <SelectItem key={dialCode} value={dialCode}>
-                          {dialCode}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      }}
+                    >
+                      <SelectTrigger className="w-24 bg-background/50 border-border focus:border-accent">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COUNTRY_DIAL_CODES.map((dialCode) => (
+                          <SelectItem key={dialCode} value={dialCode}>
+                            {dialCode}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      id="phoneNumber"
+                      type="tel"
+                      placeholder={formData.phoneCountryCode === '+256' ? '745315809' : 'Enter phone number'}
+                      value={formData.phoneNumber}
+                      onChange={(e) => handlePhoneInputChange(e.target.value)}
+                      className="flex-1 bg-background/50 border-border focus:border-accent transition-colors"
+                      maxLength={20}
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    We'll send you a verification code to confirm your number
+                  </p>
+                </div>
+              </div>
+
+              {/* Address Information Section */}
+              <div className="space-y-4 p-4 bg-background/30 rounded-lg border">
+                <h3 className="font-semibold text-foreground">Address Information</h3>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="streetAddress">Street Address *</Label>
                   <Input
-                    id="phoneNumber"
-                    type="tel"
-                    placeholder={formData.phoneCountryCode === '+256' ? '745315809' : 'Enter phone number'}
-                    value={formData.phoneNumber}
-                    onChange={(e) => handlePhoneInputChange(e.target.value)}
-                    className="flex-1 bg-background/50 border-border focus:border-accent transition-colors"
-                    maxLength={20}
+                    id="streetAddress"
+                    placeholder="123 Main St"
+                    value={formData.streetAddress}
+                    onChange={(e) => handleInputChange("streetAddress", e.target.value)}
+                    className="bg-background/50 border-border focus:border-accent transition-colors"
                     required
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  We'll send you a verification code to confirm your number
-                </p>
+
+                <div className="space-y-2">
+                  <Label htmlFor="addressLine2">Address Line 2 (Optional)</Label>
+                  <Input
+                    id="addressLine2"
+                    placeholder="Apt, Suite, Unit, etc."
+                    value={formData.addressLine2}
+                    onChange={(e) => handleInputChange("addressLine2", e.target.value)}
+                    className="bg-background/50 border-border focus:border-accent transition-colors"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City *</Label>
+                    <Input
+                      id="city"
+                      placeholder="New York"
+                      value={formData.city}
+                      onChange={(e) => handleInputChange("city", e.target.value)}
+                      className="bg-background/50 border-border focus:border-accent transition-colors"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="state">State *</Label>
+                    <Select
+                      value={formData.state}
+                      onValueChange={(value) => handleInputChange("state", value)}
+                    >
+                      <SelectTrigger className="bg-background/50 border-border focus:border-accent">
+                        <SelectValue placeholder="Select state" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {usStates.map((state) => (
+                          <SelectItem key={state.value} value={state.value}>
+                            {state.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="zipCode">ZIP Code *</Label>
+                    <Input
+                      id="zipCode"
+                      placeholder="10001"
+                      value={formData.zipCode}
+                      onChange={(e) => handleInputChange("zipCode", e.target.value)}
+                      className="bg-background/50 border-border focus:border-accent transition-colors"
+                      required
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1081,7 +1161,7 @@ const SignUp = () => {
               </Button>
               <Button
                 onClick={handleStep3Submit}
-                disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber)}
+                disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
                 className="bg-primary hover:glow-blue-lg px-8 py-2"
                 size="lg"
               >
@@ -1202,193 +1282,8 @@ const SignUp = () => {
           </>
         )}
 
-        {/* Step 5: Personal Information */}
+        {/* Step 5: Payment */}
         {step === 5 && (
-          <>
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold mb-2">Complete Your Profile</h1>
-              <p className="text-muted-foreground">Tell us about yourself</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name *</Label>
-                  <Input
-                    id="firstName"
-                    placeholder="John"
-                    value={formData.firstName}
-                    onChange={(e) => handleInputChange("firstName", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="middleName">Middle Name</Label>
-                  <Input
-                    id="middleName"
-                    placeholder="Michael"
-                    value={formData.middleName}
-                    onChange={(e) => handleInputChange("middleName", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name *</Label>
-                  <Input
-                    id="lastName"
-                    placeholder="Doe"
-                    value={formData.lastName}
-                    onChange={(e) => handleInputChange("lastName", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dateOfBirth">Date of Birth *</Label>
-                <Input
-                  id="dateOfBirth"
-                  type="date"
-                  value={formData.dateOfBirth}
-                  onChange={(e) => handleDateOfBirthChange(e.target.value)}
-                  className={`bg-background/50 border-border focus:border-accent transition-colors ${
-                    dateValidation && !dateValidation.isValid
-                      ? 'border-red-500 focus:border-red-500'
-                      : dateValidation && dateValidation.isValid
-                        ? 'border-green-500 focus:border-green-500'
-                        : ''
-                  }`}
-                  required
-                  max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
-                />
-                {dateValidation && !dateValidation.isValid ? (
-                  <p className="text-xs text-red-500 flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {dateValidation.message}
-                  </p>
-                ) : dateValidation && dateValidation.isValid ? (
-                  <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    Age verified - you are eligible to create an account
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    You must be at least 18 years old to create an account
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="streetAddress">Street Address *</Label>
-                <Input
-                  id="streetAddress"
-                  placeholder="123 Main St"
-                  value={formData.streetAddress}
-                  onChange={(e) => handleInputChange("streetAddress", e.target.value)}
-                  className="bg-background/50 border-border focus:border-accent transition-colors"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="addressLine2">Address Line 2 (Optional)</Label>
-                <Input
-                  id="addressLine2"
-                  placeholder="Apt, Suite, Unit, etc."
-                  value={formData.addressLine2}
-                  onChange={(e) => handleInputChange("addressLine2", e.target.value)}
-                  className="bg-background/50 border-border focus:border-accent transition-colors"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="city">City *</Label>
-                  <Input
-                    id="city"
-                    placeholder="New York"
-                    value={formData.city}
-                    onChange={(e) => handleInputChange("city", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="state">State *</Label>
-                  <Select
-                    value={formData.state}
-                    onValueChange={(value) => handleInputChange("state", value)}
-                  >
-                    <SelectTrigger className="bg-background/50 border-border focus:border-accent">
-                      <SelectValue placeholder="Select state" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {usStates.map((state) => (
-                        <SelectItem key={state.value} value={state.value}>
-                          {state.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="zipCode">ZIP Code *</Label>
-                  <Input
-                    id="zipCode"
-                    placeholder="10001"
-                    value={formData.zipCode}
-                    onChange={(e) => handleInputChange("zipCode", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-between mt-6">
-              <Button
-                variant="outline"
-                onClick={() => setStep(4)}
-                className="px-8 py-2"
-                disabled={loading}
-              >
-                <ChevronLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <Button
-                onClick={handleStep5Submit}
-                disabled={loading || !formData.firstName || !formData.lastName || !formData.streetAddress || !formData.city || !formData.state || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
-                className="bg-primary hover:glow-blue-lg px-8 py-2"
-                size="lg"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving Profile...
-                  </>
-                ) : (
-                  <>
-                    Complete Profile
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
-            </div>
-          </>
-        )}
-
-        {/* Step 6: Payment */}
-        {step === 6 && (
           <>
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold mb-2">Complete Your Membership</h1>
@@ -1437,7 +1332,7 @@ const SignUp = () => {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setStep(5)}
+                  onClick={() => setStep(4)}
                   className="w-full"
                   disabled={loading}
                 >

@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { auth } from '@/lib/auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -7,15 +7,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const supabase = createServerSupabaseClient({ req, res });
+    // Get current user session
+    const session = await auth.api.getSession({ headers: req.headers });
 
-    // Get the current user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
+    if (!session?.user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -25,22 +20,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'SQL query is required' });
     }
 
-    // Execute SQL using the exec_sql function
-    const { data, error: execError } = await supabase.rpc('exec_sql', {
-      sql_query: sql
-    });
-
-    if (execError) {
-      console.error('SQL execution error:', execError);
-      return res.status(500).json({ 
-        success: false, 
-        error: execError.message 
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      result: data
+    // TODO: Implement SQL execution with proper security checks
+    // For now, disable this endpoint for security reasons
+    return res.status(501).json({ 
+      success: false, 
+      error: 'SQL execution endpoint is disabled for security reasons' 
     });
 
   } catch (error) {

@@ -28,9 +28,9 @@ const LoginNew = () => {
   useEffect(() => {
     logPageVisit('/login');
     
-    // If user is already authenticated, redirect to dashboard
+    // If user is already authenticated, redirect to auth callback to check status
     if (session?.user && !isPending) {
-      router.push('/dashboard');
+      router.push('/auth/callback');
     }
   }, [session, isPending, router]);
 
@@ -101,9 +101,8 @@ const LoginNew = () => {
       await logLogin(email, true, result.data?.user?.id);
       toast.success("Welcome back!");
       
-      // Redirect to dashboard or intended page
-      const redirectTo = router.query.redirect as string || '/dashboard';
-      router.push(redirectTo);
+      // Redirect to auth callback to check onboarding status
+      router.push('/auth/callback');
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Unexpected error during login";
@@ -138,8 +137,8 @@ const LoginNew = () => {
       await logLogin(formData.email, true, result.data?.user?.id);
       toast.success("Welcome back!");
       
-      const redirectTo = router.query.redirect as string || '/dashboard';
-      router.push(redirectTo);
+      // Redirect to auth callback to check onboarding status
+      router.push('/auth/callback');
 
     } catch (err) {
       toast.error("Two-factor authentication failed");
@@ -164,8 +163,8 @@ const LoginNew = () => {
       await logLogin("passkey", true, result.data?.user?.id);
       toast.success("Welcome back!");
       
-      const redirectTo = router.query.redirect as string || '/dashboard';
-      router.push(redirectTo);
+      // Redirect to auth callback to check onboarding status
+      router.push('/auth/callback');
 
     } catch (err) {
       console.error("Passkey error:", err);
@@ -184,7 +183,7 @@ const LoginNew = () => {
 
       const result = await authClient.signIn.social({
         provider: 'google',
-        callbackURL: `${window.location.origin}/dashboard`
+        callbackURL: `${window.location.origin}/auth/callback`
       });
 
       if (result.error) {
