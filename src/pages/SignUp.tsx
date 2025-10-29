@@ -626,22 +626,7 @@ const SignUp = () => {
       const fullName = `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim();
       
       const result = await updateUser({
-        name: fullName,
-        // Store additional profile data in user metadata
-        metadata: {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          middleName: formData.middleName,
-          dateOfBirth: formData.dateOfBirth,
-          phone: formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode),
-          streetAddress: formData.streetAddress,
-          addressLine2: formData.addressLine2,
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.zipCode,
-          country: formData.country,
-          profileCompleted: true
-        }
+        name: fullName
       });
 
       if (result.error) {

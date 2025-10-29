@@ -16,17 +16,10 @@ const Security = () => {
     try {
       setLoading(true);
       
-      const result = await authClient.forgetPassword({
-        email: session?.user?.email || "",
-        redirectTo: `${window.location.origin}/reset-password`
-      });
-
-      if (result.error) {
-        toast.error("Failed to send password reset email");
-        return;
-      }
-
-      toast.success("Password reset email sent! Check your inbox.");
+      // TODO: Implement password reset with Better Auth
+      // Based on Better Auth transcript: authClient.forgetPassword(email)
+      // const result = await authClient.forgetPassword(session?.user?.email || "");
+      toast.info("Password reset functionality will be implemented soon");
     } catch (error) {
       toast.error("Failed to send password reset email");
     } finally {

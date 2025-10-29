@@ -40,31 +40,18 @@ const Transactions = () => {
   const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
-    let subscription: any = null;
+    // Subscription logic removed - using polling instead
     const fetchAndSubscribe = async () => {
-      // fetchTransactions returns the normalized user id used in tables (if any)
-      const normalizedUserId = await fetchTransactions();
+      // fetchTransactions returns the user id used in tables
+      const queryUserId = await fetchTransactions();
 
-      // subscribe to realtime changes for this user's transactions (use normalized id when possible)
-      const targetUserId = normalizedUserId || user?.id;
+      // Set up periodic refresh instead of real-time subscriptions
+      // TODO: Implement real-time updates with Better Auth and WebSockets if needed
+      const targetUserId = queryUserId || user?.id;
       if (!targetUserId) return;
       try {
-        if ((supabase as any)?.channel) {
-          subscription = (supabase as any)
-            .channel(`public:transaction_history:user=${targetUserId}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'transaction_history', filter: `user_id=eq.${targetUserId}` }, () => {
-              fetchTransactions();
-            })
-            .subscribe();
-        } else if ((supabase as any)?.from) {
-          subscription = (supabase as any)
-            .from(`transaction_history:user_id=eq.${targetUserId}`)
-            .on('*', () => fetchTransactions())
-            .subscribe();
-        } else {
-          // fallback to polling every 10s
-          pollRef.current = window.setInterval(() => fetchTransactions(), 10000);
-        }
+        // Fallback to polling every 30s
+        pollRef.current = window.setInterval(() => fetchTransactions(), 10000);
       } catch (e) {
         console.warn('Realtime subscription failed for transactions, falling back to polling', e);
         pollRef.current = window.setInterval(() => fetchTransactions(), 10000);
@@ -74,11 +61,7 @@ const Transactions = () => {
     if (user) fetchAndSubscribe();
 
     return () => {
-      try {
-        if (subscription && typeof subscription.unsubscribe === 'function') subscription.unsubscribe();
-      } catch (e) {
-        // ignore
-      }
+      // Cleanup polling interval
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
@@ -91,21 +74,9 @@ const Transactions = () => {
     if (!user) return null;
     try {
       setLoading(true);
-      // Map auth user -> normalized users.id if exists
-      let normalizedUserId: string | null = null;
-      try {
-        const { data: uData, error: uErr } = await supabase
-          .from('users')
-          .select('id')
-          .eq('auth_user_id', user.id)
-          .maybeSingle();
-        if (!uErr && uData?.id) normalizedUserId = uData.id;
-      } catch (e) {
-        // ignore mapping failure and fallback to auth user id
-      }
-
-      const queryUserId = normalizedUserId || user.id;
-      const data = await historyService.getTransactionHistory(queryUserId, { limit: 100 });
+      // Use auth user ID directly - TODO: Implement user ID mapping if needed
+      const queryUserId = user.id;
+      const data = await historyService.getTransactionHistory(queryUserId, 100);
       setTransactions(data.map(transaction => ({
         id: transaction.id,
         type: transaction.transaction_type,
@@ -114,7 +85,7 @@ const Transactions = () => {
         date: new Date(transaction.created_at).toISOString().split('T')[0],
         description: transaction.description,
         method: transaction.payment_method || 'Unknown',
-        reference: transaction.payment_reference || 'N/A'
+        reference: transaction.provider_transaction_id || 'N/A'
       })));
 
       // Calculate monthly total
@@ -130,7 +101,7 @@ const Transactions = () => {
       setMonthlyTotal(monthlyTransactions.reduce((sum, t) => 
         sum + (t.transaction_type === 'payment' ? t.amount : -t.amount), 0
       ));
-      return normalizedUserId;
+      return queryUserId;
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast({

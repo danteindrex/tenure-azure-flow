@@ -18,10 +18,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    // Check if this is an OAuth user
-    const isOAuthUser = session.user.accounts?.some(account => 
-      account.provider !== 'credential' && account.provider !== 'email'
-    ) || false;
+    // Check if this is an OAuth user by fetching their accounts
+    let isOAuthUser = false;
+    try {
+      const accounts = await auth.api.listUserAccounts({
+        headers: new Headers(req.headers as any)
+      });
+      isOAuthUser = accounts.some((account: any) => 
+        account.providerId !== 'credential' && account.providerId !== 'email'
+      );
+    } catch (error) {
+      console.warn('Could not fetch user accounts:', error);
+      // Default to false if we can't determine account type
+    }
 
     // Get user's onboarding status using the server-side service
     const onboardingStatus = await OnboardingService.getUserOnboardingStatus(

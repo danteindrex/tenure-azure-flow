@@ -53,7 +53,7 @@ const Help = () => {
   const user = session?.user;
   
   // Memoize the help service to prevent recreation on every render
-  const helpService = useMemo(() => new HelpService(supabase), [supabase]);
+  const helpService = useMemo(() => new HelpService(), []);
 
   // Load initial data
   useEffect(() => {

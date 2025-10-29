@@ -34,7 +34,7 @@ const Notifications = () => {
   const user = session?.user;
   
   // Memoize the notification service to prevent recreation on every render
-  const notificationService = useMemo(() => new NotificationService(supabase), [supabase]);
+  const notificationService = useMemo(() => new NotificationService(), []);
 
   // Load notifications data
   useEffect(() => {
@@ -49,16 +49,24 @@ const Notifications = () => {
         }
         
         // Load data in parallel
-        const [notificationsData, countsData, preferencesData] = await Promise.all([
-          notificationService.getNotifications(user.id),
-          notificationService.getNotificationCounts(user.id),
-          notificationService.getNotificationPreferences(user.id)
+        const [notificationsData, unreadCount, preferencesData] = await Promise.all([
+          notificationService.getUserNotifications(user.id),
+          notificationService.getUnreadCount(user.id),
+          notificationService.getUserPreferences(user.id)
         ]);
 
         // Only update state if component is still mounted
         if (isMounted) {
           setNotifications(notificationsData);
-          setNotificationCounts(countsData);
+          setNotificationCounts({ 
+            unread: unreadCount, 
+            total: notificationsData.length,
+            high_priority: notificationsData.filter(n => n.priority === 'high' || n.priority === 'urgent').length,
+            by_type: notificationsData.reduce((acc, n) => {
+              acc[n.type] = (acc[n.type] || 0) + 1;
+              return acc;
+            }, {} as Record<string, number>)
+          });
           setPreferences(preferencesData);
           setLoading(false);
         }
@@ -117,7 +125,7 @@ const Notifications = () => {
     if (!user) return;
     
     try {
-      const success = await notificationService.markAsRead(notificationId, user.id);
+      const success = await notificationService.markNotificationAsRead(notificationId, user.id);
       
       if (success) {
         setNotifications(prev => 
@@ -149,7 +157,7 @@ const Notifications = () => {
     if (!user) return;
     
     try {
-      const success = await notificationService.markAllAsRead(user.id);
+      const success = await notificationService.markAllNotificationsAsRead(user.id);
       
       if (success) {
         setNotifications(prev => 

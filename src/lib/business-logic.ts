@@ -1,5 +1,4 @@
-import SupabaseClientSingleton from './supabase';
-import { MemberTenure, MemberPaymentStatus } from './types';
+// Database operations moved to API endpoints for client-side compatibility
 
 // Business Rules Constants (BR-1 through BR-10)
 export const BUSINESS_RULES = {
@@ -28,28 +27,38 @@ export interface PayoutStatus {
   payoutReady: boolean;
   totalRevenue: number;
   potentialWinners: number;
-  fundStatus: string;
-  timeStatus: string;
-  daysUntilEligible: number;
+  nextPayoutDate: Date | null;
 }
 
-export interface UserPaymentStatus {
-  hasJoiningFee: boolean;
-  joiningFeeDate: Date | null;
-  lastMonthlyPayment: Date | null;
-  daysSinceLastPayment: number;
-  isInDefault: boolean;
-  nextPaymentDue: Date | null;
+export interface MemberTenure {
+  memberId: number;
+  memberName: string;
+  isActive: boolean;
+  tenureStart: Date;
+  continuousTenure: number; // months
   totalPaid: number;
+  lastPaymentDate: string;
+  position: number;
+  queuePosition: number;
+}
+
+export interface MemberPaymentStatus {
+  memberId: string;
+  status: 'current' | 'overdue' | 'suspended';
+  lastPaymentDate: string;
+  nextPaymentDue: string;
+  totalPaid: number;
+  continuousTenure: number;
+  hasJoiningFee: boolean;
+  isInDefault: boolean;
+  daysSinceLastPayment: number;
+  lastMonthlyPayment: Date | null;
   monthlyPaymentCount: number;
 }
 
 class BusinessLogicService {
-  private supabase: ReturnType<typeof SupabaseClientSingleton.getInstance>;
-
   constructor() {
-    // Always use singleton for database operations (not auth)
-    this.supabase = SupabaseClientSingleton.getInstance();
+    // Using Drizzle ORM with existing database tables
   }
 
   /**
@@ -58,22 +67,17 @@ class BusinessLogicService {
    */
   async getMemberTenureStart(userId: string): Promise<Date | null> {
     try {
-      const { data: joiningPayment, error } = await this.supabase
-        .from('user_payments')
-        .select('payment_date')
-        .eq('user_id', userId)
-        .eq('amount', BUSINESS_RULES.JOINING_FEE)
-        .eq('status', 'completed')
-        .eq('is_first_payment', true)
-        .order('payment_date', { ascending: true })
-        .limit(1)
-        .single();
+      const response = await fetch(`/api/business-rules/tenure-start?userId=${userId}`, {
+        method: 'GET',
+        credentials: 'include'
+      });
 
-      if (error || !joiningPayment) {
-        return null;
+      if (!response.ok) {
+        throw new Error('Failed to fetch tenure start');
       }
 
-      return new Date(joiningPayment.payment_date);
+      const data = await response.json();
+      return data.tenureStart ? new Date(data.tenureStart) : null;
     } catch (error) {
       console.error('Error getting member tenure start:', error);
       return null;
@@ -81,119 +85,44 @@ class BusinessLogicService {
   }
 
   /**
-   * BR-5, BR-6, BR-10: Get winner order based on continuous tenure and tie-breaker
-   * Uses normalized tables: users, user_profiles, user_payments, membership_queue
+   * BR-3, BR-4, BR-5: Get all members with continuous tenure for queue ranking
+   * Uses normalized tables with proper joins
    */
-  async getWinnerOrder(): Promise<MemberTenure[]> {
+  async getMembersWithContinuousTenure(): Promise<MemberTenure[]> {
     try {
-      // Get all active members with their joining fee payment from normalized tables
-      const { data: members, error } = await this.supabase
-        .from('users')
-        .select(`
-          id,
-          status,
-          user_profiles!inner(first_name, last_name),
-          user_payments!inner(payment_date, amount, status, is_first_payment),
-          membership_queue!inner(queue_position, is_eligible)
-        `)
-        .eq('status', 'Active')
-        .eq('user_payments.amount', BUSINESS_RULES.JOINING_FEE)
-        .eq('user_payments.status', 'completed')
-        .eq('user_payments.is_first_payment', true)
-        .eq('membership_queue.is_eligible', true);
+      const response = await fetch('/api/business-rules/continuous-tenure', {
+        method: 'GET',
+        credentials: 'include'
+      });
 
-      if (error || !members) {
-        console.error('Error fetching members for winner order:', error);
-        return [];
+      if (!response.ok) {
+        throw new Error('Failed to fetch members with continuous tenure');
       }
 
-      // Process each member to check continuous tenure
-      const memberTenures: MemberTenure[] = [];
-
-      for (const member of members) {
-        const tenureStart = new Date(member.payment[0].payment_date);
-        const hasContinuousTenure = await this.checkContinuousTenure(member.id, tenureStart);
-        
-        // Calculate tenure in months
-        const tenureMonths = Math.floor((Date.now() - tenureStart.getTime()) / (1000 * 60 * 60 * 24 * 30));
-
-        memberTenures.push({
-          id: member.id,
-          name: member.name,
-          status: member.status,
-          joinDate: member.payment[0].payment_date,
-          continuousTenure: hasContinuousTenure ? tenureMonths : 0,
-          totalPaid: member.payment.reduce((sum: number, p: any) => sum + p.amount, 0),
-          lastPaymentDate: member.payment[member.payment.length - 1].payment_date,
-          position: 0, // Will be set after sorting
-          memberId: member.id,
-          memberName: member.name,
-          isActive: member.status === 'Active',
-          tenureStart,
-          queuePosition: 0 // Will be set after sorting
-        });
-      }
-
-      // Sort by tenure (earliest first), then by member ID for tie-breaking (BR-10)
-      const sortedMembers = memberTenures
-        .filter(m => m.continuousTenure && m.isActive)
-        .sort((a, b) => {
-          const tenureCompare = a.tenureStart.getTime() - b.tenureStart.getTime();
-          return tenureCompare !== 0 ? tenureCompare : a.memberId - b.memberId;
-        });
-
-      // Assign queue positions
-      return sortedMembers.map((member, index) => ({
-        ...member,
-        queuePosition: index + 1
-      }));
-
+      const data = await response.json();
+      return data.members || [];
     } catch (error) {
-      console.error('Error calculating winner order:', error);
+      console.error('Error getting members with continuous tenure:', error);
       return [];
     }
   }
 
   /**
-   * Check if member has continuous tenure (no payment gaps > 30 days)
+   * BR-6: Check if member has continuous tenure (no missed payments)
    */
-  async checkContinuousTenure(memberId: number, tenureStart: Date): Promise<boolean> {
+  async checkContinuousTenure(userId: string, tenureStart: Date): Promise<boolean> {
     try {
-      const { data: payments, error } = await this.supabase
-        .from('payment')
-        .select('payment_date, amount')
-        .eq('memberid', memberId)
-        .eq('status', 'Completed')
-        .order('payment_date', { ascending: true });
+      const response = await fetch(`/api/business-rules/check-tenure?userId=${userId}&tenureStart=${tenureStart.toISOString()}`, {
+        method: 'GET',
+        credentials: 'include'
+      });
 
-      if (error || !payments || payments.length === 0) {
-        return false;
+      if (!response.ok) {
+        throw new Error('Failed to check continuous tenure');
       }
 
-      // Check for gaps in monthly payments
-      let lastPaymentDate = tenureStart;
-      
-      for (const payment of payments) {
-        const paymentDate = new Date(payment.payment_date);
-        const daysSinceLastPayment = Math.floor(
-          (paymentDate.getTime() - lastPaymentDate.getTime()) / (1000 * 60 * 60 * 24)
-        );
-
-        // If gap is more than grace period, tenure is broken
-        if (daysSinceLastPayment > BUSINESS_RULES.PAYMENT_GRACE_DAYS && payment.amount === BUSINESS_RULES.MONTHLY_FEE) {
-          return false;
-        }
-
-        lastPaymentDate = paymentDate;
-      }
-
-      // Check if current payment is overdue
-      const daysSinceLastPayment = Math.floor(
-        (Date.now() - lastPaymentDate.getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      return daysSinceLastPayment <= BUSINESS_RULES.PAYMENT_GRACE_DAYS;
-
+      const data = await response.json();
+      return data.hasContinuousTenure || false;
     } catch (error) {
       console.error('Error checking continuous tenure:', error);
       return false;
@@ -201,150 +130,73 @@ class BusinessLogicService {
   }
 
   /**
-   * BR-3: Calculate payout status based on fund and time requirements
+   * BR-3: Check if payout conditions are met
    */
-  async getPayoutStatus(): Promise<PayoutStatus> {
+  async checkPayoutConditions(): Promise<PayoutStatus> {
     try {
-      // Get total revenue from all completed payments
-      const { data: payments, error } = await this.supabase
-        .from('payment')
-        .select('amount')
-        .eq('status', 'Completed');
+      const response = await fetch('/api/business-rules/payout-conditions', {
+        method: 'GET',
+        credentials: 'include'
+      });
 
-      if (error) {
-        console.error('Error fetching payments for payout status:', error);
-        return this.getDefaultPayoutStatus();
+      if (!response.ok) {
+        throw new Error('Failed to check payout conditions');
       }
 
-      const totalRevenue = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
-
-      // Calculate time since business launch
-      const monthsSinceLaunch = Math.floor(
-        (Date.now() - BUSINESS_RULES.BUSINESS_LAUNCH_DATE.getTime()) / (1000 * 60 * 60 * 24 * 30)
-      );
-
-      const daysUntilEligible = Math.max(0, 
-        (BUSINESS_RULES.PAYOUT_MONTHS_REQUIRED * 30) - 
-        Math.floor((Date.now() - BUSINESS_RULES.BUSINESS_LAUNCH_DATE.getTime()) / (1000 * 60 * 60 * 24))
-      );
-
-      // Check conditions
-      const fundReady = totalRevenue >= BUSINESS_RULES.PAYOUT_THRESHOLD;
-      const timeReady = monthsSinceLaunch >= BUSINESS_RULES.PAYOUT_MONTHS_REQUIRED;
-      const payoutReady = fundReady && timeReady;
-
-      // Calculate potential winners (BR-4, BR-6)
-      const potentialWinners = Math.floor(totalRevenue / BUSINESS_RULES.REWARD_PER_WINNER);
-
-      return {
-        fundReady,
-        timeReady,
-        payoutReady,
-        totalRevenue,
-        potentialWinners,
-        fundStatus: fundReady 
-          ? 'Fund Ready' 
-          : `Need $${(BUSINESS_RULES.PAYOUT_THRESHOLD - totalRevenue).toLocaleString()} more`,
-        timeStatus: timeReady 
-          ? 'Time Requirement Met' 
-          : `${BUSINESS_RULES.PAYOUT_MONTHS_REQUIRED - monthsSinceLaunch} months remaining`,
-        daysUntilEligible
+      const data = await response.json();
+      return data.payoutStatus || {
+        fundReady: false,
+        timeReady: false,
+        payoutReady: false,
+        totalRevenue: 0,
+        potentialWinners: 0,
+        nextPayoutDate: null
       };
-
     } catch (error) {
-      console.error('Error calculating payout status:', error);
-      return this.getDefaultPayoutStatus();
+      console.error('Error checking payout conditions:', error);
+      return {
+        fundReady: false,
+        timeReady: false,
+        payoutReady: false,
+        totalRevenue: 0,
+        potentialWinners: 0,
+        nextPayoutDate: null
+      };
     }
   }
 
-  private getDefaultPayoutStatus(): PayoutStatus {
-    return {
-      fundReady: false,
-      timeReady: false,
-      payoutReady: false,
-      totalRevenue: 0,
-      potentialWinners: 0,
-      fundStatus: 'Loading...',
-      timeStatus: 'Loading...',
-      daysUntilEligible: 0
-    };
-  }
-
   /**
-   * Get member payment status including default risk
+   * Get member payment status for dashboard
    */
-  async getMemberPaymentStatus(memberId: number): Promise<MemberPaymentStatus> {
+  async getMemberPaymentStatus(userId: string): Promise<MemberPaymentStatus> {
     try {
-      // Get joining fee payment
-      const { data: joiningPayment, error: joiningError } = await this.supabase
-        .from('payment')
-        .select('payment_date')
-        .eq('memberid', memberId)
-        .eq('amount', BUSINESS_RULES.JOINING_FEE)
-        .eq('status', 'Completed')
-        .order('payment_date', { ascending: true })
-        .limit(1)
-        .single();
+      const response = await fetch(`/api/business-rules/payment-status?userId=${userId}`, {
+        method: 'GET',
+        credentials: 'include'
+      });
 
-      // Get all monthly payments
-      const { data: monthlyPayments, error: monthlyError } = await this.supabase
-        .from('payment')
-        .select('payment_date, amount')
-        .eq('memberid', memberId)
-        .eq('amount', BUSINESS_RULES.MONTHLY_FEE)
-        .eq('status', 'Completed')
-        .order('payment_date', { ascending: false });
-
-      // Get total payments
-      const { data: allPayments, error: totalError } = await this.supabase
-        .from('payment')
-        .select('amount')
-        .eq('memberid', memberId)
-        .eq('status', 'Completed');
-
-      const hasJoiningFee = !joiningError && joiningPayment;
-      const joiningFeeDate = hasJoiningFee ? new Date(joiningPayment.payment_date) : null;
-      const lastMonthlyPayment = monthlyPayments && monthlyPayments.length > 0 
-        ? new Date(monthlyPayments[0].payment_date) 
-        : null;
-
-      const daysSinceLastPayment = lastMonthlyPayment 
-        ? Math.floor((Date.now() - lastMonthlyPayment.getTime()) / (1000 * 60 * 60 * 24))
-        : (hasJoiningFee ? Math.floor((Date.now() - joiningFeeDate!.getTime()) / (1000 * 60 * 60 * 24)) : 999);
-
-      const isInDefault = daysSinceLastPayment > BUSINESS_RULES.PAYMENT_GRACE_DAYS;
-
-      // Calculate next payment due
-      let nextPaymentDue: Date | null = null;
-      if (lastMonthlyPayment) {
-        nextPaymentDue = new Date(lastMonthlyPayment);
-        nextPaymentDue.setMonth(nextPaymentDue.getMonth() + 1);
-      } else if (hasJoiningFee) {
-        nextPaymentDue = new Date(joiningFeeDate!);
-        nextPaymentDue.setMonth(nextPaymentDue.getMonth() + 1);
+      if (!response.ok) {
+        throw new Error('Failed to get member payment status');
       }
 
-      const totalPaid = allPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
-      const monthlyPaymentCount = monthlyPayments?.length || 0;
-
-      return {
-        memberId,
-        status: isInDefault ? 'overdue' : (hasJoiningFee ? 'current' : 'suspended'),
-        lastPaymentDate: lastMonthlyPayment?.toISOString() || '',
-        nextPaymentDue: nextPaymentDue?.toISOString() || '',
-        totalPaid,
-        continuousTenure: monthlyPaymentCount,
-        hasJoiningFee,
-        isInDefault,
-        daysSinceLastPayment,
-        lastMonthlyPayment,
-        monthlyPaymentCount
+      const data = await response.json();
+      return data.paymentStatus || {
+        memberId: userId,
+        status: 'suspended',
+        lastPaymentDate: '',
+        nextPaymentDue: '',
+        totalPaid: 0,
+        continuousTenure: 0,
+        hasJoiningFee: false,
+        isInDefault: true,
+        daysSinceLastPayment: 999,
+        lastMonthlyPayment: null,
+        monthlyPaymentCount: 0
       };
-
     } catch (error) {
       console.error('Error getting member payment status:', error);
       return {
-        memberId,
+        memberId: userId,
         status: 'suspended',
         lastPaymentDate: '',
         nextPaymentDue: '',
@@ -360,87 +212,58 @@ class BusinessLogicService {
   }
 
   /**
-   * BR-8: Enforce payment default penalties
+   * BR-8: Enforce payment defaults and queue management
    */
-  async enforcePaymentDefaults(): Promise<{ updated: number; removed: number }> {
+  async enforcePaymentDefaults(): Promise<{ processed: number; defaulted: number }> {
     try {
-      let updated = 0;
-      let removed = 0;
+      const response = await fetch('/api/business-rules/enforce-defaults', {
+        method: 'POST',
+        credentials: 'include'
+      });
 
-      // Get all active members
-      const { data: activeMembers, error } = await this.supabase
-        .from('member')
-        .select('id, name')
-        .eq('status', 'Active');
-
-      if (error || !activeMembers) {
-        console.error('Error fetching active members:', error);
-        return { updated: 0, removed: 0 };
+      if (!response.ok) {
+        throw new Error('Failed to enforce payment defaults');
       }
 
-      for (const member of activeMembers) {
-        const paymentStatus = await this.getMemberPaymentStatus(member.id);
-
-        if (paymentStatus.isInDefault) {
-          // Mark member as inactive (BR-8)
-          const { error: updateError } = await this.supabase
-            .from('member')
-            .update({ 
-              status: 'Inactive',
-              default_date: new Date().toISOString()
-            })
-            .eq('id', member.id);
-
-          if (!updateError) {
-            updated++;
-
-            // Remove from queue permanently (they lose their position forever)
-            const { error: queueError } = await this.supabase
-              .from('membership_queue')
-              .delete()
-              .eq('user_id', member.id);
-
-            if (!queueError) {
-              removed++;
-            }
-
-            console.log(`Member ${member.name} (ID: ${member.id}) permanently removed from queue due to payment default - they lose their position forever`);
-          }
-        }
-      }
-
-      return { updated, removed };
-
+      const data = await response.json();
+      return data.result || { processed: 0, defaulted: 0 };
     } catch (error) {
       console.error('Error enforcing payment defaults:', error);
-      return { updated: 0, removed: 0 };
+      return { processed: 0, defaulted: 0 };
     }
   }
 
   /**
-   * Update queue positions based on current tenure rankings
+   * BR-4, BR-5: Process payout to winners
    */
-  async updateQueuePositions(): Promise<boolean> {
+  async processPayoutToWinners(): Promise<{ success: boolean; winners: string[]; error?: string }> {
     try {
-      const winnerOrder = await this.getWinnerOrder();
+      const response = await fetch('/api/business-rules/process-payout', {
+        method: 'POST',
+        credentials: 'include'
+      });
 
-      for (const member of winnerOrder) {
-        await this.supabase
-          .from('queue')
-          .upsert({
-            memberid: member.memberId,
-            queue_position: member.queuePosition,
-            subscription_active: member.isActive,
-            updated_at: new Date().toISOString()
-          });
+      if (!response.ok) {
+        throw new Error('Failed to process payout to winners');
       }
 
-      return true;
+      const data = await response.json();
+      return data.result || {
+        success: false,
+        winners: [],
+        error: 'Unknown error'
+      };
     } catch (error) {
-      console.error('Error updating queue positions:', error);
-      return false;
+      console.error('Error processing payout to winners:', error);
+      return {
+        success: false,
+        winners: [],
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   }
 }
 
-export default BusinessLogicService;
+// Export singleton instance
+export const businessLogicService = new BusinessLogicService();
+export default businessLogicService;

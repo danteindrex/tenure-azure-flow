@@ -10,7 +10,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Handle GET request for checking current user's verification status
   if (req.method === "GET") {
     try {
-      const session = await auth.api.getSession({ headers: req.headers });
+      const session = await auth.api.getSession({ 
+        headers: new Headers(req.headers as any)
+      });
       
       if (!session?.user) {
         return res.status(401).json({ error: "Not authenticated" });

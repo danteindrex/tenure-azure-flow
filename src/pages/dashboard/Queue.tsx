@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { toast } from "sonner";
-import { useQueueService } from "@/lib/queueService";
+// Queue service moved to API endpoints - using fetch calls instead
 import { QueueMember } from "@/lib/types";
 
 const Queue = () => {
@@ -40,7 +40,7 @@ const Queue = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const queueService = useQueueService();
+  // Queue service moved to API endpoints - using fetch calls instead
   const { data: session } = useSession();
   const user = session?.user;
 
@@ -54,16 +54,15 @@ const Queue = () => {
     try {
       setLoading(true);
       
-      const response = await queueService.getQueueData({
-        search: searchTerm || undefined
-      });
-
-      if (response.success) {
-        setQueueData(response.data.queue);
-        setStatistics(response.data.statistics);
-      } else {
-        throw new Error(response.error || 'Failed to load queue data');
+      const response = await fetch(`/api/queue?${searchTerm ? `search=${encodeURIComponent(searchTerm)}` : ''}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to load queue data');
       }
+      
+      const data = await response.json();
+      setQueueData(data.queue || []);
+      setStatistics(data.statistics || {});
 
     } catch (error) {
       console.error('Error loading queue data:', error);
@@ -85,7 +84,7 @@ const Queue = () => {
     if (user) {
       loadQueueData();
     }
-  }, [user, queueService]);
+  }, [user]);
 
   // Find current user in queue
   const currentUserMember = queueData.find(member => 
@@ -220,7 +219,7 @@ const Queue = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-accent">{currentUserMember.queue_position ?? currentUserMember.position}</p>
+              <p className="text-2xl font-bold text-accent">{currentUserMember.position}</p>
               <p className="text-sm text-muted-foreground">Queue Position</p>
             </div>
             <div className="text-center">
