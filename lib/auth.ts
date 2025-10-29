@@ -3,7 +3,7 @@
  *
  * This file configures Better Auth with:
  * - Drizzle ORM adapter for database
- * - Resend SMTP for email verification
+ * - Gmail SMTP for email verification
  * - Google OAuth provider
  * - Passkey (WebAuthn) support
  * - Two-factor authentication (TOTP + backup codes)
@@ -16,10 +16,9 @@ import { nextCookies } from 'better-auth/next-js'
 import { twoFactor, organization } from 'better-auth/plugins'
 import { passkey } from 'better-auth/plugins/passkey'
 import { db } from '../drizzle/db'
-import { Resend } from 'resend'
+import { emailService } from '../src/lib/email'
 
-// Initialize Resend for email
-const resend = new Resend(process.env.RESEND_API_KEY!)
+// SMTP email service initialized
 
 export const auth = betterAuth({
   // Database adapter
@@ -39,33 +38,10 @@ export const auth = betterAuth({
     requireEmailVerification: true,
     sendResetPasswordEmail: async ({ user, url, token }) => {
       try {
-        await resend.emails.send({
-          from: process.env.EMAIL_FROM || 'noreply@yourdomain.com',
+        await emailService.sendPasswordResetEmail({
           to: user.email,
-          subject: 'Reset your password',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h1 style="color: #333;">Password Reset Request</h1>
-              <p style="color: #666; font-size: 16px;">
-                Click the button below to reset your password:
-              </p>
-              <a href="${url}" style="
-                display: inline-block;
-                padding: 12px 24px;
-                background-color: #0070f3;
-                color: white;
-                text-decoration: none;
-                border-radius: 5px;
-                margin: 20px 0;
-              ">Reset Password</a>
-              <p style="color: #999; font-size: 14px;">
-                Or use this code: <strong>${token}</strong>
-              </p>
-              <p style="color: #999; font-size: 12px;">
-                If you didn't request this, please ignore this email.
-              </p>
-            </div>
-          `
+          token,
+          url
         })
       } catch (error) {
         console.error('Failed to send reset password email:', error)
@@ -83,37 +59,13 @@ export const auth = betterAuth({
       console.log('   Token:', token)
       
       try {
-        const result = await resend.emails.send({
-          from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+        await emailService.sendVerificationEmail({
           to: user.email,
-          subject: 'Verify your email address',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h1 style="color: #333;">Welcome to Tenure!</h1>
-              <p style="color: #666; font-size: 16px;">
-                Please verify your email address by clicking the button below:
-              </p>
-              <a href="${url}" style="
-                display: inline-block;
-                padding: 12px 24px;
-                background-color: #0070f3;
-                color: white;
-                text-decoration: none;
-                border-radius: 5px;
-                margin: 20px 0;
-              ">Verify Email</a>
-              <p style="color: #999; font-size: 14px;">
-                Or use this code: <strong>${token}</strong>
-              </p>
-              <p style="color: #999; font-size: 12px;">
-                If you didn't request this email, you can safely ignore it.
-              </p>
-            </div>
-          `
+          token,
+          url
         })
         
-        console.log('✅ Better Auth: Email sent successfully!')
-        console.log('   Email ID:', result.data?.id)
+        console.log('✅ Better Auth: Email sent successfully via SMTP!')
         
       } catch (error) {
         console.error('❌ Better Auth: Failed to send verification email:', error)
