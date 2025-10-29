@@ -1,14 +1,11 @@
 /**
- * Test Email API
+ * Test Email API Endpoint
  * 
- * POST /api/test-email
- * Tests Resend email integration
+ * Tests SMTP email integration
  */
 
 import { NextApiRequest, NextApiResponse } from 'next'
-import { Resend } from 'resend'
-
-const resend = new Resend(process.env.RESEND_API_KEY!)
+import { emailService } from '@/lib/email'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -28,61 +25,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
     }
 
-    console.log(`📧 Testing email send to: ${email}`)
+    console.log(`📧 Testing SMTP email send to: ${email}`)
 
-    // Send test email using Resend
-    const result = await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-      to: email,
-      subject: '🧪 Test Email - Tenure Email Integration',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #333; text-align: center;">✅ Email Integration Test</h1>
-          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2 style="color: #28a745; margin-top: 0;">Success!</h2>
-            <p style="color: #666; font-size: 16px; line-height: 1.5;">
-              Your Resend email integration is working correctly! 🎉
-            </p>
-            <ul style="color: #666; line-height: 1.6;">
-              <li><strong>Sender:</strong> ${process.env.EMAIL_FROM || 'onboarding@resend.dev'}</li>
-              <li><strong>Recipient:</strong> ${email}</li>
-              <li><strong>Service:</strong> Resend API</li>
-              <li><strong>Time:</strong> ${new Date().toISOString()}</li>
-            </ul>
-          </div>
-          <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; border-left: 4px solid #2196f3;">
-            <p style="margin: 0; color: #1976d2;">
-              <strong>Next Steps:</strong> Your signup email verification should now work properly!
-            </p>
-          </div>
-          <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-          <p style="color: #999; font-size: 14px; text-align: center;">
-            This is a test email from your Tenure application.<br>
-            If you received this, your email integration is configured correctly.
-          </p>
-        </div>
-      `
-    })
+    // Verify SMTP connection first
+    const connectionValid = await emailService.verifyConnection()
+    if (!connectionValid) {
+      return res.status(500).json({ 
+        success: false,
+        error: 'SMTP connection failed',
+        details: 'Check your SMTP credentials'
+      })
+    }
 
-    console.log('✅ Email sent successfully:', result)
+    // Send test email using SMTP
+    const result = await emailService.sendTestEmail(email)
 
-    return res.status(200).json({
+    console.log('✅ Test email sent successfully!')
+
+    res.status(200).json({
       success: true,
-      message: 'Test email sent successfully!',
-      data: {
-        id: result.data?.id,
-        from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-        to: email,
-        subject: '🧪 Test Email - Tenure Email Integration'
-      }
+      message: 'Test email sent successfully via SMTP!',
+      messageId: result.messageId,
+      provider: 'Gmail SMTP',
+      timestamp: new Date().toISOString()
     })
 
   } catch (error: any) {
-    console.error('❌ Email test failed:', error)
-    return res.status(500).json({
+    console.error('❌ Test email failed:', error)
+    
+    res.status(500).json({
       success: false,
       error: error.message || 'Failed to send test email',
-      details: error.response?.body || error
+      details: 'Check server logs for more information'
     })
   }
 }

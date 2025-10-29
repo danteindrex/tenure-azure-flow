@@ -1,91 +1,94 @@
 /**
- * Test Email Script
+ * Test SMTP Email Script
  * 
- * This script directly tests the Resend email integration
- * Usage: npx tsx scripts/test-email.ts
+ * Tests Gmail SMTP email functionality
  */
 
-import * as dotenv from 'dotenv'
-import { Resend } from 'resend'
-
-// Load environment variables
-dotenv.config({ path: '.env.local' })
+import { config } from 'dotenv'
+import { resolve } from 'path'
 
 async function testEmail() {
-  console.log('📧 Testing Resend email integration...')
+  // Load environment variables
+  config({ path: resolve(process.cwd(), '.env.local') })
+  
+  console.log('🧪 Testing SMTP Email Integration...\n')
   
   try {
-    // Check if API key is configured
-    if (!process.env.RESEND_API_KEY) {
-      console.error('❌ RESEND_API_KEY not found in .env.local')
+    // Check if SMTP credentials are configured
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.error('❌ SMTP credentials not found in .env.local')
+      console.error('Required: SMTP_HOST, SMTP_USER, SMTP_PASS')
       process.exit(1)
     }
 
-    // Initialize Resend
-    const resend = new Resend(process.env.RESEND_API_KEY)
+    // Initialize Email Service
+    const { emailService } = await import('../src/lib/email')
     
-    // Test email details - must use your verified Resend email
-    const testEmail = 'trevorsdanny@gmail.com' // Your verified Resend email
-    const fromEmail = process.env.EMAIL_FROM || 'onboarding@resend.dev'
+    // Test email details
+    const testEmail = 'nakisisageorge@gmail.com'
     
-    console.log(`📤 Sending test email...`)
-    console.log(`   From: ${fromEmail}`)
+    console.log('📧 Testing SMTP connection...')
+    const connectionValid = await emailService.verifyConnection()
+    
+    if (!connectionValid) {
+      console.error('❌ SMTP connection failed!')
+      console.error('💡 Check your SMTP credentials in .env.local')
+      process.exit(1)
+    }
+    
+    console.log('✅ SMTP connection verified!')
+    console.log('📧 Sending test email...')
+    console.log(`   From: ${process.env.EMAIL_FROM}`)
     console.log(`   To: ${testEmail}`)
     
-    // Send test email
-    const result = await resend.emails.send({
-      from: fromEmail,
-      to: testEmail,
-      subject: '🧪 Tenure Email Integration Test',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #333;">✅ Email Integration Test Successful!</h1>
-          <p style="color: #666; font-size: 16px;">
-            Your Resend email integration is working correctly! 🎉
-          </p>
-          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <strong>Configuration:</strong><br>
-            • Sender: ${fromEmail}<br>
-            • Service: Resend API<br>
-            • Time: ${new Date().toISOString()}
-          </div>
-          <p style="color: #28a745;">
-            <strong>✓ Your signup email verification should now work!</strong>
-          </p>
-        </div>
-      `
-    })
+    const result = await emailService.sendTestEmail(testEmail)
 
-    if (result.data) {
-      console.log('✅ Email sent successfully!')
-      console.log(`   Email ID: ${result.data.id}`)
-      console.log(`   Status: Delivered to Resend`)
-      console.log('')
-      console.log('🎉 Email integration is working correctly!')
-      console.log('📱 Check your inbox for the test email.')
-    } else {
-      console.error('❌ Email sending failed - no data returned')
-      console.error('Response:', result)
-    }
-
-  } catch (error: any) {
-    console.error('❌ Email test failed:')
-    console.error('Error:', error.message)
+    console.log('✅ Email sent successfully!')
+    console.log(`   Message ID: ${result.messageId}`)
+    console.log(`   Check your inbox at ${testEmail}`)
     
-    if (error.response) {
-      console.error('Response:', error.response.body)
-    }
+    // Test OTP email templates
+    console.log('\n📧 Testing OTP email templates...')
+    
+    // Test verification email
+    await emailService.sendVerificationEmail({
+      to: testEmail,
+      token: '123456',
+      url: 'https://example.com/verify?token=123456'
+    })
+    
+    console.log('✅ Verification email template sent!')
+    
+    // Test password reset email
+    await emailService.sendPasswordResetEmail({
+      to: testEmail,
+      token: '789012',
+      url: 'https://example.com/reset?token=789012'
+    })
+    
+    console.log('✅ Password reset email template sent!')
+    
+    console.log('\n🎯 All email tests completed successfully!')
+    console.log('📧 Check your inbox for:')
+    console.log('   1. SMTP test email')
+    console.log('   2. Email verification template (with OTP: 123456)')
+    console.log('   3. Password reset template (with OTP: 789012)')
+    
+  } catch (error: any) {
+    console.error('❌ Email test failed:', error.message)
     
     // Common error messages
-    if (error.message.includes('API key')) {
-      console.log('\n💡 Tip: Check your RESEND_API_KEY in .env.local')
+    if (error.message.includes('authentication')) {
+      console.log('\n💡 Tip: Check your Gmail app password in .env.local')
+      console.log('   Make sure you\'re using an app password, not your regular password')
     }
-    if (error.message.includes('domain')) {
-      console.log('\n💡 Tip: Make sure you\'re using onboarding@resend.dev for testing')
+    if (error.message.includes('connection')) {
+      console.log('\n💡 Tip: Check your SMTP host and port settings')
+      console.log('   Gmail SMTP: smtp.gmail.com:587')
     }
     
     process.exit(1)
   }
 }
 
-testEmail()
+testEmail().catch(console.error)
