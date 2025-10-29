@@ -50,29 +50,33 @@ async function testEmail() {
     // Test OTP email templates
     console.log('\n📧 Testing OTP email templates...')
     
+    // Generate dynamic 6-digit codes
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString()
+    
     // Test verification email
     await emailService.sendVerificationEmail({
       to: testEmail,
-      token: '123456',
-      url: 'https://example.com/verify?token=123456'
+      token: verificationCode,
+      url: `https://example.com/verify?token=${verificationCode}`
     })
     
-    console.log('✅ Verification email template sent!')
+    console.log(`✅ Verification email template sent! (Code: ${verificationCode})`)
     
     // Test password reset email
     await emailService.sendPasswordResetEmail({
       to: testEmail,
-      token: '789012',
-      url: 'https://example.com/reset?token=789012'
+      token: resetCode,
+      url: `https://example.com/reset?token=${resetCode}`
     })
     
-    console.log('✅ Password reset email template sent!')
+    console.log(`✅ Password reset email template sent! (Code: ${resetCode})`)
     
     console.log('\n🎯 All email tests completed successfully!')
     console.log('📧 Check your inbox for:')
     console.log('   1. SMTP test email')
-    console.log('   2. Email verification template (with OTP: 123456)')
-    console.log('   3. Password reset template (with OTP: 789012)')
+    console.log(`   2. Email verification template (with OTP: ${verificationCode})`)
+    console.log(`   3. Password reset template (with OTP: ${resetCode})`)
     
   } catch (error: any) {
     console.error('❌ Email test failed:', error.message)
