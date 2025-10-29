@@ -101,7 +101,7 @@ const Login = () => {
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-2 text-accent">
             <Crown className="w-8 h-8" />
-            <span className="text-2xl font-bold text-foreground">Tenure</span>
+            <span className="text-2xl font-bold text-foreground">Home Solutions</span>
           </div>
         </div>
 

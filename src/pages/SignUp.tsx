@@ -49,12 +49,12 @@ const SignUp = () => {
   // Log page visit and check for existing session
   useEffect(() => {
     logPageVisit('/signup');
-    
+
     // Check URL parameters for step and OAuth info
     const urlParams = new URLSearchParams(window.location.search);
     const stepParam = urlParams.get('step');
     const oauthParam = urlParams.get('oauth');
-    
+
     // If OAuth user, pre-fill data from session
     if (oauthParam && session?.user) {
       const fullName = session.user.name || "";
@@ -71,7 +71,7 @@ const SignUp = () => {
         middleName,
       }));
     }
-    
+
     // If user is authenticated, check their database state to determine correct step
     if (session?.user && !isPending) {
       fetch('/api/onboarding/status', {
@@ -88,14 +88,14 @@ const SignUp = () => {
               // Set step based on database state, not URL parameter
               const correctStep = data.status.nextStep;
               console.log(`User should be on step ${correctStep} based on database state`);
-              
+
               // Handle legacy step 5 users by redirecting to step 3 (merged step)
               if (correctStep === 7) {
                 setStep(5); // Payment step
               } else if (correctStep >= 1 && correctStep <= 6) {
                 setStep(correctStep);
               }
-              
+
               // Pre-fill email if available
               if (session.user.email) {
                 setFormData(prev => ({
@@ -357,11 +357,11 @@ const SignUp = () => {
 
     try {
 
-      console.log("The current formdata extracted from the form",formData)
+      console.log("The current formdata extracted from the form", formData)
       setLoading(true);
       const email = formData.email.trim();
       const username = `${formData.firstName} ${formData.lastName}`
-      baseLogger("authentication","WillCreateAccount");
+      baseLogger("authentication", "WillCreateAccount");
 
 
       const currentProviededEmail = formData.email;
@@ -374,8 +374,8 @@ const SignUp = () => {
         name: "User", // Temporary name, will be updated in step 3
       });
 
-      console.log("The current credentials",result.data)
-      baseLogger("authentication","DidCreateAccount")
+      console.log("The current credentials", result.data)
+      baseLogger("authentication", "DidCreateAccount")
 
       if (result.error) {
         console.error("Account creation error:", result.error);
@@ -513,7 +513,7 @@ const SignUp = () => {
 
     try {
       setLoading(true);
-      
+
       // Send phone OTP via Twilio
       await sendPhoneOtp();
 
@@ -595,7 +595,7 @@ const SignUp = () => {
 
       // Phone is now verified, save profile and move to payment
       await saveCompleteProfile();
-      
+
       // Update progress in database
       await fetch('/api/onboarding/update-progress', {
         method: 'POST',
@@ -624,7 +624,7 @@ const SignUp = () => {
     try {
       // Update user profile with Better Auth
       const fullName = `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim();
-      
+
       const result = await updateUser({
         name: fullName
       });
@@ -761,7 +761,7 @@ const SignUp = () => {
         <div className="flex justify-center mb-6">
           <div className="flex items-center gap-2 text-accent">
             <Crown className="w-8 h-8" />
-            <span className="text-2xl font-bold">Tenure</span>
+            <span className="text-2xl font-bold">Home Solutions</span>
           </div>
         </div>
 
@@ -916,9 +916,8 @@ const SignUp = () => {
                       const otpCode = pastedText.replace(/\D/g, '').slice(0, 6);
                       handleOtpInputChange('emailOtpCode', otpCode);
                     }}
-                    className={`text-center text-2xl tracking-widest bg-background/50 border-border focus:border-accent transition-colors ${
-                      autoSubmitting ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''
-                    }`}
+                    className={`text-center text-2xl tracking-widest bg-background/50 border-border focus:border-accent transition-colors ${autoSubmitting ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''
+                      }`}
                     placeholder="000000"
                     maxLength={6}
                     autoComplete="one-time-code"
@@ -989,8 +988,8 @@ const SignUp = () => {
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold mb-2">Complete Your Profile</h1>
               <p className="text-muted-foreground">
-                {new URLSearchParams(window.location.search).get('oauth') 
-                  ? "Complete your profile to continue" 
+                {new URLSearchParams(window.location.search).get('oauth')
+                  ? "Complete your profile to continue"
                   : "Tell us about yourself and your address"
                 }
               </p>
@@ -1006,7 +1005,7 @@ const SignUp = () => {
               {/* Personal Information Section */}
               <div className="space-y-4 p-4 bg-background/30 rounded-lg border">
                 <h3 className="font-semibold text-foreground">Personal Information</h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="firstName">First Name *</Label>
@@ -1051,13 +1050,12 @@ const SignUp = () => {
                     type="date"
                     value={formData.dateOfBirth}
                     onChange={(e) => handleDateOfBirthChange(e.target.value)}
-                    className={`bg-background/50 border-border focus:border-accent transition-colors ${
-                      dateValidation && !dateValidation.isValid
-                        ? 'border-red-500 focus:border-red-500'
-                        : dateValidation && dateValidation.isValid
-                          ? 'border-green-500 focus:border-green-500'
-                          : ''
-                    }`}
+                    className={`bg-background/50 border-border focus:border-accent transition-colors ${dateValidation && !dateValidation.isValid
+                      ? 'border-red-500 focus:border-red-500'
+                      : dateValidation && dateValidation.isValid
+                        ? 'border-green-500 focus:border-green-500'
+                        : ''
+                      }`}
                     required
                     max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
                   />
@@ -1116,7 +1114,7 @@ const SignUp = () => {
               {/* Address Information Section */}
               <div className="space-y-4 p-4 bg-background/30 rounded-lg border">
                 <h3 className="font-semibold text-foreground">Address Information</h3>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="streetAddress">Street Address *</Label>
                   <Input
@@ -1253,9 +1251,8 @@ const SignUp = () => {
                       const otpCode = pastedText.replace(/\D/g, '').slice(0, 6);
                       handleOtpInputChange('phoneOtpCode', otpCode);
                     }}
-                    className={`text-center text-2xl tracking-widest bg-background/50 border-border focus:border-accent transition-colors ${
-                      autoSubmitting ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''
-                    }`}
+                    className={`text-center text-2xl tracking-widest bg-background/50 border-border focus:border-accent transition-colors ${autoSubmitting ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''
+                      }`}
                     placeholder="000000"
                     maxLength={6}
                     autoComplete="one-time-code"
