@@ -15,6 +15,40 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  
+  // Field validation states
+  const [fieldValidation, setFieldValidation] = useState({
+    email: { isValid: false, touched: false },
+    password: { isValid: false, touched: false },
+  });
+
+  // Validation helper functions
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password: string): boolean => {
+    return password.length >= 8;
+  };
+
+  const updateFieldValidation = (field: string, value: string, isValid: boolean) => {
+    setFieldValidation(prev => ({
+      ...prev,
+      [field]: { isValid, touched: true }
+    }));
+  };
+
+  // Validation asterisk component (for future required fields)
+  const ValidationAsterisk = ({ isValid, touched }: { isValid: boolean; touched: boolean }) => {
+    let colorClass = 'text-gray-500'; // Default gray for untouched
+    
+    if (touched) {
+      colorClass = isValid ? 'text-green-500' : 'text-red-500';
+    }
+    
+    return <span className={colorClass}>*</span>;
+  };
 
   // Log page visit
   useEffect(() => {
@@ -92,64 +126,86 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
-      {/* Background Glow Effect */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-black">
+      {/* Next.js Dark Theme Background Glow Effect */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/4 right-1/4 w-[400px] h-[400px] bg-purple-500/8 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-1/4 left-1/4 w-[350px] h-[350px] bg-cyan-500/6 rounded-full blur-[90px] pointer-events-none" />
       
-      <Card className="glass-card w-full max-w-md p-8 hover-float relative z-10">
+      <Card className="w-full max-w-md p-8 relative z-10 bg-gray-900/80 backdrop-blur-xl border border-gray-800 shadow-2xl">
         {/* Logo */}
         <div className="flex justify-center mb-8">
-          <div className="flex items-center gap-2 text-accent">
-            <Crown className="w-8 h-8" />
-            <span className="text-2xl font-bold text-foreground">Home Solutions</span>
+          <div className="flex items-center gap-2">
+            <Crown className="w-8 h-8 text-blue-400" />
+            <span className="text-2xl font-bold text-white">Home Solutions</span>
           </div>
         </div>
 
         {/* Title */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2 text-foreground">Welcome Back</h1>
-          <p className="text-muted-foreground">Sign in to your account</p>
+          <h1 className="text-3xl font-bold mb-2 text-white">Welcome Back</h1>
+          <p className="text-gray-400">Sign in to your account</p>
         </div>
 
         {/* Form */}
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-foreground">Email</Label>
+            <Label htmlFor="email" className="text-gray-200">Email</Label>
             <Input
               id="email"
               type="email"
               placeholder="you@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="bg-background/50 border-border focus:border-accent transition-colors text-foreground placeholder:text-muted-foreground"
+              onChange={(e) => {
+                setEmail(e.target.value);
+                const isValid = validateEmail(e.target.value);
+                updateFieldValidation('email', e.target.value, isValid);
+              }}
+              className={`bg-gray-800/50 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${
+                fieldValidation.email.touched 
+                  ? fieldValidation.email.isValid 
+                    ? 'border-green-500 focus:border-green-500' 
+                    : 'border-red-500 focus:border-red-500'
+                  : 'border-gray-700 focus:border-blue-500'
+              }`}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-foreground">Password</Label>
+            <Label htmlFor="password" className="text-gray-200">Password</Label>
             <Input
               id="password"
               type="password"
               placeholder="••••••••"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="bg-background/50 border-border focus:border-accent transition-colors text-foreground placeholder:text-muted-foreground"
+              onChange={(e) => {
+                setPassword(e.target.value);
+                const isValid = validatePassword(e.target.value);
+                updateFieldValidation('password', e.target.value, isValid);
+              }}
+              className={`bg-gray-800/50 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${
+                fieldValidation.password.touched 
+                  ? fieldValidation.password.isValid 
+                    ? 'border-green-500 focus:border-green-500' 
+                    : 'border-red-500 focus:border-red-500'
+                  : 'border-gray-700 focus:border-blue-500'
+              }`}
               required
             />
           </div>
 
           <div className="flex items-center justify-between text-sm">
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" className="w-4 h-4 rounded border-border" />
-              <span className="text-muted-foreground">Remember me</span>
+              <input type="checkbox" className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500/20" />
+              <span className="text-gray-400">Remember me</span>
             </label>
-            <Link href="/reset-password" className="text-accent hover:underline">
+            <Link href="/reset-password" className="text-blue-400 hover:text-blue-300 hover:underline transition-colors">
               Forgot password?
             </Link>
           </div>
 
-          <Button type="submit" className="w-full bg-primary hover:glow-blue-lg" size="lg" disabled={loading}>
+          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200" size="lg" disabled={loading}>
             {loading ? "Signing in..." : "Login"}
           </Button>
         </form>
@@ -157,18 +213,17 @@ const Login = () => {
         {/* Divider */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border"></div>
+            <div className="w-full border-t border-gray-700"></div>
           </div>
           <div className="relative flex justify-center text-xs">
-            <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+            <span className="bg-gray-900 px-2 text-gray-400">Or continue with</span>
           </div>
         </div>
 
         {/* Social Login */}
         <div className="grid grid-cols-2 gap-4">
           <Button 
-            variant="glass" 
-            className="w-full" 
+            className="w-full bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white transition-colors" 
             onClick={handleGoogleLogin}
             disabled={loading}
           >
@@ -180,7 +235,7 @@ const Login = () => {
             </svg>
             {loading ? "Signing in..." : "Google"}
           </Button>
-          <Button variant="glass" className="w-full" disabled>
+          <Button className="w-full bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white transition-colors" disabled>
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
               <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
             </svg>
@@ -189,9 +244,9 @@ const Login = () => {
         </div>
 
         {/* Sign Up Link */}
-        <p className="text-center text-sm text-muted-foreground mt-6">
+        <p className="text-center text-sm text-gray-400 mt-6">
           {"Don't"} have an account?{" "}
-          <Link href="/signup" className="text-accent hover:underline font-medium">
+          <Link href="/signup" className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors">
             Sign up
           </Link>
         </p>
