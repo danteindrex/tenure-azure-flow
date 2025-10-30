@@ -45,6 +45,7 @@ const SignUp = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [dateValidation, setDateValidation] = useState<{ isValid: boolean; message: string } | null>(null);
   const [autoSubmitting, setAutoSubmitting] = useState(false);
+  const [isBypassed, setIsBypassed] = useState(false);
   
   // Field validation states
   const [fieldValidation, setFieldValidation] = useState({
@@ -87,7 +88,7 @@ const SignUp = () => {
     }
     
     // If user is authenticated, check their database state to determine correct step
-    if (session?.user && !isPending && !bypassed) {
+    if (session?.user && !isPending && !isBypassed) {
       fetch('/api/onboarding/status', {
         method: 'GET',
         credentials: 'include'
@@ -142,7 +143,7 @@ const SignUp = () => {
         setStep(stepNumber);
       }
     }
-  }, [session, isPending, navigate]);
+  }, [session, isPending, navigate, isBypassed]);
 
   // Format phone number for display (US format: (555) 123-4567)
   const formatPhoneForDisplay = (phone: string): string => {
@@ -891,7 +892,7 @@ const SignUp = () => {
         })
       });
 
-      setBypassed(true);
+      setIsBypassed(true);
       setStep(5);
       toast.success("Phone bypassed for development! Please proceed to payment.");
 
