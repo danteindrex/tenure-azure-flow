@@ -15,7 +15,6 @@ import {
   Users
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import { toast } from "sonner";
 
 interface NewsPost {
@@ -47,7 +46,7 @@ const NewsFeed = () => {
     nextPayoutDate: 'TBD'
   });
 
-  const supabase = useSupabaseClient();
+
   const { data: session } = useSession();
   const user = session?.user;
 
@@ -57,42 +56,22 @@ const NewsFeed = () => {
       setLoading(true);
 
       // Fetch published news posts
-      const { data: posts, error: postsError } = await supabase
-        .from('newsfeedpost')
-        .select('*')
-        .eq('status', 'Published')
-        .order('publish_date', { ascending: false })
-        .limit(10);
-
-      if (postsError) {
-        console.error('Error fetching news posts:', postsError);
+      const response = await fetch('/api/newsfeed/posts');
+      if (response.ok) {
+        const data = await response.json();
+        setNewsPosts(data.posts || []);
       } else {
-        setNewsPosts(posts || []);
+        console.error('Error fetching news posts:', response.statusText);
       }
 
-      // Calculate fund statistics using normalized tables
-      const { data: payments, error: paymentsError } = await supabase
-        .from('user_payments')
-        .select('amount')
-        .eq('status', 'completed');
-
-      const { data: members, error: membersError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('status', 'Active');
-
-      if (!paymentsError && !membersError) {
-        const totalRevenue = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
-        const totalMembers = members?.length || 0;
-        const potentialWinners = Math.min(Math.floor(totalRevenue / 100000), totalMembers); // BR-4: $100K per winner
-
-        setFundStats({
-          totalRevenue,
-          totalMembers,
-          potentialWinners,
-          nextPayoutDate: 'March 15, 2025' // This could be calculated based on business rules
-        });
-      }
+      // Calculate fund statistics - placeholder values for now
+      // TODO: Create API endpoint for fund statistics
+      setFundStats({
+        totalRevenue: 0,
+        totalMembers: 0,
+        potentialWinners: 0,
+        nextPayoutDate: 'March 15, 2025'
+      });
 
     } catch (error) {
       console.error('Error loading news feed data:', error);
@@ -112,7 +91,7 @@ const NewsFeed = () => {
 
   useEffect(() => {
     loadNewsFeedData();
-  }, [supabase]);
+  }, []);
 
   // Get priority badge color
   const getPriorityBadge = (priority: string) => {

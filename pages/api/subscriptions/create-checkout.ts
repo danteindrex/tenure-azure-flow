@@ -1,5 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createPagesServerClient } from "@supabase/auth-helpers-nextjs";
+import { auth } from "@/lib/auth";
+import { db } from "@/drizzle/db";
+import { users } from "@/drizzle/schema/users";
+import { eq } from "drizzle-orm";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -8,49 +11,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const supabaseAuth = createPagesServerClient({ req, res });
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseAuth.auth.getUser();
+    // Get current user session
+    const session = await auth.api.getSession({ 
+      headers: new Headers(req.headers as any)
+    });
 
-    if (userError) {
-      return res.status(401).json({ error: userError.message });
-    }
-    if (!user) {
+    if (!session?.user) {
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    // Get user ID from normalized database, create if doesn't exist
-    const userQuery = await supabaseAuth
-      .from('users')
-      .select('id')
-      .eq('auth_user_id', user.id)
-      .single();
+    // Get user from database
+    const userQuery = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
 
-    let userData = userQuery.data;
+    let userData = userQuery[0];
 
     // If user record doesn't exist, create it
-    if (userQuery.error || !userData) {
-      console.log('User record not found, creating new record for:', user.email);
+    if (!userData) {
+      console.log('User record not found, creating new record for:', session.user.email);
 
-      const { data: newUserData, error: createError } = await supabaseAuth
-        .from('users')
-        .insert({
-          auth_user_id: user.id,
-          email: user.email,
-          email_verified: true,
+      const newUserData = await db
+        .insert(users)
+        .values({
+          id: session.user.id,
+          authUserId: session.user.id,
+          email: session.user.email || '',
+          emailVerified: true,
           status: 'Pending'
         })
-        .select('id')
-        .single();
+        .returning();
 
-      if (createError || !newUserData) {
-        console.error('Failed to create user record:', createError);
+      if (!newUserData || newUserData.length === 0) {
+        console.error('Failed to create user record');
         return res.status(500).json({ error: 'Failed to create user record' });
       }
 
-      userData = newUserData;
+      userData = newUserData[0];
     }
 
     // Call subscription service to create Stripe checkout session
@@ -60,6 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.user.id}`, // Add authentication
       },
       body: JSON.stringify({
         userId: userData.id, // Using normalized user ID

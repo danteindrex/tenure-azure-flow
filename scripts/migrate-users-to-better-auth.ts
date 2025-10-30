@@ -150,7 +150,7 @@ async function migrateUsers() {
 
     // Check for missing links
     if (parseInt(summary.supabase_users) !== parseInt(summary.better_auth_users)) {
-      console.log('\n⚠️  Warning: Number of Supabase users doesn't match Better Auth users')
+      console.log('\n⚠️  Warning: Number of Supabase users does not match Better Auth users')
     }
 
     if (parseInt(summary.public_users) !== parseInt(summary.linked_users)) {

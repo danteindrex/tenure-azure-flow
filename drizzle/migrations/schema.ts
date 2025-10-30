@@ -442,7 +442,7 @@ export const systemAuditLogs = pgTable("system_audit_logs", {
 
 export const payoutManagement = pgTable("payout_management", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	payoutId: text("payout_id").default((gen_random_uuid())).notNull(),
+	payoutId: text("payout_id").default(sql`gen_random_uuid()`).notNull(),
 	userId: uuid("user_id").notNull(),
 	queuePosition: integer("queue_position").notNull(),
 	amount: numeric({ precision: 12, scale:  2 }).default('100000.00').notNull(),
@@ -497,7 +497,7 @@ export const userAuditLogs = pgTable("user_audit_logs", {
 
 export const taxForms = pgTable("tax_forms", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	formId: text("form_id").default((gen_random_uuid())).notNull(),
+	formId: text("form_id").default(sql`gen_random_uuid()`).notNull(),
 	userId: uuid("user_id").notNull(),
 	formType: text("form_type").notNull(),
 	taxYear: integer("tax_year").notNull(),
@@ -579,7 +579,7 @@ export const kycVerification = pgTable("kyc_verification", {
 
 export const adminAlerts = pgTable("admin_alerts", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	alertId: text("alert_id").default((gen_random_uuid())).notNull(),
+	alertId: text("alert_id").default(sql`gen_random_uuid()`).notNull(),
 	title: text().notNull(),
 	message: text().notNull(),
 	severity: text().default('info').notNull(),

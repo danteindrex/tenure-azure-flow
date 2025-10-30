@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "@/lib/auth-client";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import HelpService, { SupportTicket, FAQCategory, FAQItem, KnowledgeBaseArticle } from "@/lib/help";
 import { logError } from "@/lib/audit";
 
@@ -49,12 +48,12 @@ const Help = () => {
     totalResults: number;
   }>({ faqItems: [], articles: [], totalResults: 0 });
 
-  const supabase = useSupabaseClient();
+
   const { data: session } = useSession();
   const user = session?.user;
   
   // Memoize the help service to prevent recreation on every render
-  const helpService = useMemo(() => new HelpService(supabase), [supabase]);
+  const helpService = useMemo(() => new HelpService(), []);
 
   // Load initial data
   useEffect(() => {

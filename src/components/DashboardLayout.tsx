@@ -7,6 +7,7 @@ import { authClient, useSession } from "@/lib/auth-client";
 import { logLogout } from "@/lib/audit";
 import { useTheme } from "@/contexts/ThemeContext";
 import Sidebar from "./Sidebar";
+import IdentityVerificationBanner from "./IdentityVerificationBanner";
 
 const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
   const router = useRouter();
@@ -56,6 +57,9 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
       <div className="flex-1 flex flex-col">
         {/* Sweep Animation on Load */}
         <div className="fixed top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-accent to-transparent sweep-line z-50" />
+
+        {/* Identity Verification Banner */}
+        <IdentityVerificationBanner />
 
         {/* Header */}
         <header className="sticky top-0 z-40 backdrop-blur-lg bg-background/95 border-b border-border shadow-sm">

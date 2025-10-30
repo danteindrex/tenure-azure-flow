@@ -1,5 +1,5 @@
 // Help system service for managing support tickets, FAQ, and knowledge base
-import SupabaseClientSingleton from './supabase';
+import { db } from '../../drizzle/db';
 
 export interface SupportTicket {
   id?: string;
@@ -87,28 +87,17 @@ export interface HelpSearchLog {
 }
 
 class HelpService {
-  private supabase: ReturnType<typeof SupabaseClientSingleton.getInstance>;
-
   constructor() {
-    // Always use singleton for database operations (not auth)
-    this.supabase = SupabaseClientSingleton.getInstance();
+    // Using Drizzle ORM with existing database tables
+    // Note: Help/support tables may need to be created if not existing
   }
 
-  // Support Tickets
+  // Support Tickets - Placeholder implementations
   async createSupportTicket(ticket: Omit<SupportTicket, 'id' | 'created_at' | 'updated_at' | 'ticket_number'>): Promise<SupportTicket | null> {
     try {
-      const { data, error } = await this.supabase
-        .from('support_tickets')
-        .insert(ticket)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating support ticket:', error);
-        return null;
-      }
-
-      return data;
+      // TODO: Implement with proper support_tickets table
+      console.log('Creating support ticket:', ticket);
+      return null;
     } catch (error) {
       console.error('Error in createSupportTicket:', error);
       return null;
@@ -117,18 +106,9 @@ class HelpService {
 
   async getSupportTickets(userId: string): Promise<SupportTicket[]> {
     try {
-      const { data, error } = await this.supabase
-        .from('support_tickets')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching support tickets:', error);
-        return [];
-      }
-
-      return data || [];
+      // TODO: Implement with proper support_tickets table
+      console.log('Getting support tickets for user:', userId);
+      return [];
     } catch (error) {
       console.error('Error in getSupportTickets:', error);
       return [];
@@ -137,19 +117,9 @@ class HelpService {
 
   async getSupportTicket(ticketId: string, userId: string): Promise<SupportTicket | null> {
     try {
-      const { data, error } = await this.supabase
-        .from('support_tickets')
-        .select('*')
-        .eq('id', ticketId)
-        .eq('user_id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching support ticket:', error);
-        return null;
-      }
-
-      return data;
+      // TODO: Implement with proper support_tickets table
+      console.log('Getting support ticket:', ticketId, 'for user:', userId);
+      return null;
     } catch (error) {
       console.error('Error in getSupportTicket:', error);
       return null;
@@ -158,39 +128,21 @@ class HelpService {
 
   async updateSupportTicket(ticketId: string, updates: Partial<SupportTicket>, userId: string): Promise<boolean> {
     try {
-      const { error } = await this.supabase
-        .from('support_tickets')
-        .update(updates)
-        .eq('id', ticketId)
-        .eq('user_id', userId);
-
-      if (error) {
-        console.error('Error updating support ticket:', error);
-        return false;
-      }
-
-      return true;
+      // TODO: Implement with proper support_tickets table
+      console.log('Updating support ticket:', ticketId, updates, 'for user:', userId);
+      return false;
     } catch (error) {
       console.error('Error in updateSupportTicket:', error);
       return false;
     }
   }
 
-  // Support Ticket Messages
+  // Support Ticket Messages - Placeholder implementations
   async addTicketMessage(message: Omit<SupportTicketMessage, 'id' | 'created_at'>): Promise<SupportTicketMessage | null> {
     try {
-      const { data, error } = await this.supabase
-        .from('support_ticket_messages')
-        .insert(message)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error adding ticket message:', error);
-        return null;
-      }
-
-      return data;
+      // TODO: Implement with proper support_ticket_messages table
+      console.log('Adding ticket message:', message);
+      return null;
     } catch (error) {
       console.error('Error in addTicketMessage:', error);
       return null;
@@ -199,66 +151,97 @@ class HelpService {
 
   async getTicketMessages(ticketId: string): Promise<SupportTicketMessage[]> {
     try {
-      const { data, error } = await this.supabase
-        .from('support_ticket_messages')
-        .select('*')
-        .eq('ticket_id', ticketId)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching ticket messages:', error);
-        return [];
-      }
-
-      return data || [];
+      // TODO: Implement with proper support_ticket_messages table
+      console.log('Getting ticket messages for:', ticketId);
+      return [];
     } catch (error) {
       console.error('Error in getTicketMessages:', error);
       return [];
     }
   }
 
-  // FAQ Categories
+  // FAQ Categories - Static data for now
   async getFAQCategories(): Promise<FAQCategory[]> {
     try {
-      const { data, error } = await this.supabase
-        .from('faq_categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching FAQ categories:', error);
-        return [];
-      }
-
-      return data || [];
+      // Return static FAQ categories until database tables are created
+      return [
+        {
+          id: '1',
+          name: 'Account Management',
+          description: 'Questions about your account, profile, and settings',
+          icon: 'user',
+          sort_order: 1,
+          is_active: true
+        },
+        {
+          id: '2',
+          name: 'Payments & Billing',
+          description: 'Payment methods, billing cycles, and transaction history',
+          icon: 'credit-card',
+          sort_order: 2,
+          is_active: true
+        },
+        {
+          id: '3',
+          name: 'Queue System',
+          description: 'How the membership queue works and your position',
+          icon: 'list',
+          sort_order: 3,
+          is_active: true
+        },
+        {
+          id: '4',
+          name: 'Technical Support',
+          description: 'Technical issues, bugs, and troubleshooting',
+          icon: 'settings',
+          sort_order: 4,
+          is_active: true
+        }
+      ];
     } catch (error) {
       console.error('Error in getFAQCategories:', error);
       return [];
     }
   }
 
-  // FAQ Items
+  // FAQ Items - Static data for now
   async getFAQItems(categoryId?: string): Promise<FAQItem[]> {
     try {
-      let query = this.supabase
-        .from('faq_items')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true });
+      // Return static FAQ items until database tables are created
+      const allFAQs = [
+        {
+          id: '1',
+          category_id: '1',
+          question: 'How do I update my profile information?',
+          answer: 'You can update your profile information by going to Settings > Profile and editing your details.',
+          sort_order: 1,
+          is_active: true,
+          view_count: 0,
+          helpful_count: 0
+        },
+        {
+          id: '2',
+          category_id: '2',
+          question: 'When will I be charged for my membership?',
+          answer: 'You will be charged $300 initially (joining fee + first month), then $25 monthly thereafter.',
+          sort_order: 1,
+          is_active: true,
+          view_count: 0,
+          helpful_count: 0
+        },
+        {
+          id: '3',
+          category_id: '3',
+          question: 'How does the queue system work?',
+          answer: 'Members are ranked by their tenure start date. The longest continuous members are eligible for payouts.',
+          sort_order: 1,
+          is_active: true,
+          view_count: 0,
+          helpful_count: 0
+        }
+      ];
 
-      if (categoryId) {
-        query = query.eq('category_id', categoryId);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching FAQ items:', error);
-        return [];
-      }
-
-      return data || [];
+      return categoryId ? allFAQs.filter(faq => faq.category_id === categoryId) : allFAQs;
     } catch (error) {
       console.error('Error in getFAQItems:', error);
       return [];
@@ -267,19 +250,13 @@ class HelpService {
 
   async searchFAQItems(searchQuery: string): Promise<FAQItem[]> {
     try {
-      const { data, error } = await this.supabase
-        .from('faq_items')
-        .select('*')
-        .eq('is_active', true)
-        .or(`question.ilike.%${searchQuery}%,answer.ilike.%${searchQuery}%`)
-        .order('helpful_count', { ascending: false });
-
-      if (error) {
-        console.error('Error searching FAQ items:', error);
-        return [];
-      }
-
-      return data || [];
+      const allFAQs = await this.getFAQItems();
+      const query = searchQuery.toLowerCase();
+      
+      return allFAQs.filter(faq => 
+        faq.question.toLowerCase().includes(query) || 
+        faq.answer.toLowerCase().includes(query)
+      );
     } catch (error) {
       console.error('Error in searchFAQItems:', error);
       return [];
@@ -288,31 +265,8 @@ class HelpService {
 
   async incrementFAQViewCount(faqId: string): Promise<boolean> {
     try {
-      // First get the current view count
-      const { data: currentData, error: fetchError } = await this.supabase
-        .from('faq_items')
-        .select('view_count')
-        .eq('id', faqId)
-        .single();
-
-      if (fetchError) {
-        console.error('Error fetching current FAQ view count:', fetchError);
-        return false;
-      }
-
-      const currentViewCount = currentData?.view_count || 0;
-
-      // Then update with incremented value
-      const { error } = await this.supabase
-        .from('faq_items')
-        .update({ view_count: currentViewCount + 1 })
-        .eq('id', faqId);
-
-      if (error) {
-        console.error('Error incrementing FAQ view count:', error);
-        return false;
-      }
-
+      // TODO: Implement with proper faq_items table
+      console.log('Incrementing FAQ view count for:', faqId);
       return true;
     } catch (error) {
       console.error('Error in incrementFAQViewCount:', error);
@@ -320,31 +274,12 @@ class HelpService {
     }
   }
 
-  // Knowledge Base Articles
+  // Knowledge Base Articles - Placeholder implementations
   async getKnowledgeBaseArticles(category?: string, featured?: boolean): Promise<KnowledgeBaseArticle[]> {
     try {
-      let query = this.supabase
-        .from('knowledge_base_articles')
-        .select('*')
-        .eq('is_published', true)
-        .order('created_at', { ascending: false });
-
-      if (category) {
-        query = query.eq('category', category);
-      }
-
-      if (featured) {
-        query = query.eq('is_featured', true);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching knowledge base articles:', error);
-        return [];
-      }
-
-      return data || [];
+      // TODO: Implement with proper knowledge_base_articles table
+      console.log('Getting knowledge base articles:', { category, featured });
+      return [];
     } catch (error) {
       console.error('Error in getKnowledgeBaseArticles:', error);
       return [];
@@ -353,43 +288,20 @@ class HelpService {
 
   async searchKnowledgeBase(searchQuery: string): Promise<KnowledgeBaseArticle[]> {
     try {
-      const { data, error } = await this.supabase
-        .from('knowledge_base_articles')
-        .select('*')
-        .eq('is_published', true)
-        .or(`title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%,excerpt.ilike.%${searchQuery}%`)
-        .order('helpful_count', { ascending: false });
-
-      if (error) {
-        console.error('Error searching knowledge base:', error);
-        return [];
-      }
-
-      return data || [];
+      // TODO: Implement with proper knowledge_base_articles table
+      console.log('Searching knowledge base:', searchQuery);
+      return [];
     } catch (error) {
       console.error('Error in searchKnowledgeBase:', error);
       return [];
     }
   }
 
-  // Search Logs
+  // Search Logs - Placeholder implementation
   async logSearch(searchQuery: string, resultsCount: number, userId?: string, clickedResultId?: string, clickedResultType?: string): Promise<boolean> {
     try {
-      const { error } = await this.supabase
-        .from('help_search_logs')
-        .insert({
-          user_id: userId,
-          search_query: searchQuery,
-          results_count: resultsCount,
-          clicked_result_id: clickedResultId,
-          clicked_result_type: clickedResultType
-        });
-
-      if (error) {
-        console.error('Error logging search:', error);
-        return false;
-      }
-
+      // TODO: Implement with proper help_search_logs table
+      console.log('Logging search:', { searchQuery, resultsCount, userId, clickedResultId, clickedResultType });
       return true;
     } catch (error) {
       console.error('Error in logSearch:', error);

@@ -3,7 +3,8 @@
  *
  * This file configures Better Auth with:
  * - Drizzle ORM adapter for database
- * - Resend SMTP for email verification
+ * - Gmail SMTP for email verification
+ * - Gmail SMTP for email verification
  * - Google OAuth provider
  * - Passkey (WebAuthn) support
  * - Two-factor authentication (TOTP + backup codes)
@@ -13,16 +14,18 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { nextCookies } from 'better-auth/next-js'
-import { passkey, twoFactor, organization } from 'better-auth/plugins'
-import { db } from '@/drizzle/db'
-import { Resend } from 'resend'
+import { twoFactor, organization, emailOTP } from 'better-auth/plugins'
+import { passkey } from 'better-auth/plugins/passkey'
+import { db } from '../drizzle/db'
+import { emailService } from '../src/lib/email'
 
-// Initialize Resend for email
-const resend = new Resend(process.env.RESEND_API_KEY!)
+// SMTP email service initialized
 
 export const auth = betterAuth({
   // Database adapter
-  database: drizzleAdapter(db, { provider: 'pg' }),
+  database: drizzleAdapter(db, {
+    provider: 'pg'
+  }),
 
   // Base URL for authentication
   baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
@@ -34,80 +37,6 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
-
-    // Send verification email using Resend
-    sendVerificationEmail: async ({ user, url, token }) => {
-      try {
-        await resend.emails.send({
-          from: process.env.EMAIL_FROM || 'noreply@yourdomain.com',
-          to: user.email,
-          subject: 'Verify your email address',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h1 style="color: #333;">Welcome to Tenure!</h1>
-              <p style="color: #666; font-size: 16px;">
-                Please verify your email address by clicking the button below:
-              </p>
-              <a href="${url}" style="
-                display: inline-block;
-                padding: 12px 24px;
-                background-color: #0070f3;
-                color: white;
-                text-decoration: none;
-                border-radius: 5px;
-                margin: 20px 0;
-              ">Verify Email</a>
-              <p style="color: #999; font-size: 14px;">
-                Or use this code: <strong>${token}</strong>
-              </p>
-              <p style="color: #999; font-size: 12px;">
-                If you didn't request this email, you can safely ignore it.
-              </p>
-            </div>
-          `
-        })
-      } catch (error) {
-        console.error('Failed to send verification email:', error)
-        throw error
-      }
-    },
-
-    // Send password reset email
-    sendResetPasswordEmail: async ({ user, url, token }) => {
-      try {
-        await resend.emails.send({
-          from: process.env.EMAIL_FROM || 'noreply@yourdomain.com',
-          to: user.email,
-          subject: 'Reset your password',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h1 style="color: #333;">Password Reset Request</h1>
-              <p style="color: #666; font-size: 16px;">
-                Click the button below to reset your password:
-              </p>
-              <a href="${url}" style="
-                display: inline-block;
-                padding: 12px 24px;
-                background-color: #0070f3;
-                color: white;
-                text-decoration: none;
-                border-radius: 5px;
-                margin: 20px 0;
-              ">Reset Password</a>
-              <p style="color: #999; font-size: 14px;">
-                Or use this code: <strong>${token}</strong>
-              </p>
-              <p style="color: #999; font-size: 12px;">
-                If you didn't request this, please ignore this email.
-              </p>
-            </div>
-          `
-        })
-      } catch (error) {
-        console.error('Failed to send reset password email:', error)
-        throw error
-      }
-    }
   },
 
   // Social authentication providers
@@ -124,22 +53,66 @@ export const auth = betterAuth({
   plugins: [
     nextCookies(),  // Required for Next.js cookie management
 
-    // Passkey plugin (WebAuthn - Face ID, Touch ID, Windows Hello)
+    // Email OTP plugin for 6-digit verification codes
+    emailOTP({
+      // Override default email verification to use OTP instead of links
+      overrideDefaultEmailVerification: true,
+      // 6-digit OTP (default)
+      otpLength: 6,
+      // OTP expires in 10 minutes
+      expiresIn: 600,
+      // Send verification OTP when user signs up
+      sendVerificationOnSignUp: true,
+      // Allow 3 attempts before invalidating OTP
+      allowedAttempts: 3,
+      // Send OTP via our email service
+      async sendVerificationOTP({ email, otp, type }) {
+        console.log('📧 Better Auth: Sending OTP email...')
+        console.log('   Email:', email)
+        console.log('   OTP (6-digit):', otp)
+        console.log('   Type:', type)
+
+        try {
+          if (type === 'email-verification') {
+            await emailService.sendVerificationEmail({
+              to: email,
+              token: otp,
+              url: `${process.env.BETTER_AUTH_URL}/verify-email?email=${email}&otp=${otp}`
+            })
+          } else if (type === 'forget-password') {
+            await emailService.sendPasswordResetEmail({
+              to: email,
+              token: otp,
+              url: `${process.env.BETTER_AUTH_URL}/reset-password?email=${email}&otp=${otp}`
+            })
+          } else if (type === 'sign-in') {
+            // For sign-in OTP, we can use the verification template
+            await emailService.sendVerificationEmail({
+              to: email,
+              token: otp,
+              url: `${process.env.BETTER_AUTH_URL}/sign-in?email=${email}&otp=${otp}`
+            })
+          }
+
+          console.log('✅ Better Auth: OTP email sent successfully!')
+
+        } catch (error) {
+          console.error('❌ Better Auth: Failed to send OTP email:', error)
+          throw error
+        }
+      }
+    }),
+
+    // Passkey plugin (WebAuthn support)
     passkey({
-      // Relying Party name (your app name)
       rpName: 'Tenure',
-      // Relying Party ID (your domain)
-      rpID: process.env.NODE_ENV === 'production'
-        ? 'yourdomain.com'
-        : 'localhost'
+      rpID: process.env.NODE_ENV === 'production' ? 'yourdomain.com' : 'localhost'
     }),
 
     // Two-Factor Authentication plugin (TOTP + backup codes)
     twoFactor({
       // Issuer name shown in authenticator apps
-      issuer: 'Tenure',
-      // Number of backup codes to generate
-      backupCodeLength: 10
+      issuer: 'Tenure'
     }),
 
     // Organization plugin (team management)
@@ -163,7 +136,9 @@ export const auth = betterAuth({
 
   // Advanced configuration
   advanced: {
-    generateId: false,  // Let PostgreSQL handle UUID generation
+    database: {
+      generateId: () => crypto.randomUUID(), // Generate UUIDs for Better Auth
+    },
     useSecureCookies: process.env.NODE_ENV === 'production',
     // Cross-origin settings for API
     crossSubDomainCookies: {
@@ -181,4 +156,3 @@ export const auth = betterAuth({
 
 // Export types for use in application
 export type Session = typeof auth.$Infer.Session
-export type User = typeof auth.$Infer.User

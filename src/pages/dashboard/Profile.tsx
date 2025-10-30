@@ -58,21 +58,10 @@ const Profile = () => {
         const fullName = user.name || '';
         const email = user.email || '';
         
-        // Parse phone number if available
-        let phoneCountryCode = '+1';
-        let phoneNumber = '';
-        const rawPhone = user.metadata?.phone || '';
-        if (rawPhone) {
-          if (rawPhone.startsWith('+')) {
-            const match = rawPhone.match(/^(\+\d{1,3})(.+)$/);
-            if (match) {
-              phoneCountryCode = match[1];
-              phoneNumber = match[2].replace(/[^0-9]/g, '');
-            }
-          } else {
-            phoneNumber = rawPhone.replace(/[^0-9]/g, '');
-          }
-        }
+        // Default phone values - TODO: Get from user profile data
+        const phoneCountryCode = '+1';
+        const phoneNumber = '';
+        // Note: Phone data should be fetched from user_contacts table
 
         const userIdDisplay = `USR-${String(user.id).slice(-6)}`;
         const joinDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
@@ -82,14 +71,14 @@ const Profile = () => {
           email,
           phoneCountryCode,
           phoneNumber,
-          streetAddress: user.metadata?.streetAddress || '',
-          city: user.metadata?.city || '',
-          state: user.metadata?.state || '',
-          zipCode: user.metadata?.zipCode || '',
+          streetAddress: '',
+          city: '',
+          state: '',
+          zipCode: '',
           userId: userIdDisplay,
           joinDate,
           status: 'Active',
-          bio: user.metadata?.bio || '',
+          bio: '',
         };
 
         setProfileData(userData);
@@ -114,15 +103,8 @@ const Profile = () => {
       
       // Update user profile with Better Auth
       const result = await authClient.updateUser({
-        name: profileData.fullName,
-        metadata: {
-          phone: profileData.phoneNumber,
-          streetAddress: profileData.streetAddress,
-          city: profileData.city,
-          state: profileData.state,
-          zipCode: profileData.zipCode,
-          bio: profileData.bio,
-        }
+        name: profileData.fullName
+        // TODO: Store additional profile data in user_profiles table
       });
 
       if (result.error) {

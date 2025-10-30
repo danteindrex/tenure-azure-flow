@@ -15,10 +15,9 @@ import {
   Activity
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
 
 const Analytics = () => {
-  const supabase = useSupabaseClient();
+
   const { data: session } = useSession();
   const user = session?.user;
   const [timeRange, setTimeRange] = useState("6months");
@@ -55,136 +54,58 @@ const Analytics = () => {
     }
   }, [timeRange]);
 
-  const monthLabel = (d: Date) => d.toLocaleString("en-US", { month: "short", year: "numeric" });
 
-  const computeNextPayoutLabel = () => {
-    const now = new Date();
-    const target = new Date(now.getFullYear(), now.getMonth(), 15);
-    if (now > target) target.setMonth(target.getMonth() + 1);
-    return `${target.toLocaleString("en-US", { month: "long" })} ${target.getFullYear()}`;
-  };
 
   useEffect(() => {
     const load = async () => {
       try {
-        // Resolve current user_id
-        let userId: string | null = null;
-        if (user?.id) {
-          const { data: userData } = await supabase
-            .from('users')
-            .select('id')
-            .eq('auth_user_id', user.id)
-            .maybeSingle();
-          if (userData?.id) userId = userData.id as string;
-
-          // Get tenure from membership_queue
-          const { data: queueData } = await supabase
-            .from('membership_queue')
-            .select('months_in_queue')
-            .eq('user_id', userId)
-            .maybeSingle();
-          setOverview((o) => ({ ...o, tenureMonths: queueData?.months_in_queue ?? 0 }));
+        const response = await fetch(`/api/analytics/overview?rangeMonths=${rangeMonths}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch analytics data');
         }
+        
+        const data = await response.json();
+        const { overview: apiOverview, monthly } = data;
 
-        // Fetch payments for current user to compute invested and monthly series
-        let investedTotal = 0;
-        const now = new Date();
-        const months: Array<{ key: string; invested: number; earned: number }> = [];
-        for (let i = rangeMonths - 1; i >= 0; i--) {
-          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          months.push({ key: `${d.getFullYear()}-${d.getMonth() + 1}`, invested: 0, earned: 0 });
-        }
-
-        if (userId) {
-          const fromDate = new Date(now.getFullYear(), now.getMonth() - (rangeMonths - 1), 1);
-          const { data: myPayments } = await supabase
-            .from('user_payments')
-            .select('amount, payment_date, status')
-            .eq('user_id', userId)
-            .gte('payment_date', fromDate.toISOString())
-            .order('payment_date', { ascending: true });
-          if (myPayments) {
-            for (const p of myPayments as any[]) {
-              investedTotal += p.amount || 0;
-              const d = new Date(p.payment_date);
-              const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
-              const bucket = months.find((m) => m.key === key);
-              if (bucket) bucket.invested += p.amount || 0;
-            }
-          }
-        }
-
-        // Fetch queue to compute position and progress
-        let queuePosition = 0;
-        let queueCount = 0;
-        {
-          const { data: queue } = await supabase
-            .from('membership_queue')
-            .select('user_id, queue_position')
-            .order('queue_position', { ascending: true });
-          if (queue) {
-            queueCount = queue.length;
-            if (userId) {
-              const row = (queue as any[]).find((q) => q.user_id === userId);
-              queuePosition = row?.queue_position ?? 0;
-            }
-          }
-        }
-
-        // Compute total earned (if payout table unavailable, keep 0)
-        const totalEarned = 0;
-        const netPosition = totalEarned - investedTotal;
-
-        // Potential payout: approximate as total revenue of all completed payments / 2
-        let totalRevenueAll = 0;
-        {
-          const { data: allPayments } = await supabase
-            .from('user_payments')
-            .select('amount')
-            .eq('status', 'completed');
-          if (allPayments) totalRevenueAll = (allPayments as any[]).reduce((s, p) => s + (p.amount || 0), 0);
-        }
-        const potentialPayout = Math.max(totalRevenueAll / 2, 0);
-
-        // Monthly data finalization
-        const monthly = months.map((m, idx) => {
-          const date = new Date(now.getFullYear(), now.getMonth() - (rangeMonths - 1 - idx), 1);
-          const label = monthLabel(date);
-          const earned = 0; // no payouts source yet
-          return { month: label, invested: m.invested, earned, net: earned - m.invested };
-        });
-
-        // Performance metrics
-        const monthsWithPayments = monthly.filter((m) => m.invested > 0).length;
+        // Calculate additional metrics from the monthly data
+        const monthsWithPayments = monthly.filter((m: any) => m.invested > 0).length;
         const paymentConsistency = Math.round((monthsWithPayments / Math.max(monthly.length, 1)) * 100);
-        const queueProgress = queueCount > 0 && queuePosition > 0 ? Math.round(((queueCount - queuePosition + 1) / queueCount) * 100) : 0;
+        const queueProgress = apiOverview.queueCount > 0 && apiOverview.queuePosition > 0 
+          ? Math.round(((apiOverview.queueCount - apiOverview.queuePosition + 1) / apiOverview.queueCount) * 100) 
+          : 0;
         const startInvest = monthly[0]?.invested ?? 0;
         const endInvest = monthly[monthly.length - 1]?.invested ?? 0;
         const fundGrowth = startInvest > 0 ? Number((((endInvest - startInvest) / startInvest) * 100).toFixed(1)) : 0;
         const riskLevel = paymentConsistency >= 80 ? "Low" : paymentConsistency >= 50 ? "Medium" : "High";
 
+        // Add net calculation to monthly data
+        const monthlyWithNet = monthly.map((m: any) => ({
+          ...m,
+          net: m.earned - m.invested
+        }));
+
         // Projections
-        const nextPayout = computeNextPayoutLabel();
+        const nextPayout = apiOverview.nextPayoutDate;
         const confidence = Math.min(100, Math.max(0, Math.round((paymentConsistency + queueProgress) / 2)));
 
         setOverview({
-          totalInvested: investedTotal,
-          totalEarned,
-          netPosition,
-          tenureMonths: overview.tenureMonths,
-          queuePosition,
-          potentialPayout,
+          totalInvested: apiOverview.investedTotal,
+          totalEarned: apiOverview.totalEarned,
+          netPosition: apiOverview.netPosition,
+          tenureMonths: apiOverview.tenureMonths,
+          queuePosition: apiOverview.queuePosition,
+          potentialPayout: apiOverview.potentialPayout,
         });
-        setMonthlyData(monthly);
+        setMonthlyData(monthlyWithNet);
         setPerformance({ paymentConsistency, queueProgress, fundGrowth, riskLevel });
-        setProjections({ nextPayout, estimatedPayout: potentialPayout, confidence });
-      } catch {
+        setProjections({ nextPayout, estimatedPayout: apiOverview.potentialPayout, confidence });
+      } catch (error) {
+        console.error('Failed to load analytics data:', error);
         // Keep defaults on error
       }
     };
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabase, user?.id, rangeMonths]);
+  }, [user?.id, rangeMonths]);
 
   const getRiskColor = (risk: string) => {
     switch (risk) {

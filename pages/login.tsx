@@ -5,8 +5,8 @@ export default function LoginPage() {
   return (
     <>
       <Head>
-        <title>Login | Tenure</title>
-        <meta name="description" content="Sign in to your Tenure dashboard." />
+        <title>Login | Home Solutions</title>
+        <meta name="description" content="Sign in to your Home Solutions dashboard." />
       </Head>
       <Login />
     </>

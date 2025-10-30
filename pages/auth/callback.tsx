@@ -1,53 +1,60 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import { useSession } from '@/lib/auth-client';
 import { logError } from '@/lib/audit';
 
 const AuthCallback = () => {
   const router = useRouter();
-  const supabase = useSupabaseClient();
+  const { data: session, isPending } = useSession();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Auth callback error:', error);
-          await logError(`Auth callback error: ${error.message}`, undefined, {
-            error_code: error.message,
-            url: window.location.href
-          });
-          setError(error.message);
-          setLoading(false);
+        // Wait for session to load
+        if (isPending) {
           return;
         }
 
-        if (data.session) {
-          // Check if this is a new user who needs to complete profile
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('id')
-            .eq('auth_user_id', data.session.user.id)
-            .single();
-
-          if (userError || !userData) {
-            // New user - redirect to complete profile
-            router.replace('/signup/complete-profile');
-          } else {
-            // Existing user - redirect to dashboard
-            router.replace('/dashboard');
-          }
-        } else {
+        if (!session?.user) {
           // No session, redirect to login
           router.replace('/login');
+          return;
         }
+
+        // Get user's onboarding status via API
+        const response = await fetch('/api/onboarding/status', {
+          method: 'GET',
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          throw new Error(`API failed with status ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(`API returned error: ${data.error}`);
+        }
+        const onboardingStatus = data.status;
+        
+        console.log('User onboarding status:', {
+          userId: session.user.id,
+          step: onboardingStatus.step,
+          nextRoute: onboardingStatus.nextRoute,
+          canAccessDashboard: onboardingStatus.canAccessDashboard
+        });
+
+        // Redirect to the appropriate step
+        router.replace(onboardingStatus.nextRoute);
+
       } catch (err: any) {
-        console.error('Unexpected auth callback error:', err);
-        await logError(`Unexpected auth callback error: ${err.message}`, undefined, {
-          url: window.location.href
+        console.error('Auth callback error:', err);
+        await logError(`Auth callback error: ${err.message}`, session?.user?.id, {
+          url: window.location.href,
+          error: err.message
         });
         setError(err.message);
       } finally {
@@ -56,7 +63,7 @@ const AuthCallback = () => {
     };
 
     handleAuthCallback();
-  }, [router, supabase]);
+  }, [router, session, isPending]);
 
   if (loading) {
     return (

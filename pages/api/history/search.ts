@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { auth } from '@/lib/auth';
 import { logError } from '../../../src/lib/audit';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -8,10 +8,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const supabase = createPagesServerClient({ req, res });
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Get current user session
+    const session = await auth.api.getSession({ 
+      headers: new Headers(req.headers as any)
+    });
 
-    if (authError || !user) {
+    if (!session?.user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -21,39 +23,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Search term is required' });
     }
 
-    // Search activities
-    const { data: activities, error: activitiesError } = await supabase
-      .from('user_activity_history')
-      .select('*')
-      .eq('user_id', user.id)
-      .or(`action.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
-      .order('created_at', { ascending: false })
-      .limit(parseInt(limit as string));
-
-    if (activitiesError) {
-      console.error('Error searching activities:', activitiesError);
-      await logError(`Error searching activities: ${activitiesError.message}`, user.id);
-    }
-
-    // Search transactions
-    const { data: transactions, error: transactionsError } = await supabase
-      .from('transaction_history')
-      .select('*')
-      .eq('user_id', user.id)
-      .or(`description.ilike.%${searchTerm}%,payment_reference.ilike.%${searchTerm}%`)
-      .order('created_at', { ascending: false })
-      .limit(parseInt(limit as string));
-
-    if (transactionsError) {
-      console.error('Error searching transactions:', transactionsError);
-      await logError(`Error searching transactions: ${transactionsError.message}`, user.id);
-    }
+    // TODO: Implement search with Drizzle ORM
+    // For now, return empty results until history tables are set up
 
     res.status(200).json({
-      activities: activities || [],
-      transactions: transactions || [],
+      activities: [],
+      transactions: [],
       search_term: searchTerm,
-      total_results: (activities?.length || 0) + (transactions?.length || 0)
+      total_results: 0
     });
 
   } catch (error: any) {

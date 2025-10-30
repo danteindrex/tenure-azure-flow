@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createPagesServerClient } from "@supabase/auth-helpers-nextjs";
+import { auth } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -9,18 +9,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const supabaseAuth = createPagesServerClient({ req, res });
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseAuth.auth.getUser();
-
-    if (userError) {
-      return res.status(401).json({ error: userError.message });
-    }
-    if (!user) {
+    // Get current user session using Better Auth
+    const session = await auth.api.getSession({ 
+      headers: new Headers(req.headers as any)
+    });
+    
+    if (!session?.user) {
       return res.status(401).json({ error: "Not authenticated" });
     }
+
+    const user = session.user;
 
     const { 
       email, 

@@ -24,13 +24,8 @@ export {
   session,
   account,
   verification,
-  passkey,
   twoFactor,
-  userRelations,
-  sessionRelations,
-  accountRelations,
-  passkeyRelations,
-  twoFactorRelations
+  organization
 } from './auth'
 
 // ============================================================================
@@ -41,12 +36,7 @@ export {
   userProfiles,
   userContacts,
   userAddresses,
-  userMemberships,
-  usersRelations,
-  userProfilesRelations,
-  userContactsRelations,
-  userAddressesRelations,
-  userMembershipsRelations
+  userMemberships
 } from './users'
 
 // ============================================================================
@@ -58,13 +48,7 @@ export {
   userSecuritySettings,
   userPaymentSettings,
   userPrivacySettings,
-  userAppearanceSettings,
-  userSettingsRelations,
-  userNotificationPreferencesRelations,
-  userSecuritySettingsRelations,
-  userPaymentSettingsRelations,
-  userPrivacySettingsRelations,
-  userAppearanceSettingsRelations
+  userAppearanceSettings
 } from './settings'
 
 // ============================================================================
@@ -75,12 +59,7 @@ export {
   userSubscriptions,
   userPayments,
   userBillingSchedules,
-  userAgreements,
-  userPaymentMethodsRelations,
-  userSubscriptionsRelations,
-  userPaymentsRelations,
-  userBillingSchedulesRelations,
-  userAgreementsRelations
+  userAgreements
 } from './financial'
 
 // ============================================================================
@@ -90,11 +69,7 @@ export {
   membershipQueue,
   kycVerification,
   payoutManagement,
-  disputes,
-  membershipQueueRelations,
-  kycVerificationRelations,
-  payoutManagementRelations,
-  disputesRelations
+  disputes
 } from './membership'
 
 // ============================================================================
@@ -103,10 +78,7 @@ export {
 export {
   taxForms,
   transactionMonitoring,
-  verificationCodes,
-  taxFormsRelations,
-  transactionMonitoringRelations,
-  verificationCodesRelations
+  verificationCodes
 } from './compliance'
 
 // ============================================================================
@@ -114,22 +86,12 @@ export {
 // ============================================================================
 export {
   systemAuditLogs,
-  userAuditLogs,
-  systemAuditLogsRelations,
-  userAuditLogsRelations
+  userAuditLogs
 } from './audit'
 
 // ============================================================================
-// ORGANIZATION TABLES (BETTER AUTH)
+// ORGANIZATION TABLES (BETTER AUTH) - Now exported from auth.ts
 // ============================================================================
-export {
-  organization,
-  organizationMember,
-  organizationInvitation,
-  organizationRelations,
-  organizationMemberRelations,
-  organizationInvitationRelations
-} from './organizations'
 
 // ============================================================================
 // ADMIN & PAYLOAD CMS TABLES
@@ -142,12 +104,5 @@ export {
   payloadPreferences,
   payloadPreferencesRels,
   payloadLockedDocuments,
-  payloadLockedDocumentsRels,
-  adminRelations,
-  adminSessionsRelations,
-  adminAlertsRelations,
-  payloadPreferencesRelations,
-  payloadPreferencesRelsRelations,
-  payloadLockedDocumentsRelations,
-  payloadLockedDocumentsRelsRelations
+  payloadLockedDocumentsRels
 } from './admin'

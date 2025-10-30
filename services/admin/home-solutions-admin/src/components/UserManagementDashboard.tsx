@@ -2,123 +2,123 @@
 import React, { useEffect, useState } from 'react'
 
 interface UserData {
-  id: string
-  email: string
-  status: string
-  email_verified: boolean
-  created_at: string
-  profile?: {
-    fullName: string
-    phoneNumber: string
-  }
-  financial?: {
-    totalPayments: number
-    paymentCount: number
-    lastPaymentDate: string
-  }
-  queue?: {
-    position: number
+    id: string
+    email: string
     status: string
-  }
+    email_verified: boolean
+    created_at: string
+    profile?: {
+        fullName: string
+        phoneNumber: string
+    }
+    financial?: {
+        totalPayments: number
+        paymentCount: number
+        lastPaymentDate: string
+    }
+    queue?: {
+        position: number
+        status: string
+    }
 }
 
 interface UserStats {
-  totalUsers: number
-  activeUsers: number
-  pendingUsers: number
-  totalRevenue: number
-  averagePayments: number
+    totalUsers: number
+    activeUsers: number
+    pendingUsers: number
+    totalRevenue: number
+    averagePayments: number
 }
 
 const UserManagementDashboard: React.FC = () => {
-  const [users, setUsers] = useState<UserData[]>([])
-  const [stats, setStats] = useState<UserStats | null>(null)
-  const [selectedUser, setSelectedUser] = useState<UserData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
+    const [users, setUsers] = useState<UserData[]>([])
+    const [stats, setStats] = useState<UserStats | null>(null)
+    const [selectedUser, setSelectedUser] = useState<UserData | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
+    const [searchTerm, setSearchTerm] = useState('')
 
-  useEffect(() => {
-    fetchUserData()
-  }, [])
+    useEffect(() => {
+        fetchUserData()
+    }, [])
 
-  const fetchUserData = async () => {
-    try {
-      setLoading(true)
-      
-      // Fetch users and stats in parallel
-      const [usersResponse, statsResponse] = await Promise.all([
-        fetch('/api/metrics/user-management'),
-        fetch('/api/metrics/user-stats')
-      ])
+    const fetchUserData = async () => {
+        try {
+            setLoading(true)
 
-      if (!usersResponse.ok || !statsResponse.ok) {
-        throw new Error('Failed to fetch user data')
-      }
+            // Fetch users and stats in parallel
+            const [usersResponse, statsResponse] = await Promise.all([
+                fetch('/api/metrics/user-management'),
+                fetch('/api/metrics/user-stats')
+            ])
 
-      const usersData = await usersResponse.json()
-      const statsData = await statsResponse.json()
+            if (!usersResponse.ok || !statsResponse.ok) {
+                throw new Error('Failed to fetch user data')
+            }
 
-      setUsers(usersData.users || [])
-      setStats(statsData)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setLoading(false)
+            const usersData = await usersResponse.json()
+            const statsData = await statsResponse.json()
+
+            setUsers(usersData.users || [])
+            setStats(statsData)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Unknown error')
+        } finally {
+            setLoading(false)
+        }
     }
-  }
 
-  const fetchUserDetails = async (userId: string) => {
-    try {
-      const response = await fetch(`/api/metrics/user-details/${userId}`)
-      if (!response.ok) throw new Error('Failed to fetch user details')
-      
-      const details = await response.json()
-      
-      // Find the user and update with detailed info
-      const user = users.find(u => u.id === userId)
-      if (user) {
-        setSelectedUser({
-          ...user,
-          profile: details.profile,
-          financial: details.financial,
-          queue: details.queue
-        })
-      }
-    } catch (err) {
-      console.error('Error fetching user details:', err)
+    const fetchUserDetails = async (userId: string) => {
+        try {
+            const response = await fetch(`/api/metrics/user-details/${userId}`)
+            if (!response.ok) throw new Error('Failed to fetch user details')
+
+            const details = await response.json()
+
+            // Find the user and update with detailed info
+            const user = users.find(u => u.id === userId)
+            if (user) {
+                setSelectedUser({
+                    ...user,
+                    profile: details.profile,
+                    financial: details.financial,
+                    queue: details.queue
+                })
+            }
+        } catch (err) {
+            console.error('Error fetching user details:', err)
+        }
     }
-  }
 
-  const filteredUsers = users.filter(user =>
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.status.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  if (loading) {
-    return (
-      <div className="user-management-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading user management dashboard...</p>
-      </div>
+    const filteredUsers = users.filter(user =>
+        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.status.toLowerCase().includes(searchTerm.toLowerCase())
     )
-  }
 
-  if (error) {
+    if (loading) {
+        return (
+            <div className="user-management-loading">
+                <div className="loading-spinner"></div>
+                <p>Loading user management dashboard...</p>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="user-management-error">
+                <h3>Error Loading User Management</h3>
+                <p>{error}</p>
+                <button onClick={fetchUserData} className="retry-button">
+                    Retry
+                </button>
+            </div>
+        )
+    }
+
     return (
-      <div className="user-management-error">
-        <h3>Error Loading User Management</h3>
-        <p>{error}</p>
-        <button onClick={fetchUserData} className="retry-button">
-          Retry
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="user-management-dashboard">
-      <style jsx>{`
+        <div className="user-management-dashboard">
+            <style jsx>{`
         .user-management-dashboard {
           padding: 24px;
           background: #f8f9fa;
@@ -301,162 +301,162 @@ const UserManagementDashboard: React.FC = () => {
         }
       `}</style>
 
-      <div className="dashboard-header">
-        <h2 className="dashboard-title">👥 User Management Dashboard</h2>
-      </div>
-
-      {stats && (
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-value">{stats.totalUsers}</div>
-            <div className="stat-label">Total Users</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{stats.activeUsers}</div>
-            <div className="stat-label">Active Users</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{stats.pendingUsers}</div>
-            <div className="stat-label">Pending Users</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">${stats.totalRevenue.toFixed(0)}</div>
-            <div className="stat-label">Total Revenue</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{stats.averagePayments.toFixed(1)}</div>
-            <div className="stat-label">Avg Payments/User</div>
-          </div>
-        </div>
-      )}
-
-      <div className="user-section">
-        <div className="users-list">
-          <div className="list-header">
-            <h3 className="list-title">Users ({filteredUsers.length})</h3>
-            <input
-              type="text"
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-          </div>
-          
-          <table className="users-table">
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Status</th>
-                <th>Verified</th>
-                <th>Joined</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map((user) => (
-                <tr
-                  key={user.id}
-                  className={`user-row ${selectedUser?.id === user.id ? 'selected' : ''}`}
-                  onClick={() => fetchUserDetails(user.id)}
-                >
-                  <td>{user.email}</td>
-                  <td>
-                    <span className={`status-badge status-${user.status.toLowerCase()}`}>
-                      {user.status}
-                    </span>
-                  </td>
-                  <td>{user.email_verified ? '✅' : '❌'}</td>
-                  <td>{new Date(user.created_at).toLocaleDateString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="user-details">
-          {selectedUser ? (
-            <>
-              <div className="details-header">
-                User Details: {selectedUser.email}
-              </div>
-              
-              <div className="detail-section">
-                <div className="section-title">📧 Account Information</div>
-                <div className="detail-item">
-                  <span className="detail-label">Email:</span>
-                  <span className="detail-value">{selectedUser.email}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Status:</span>
-                  <span className={`detail-value status-badge status-${selectedUser.status.toLowerCase()}`}>
-                    {selectedUser.status}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Verified:</span>
-                  <span className="detail-value">{selectedUser.email_verified ? 'Yes' : 'No'}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Joined:</span>
-                  <span className="detail-value">{new Date(selectedUser.created_at).toLocaleDateString()}</span>
-                </div>
-              </div>
-
-              {selectedUser.profile && (
-                <div className="detail-section">
-                  <div className="section-title">👤 Profile</div>
-                  <div className="detail-item">
-                    <span className="detail-label">Name:</span>
-                    <span className="detail-value">{selectedUser.profile.fullName || 'Not provided'}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Phone:</span>
-                    <span className="detail-value">{selectedUser.profile.phoneNumber || 'Not provided'}</span>
-                  </div>
-                </div>
-              )}
-
-              {selectedUser.financial && (
-                <div className="detail-section">
-                  <div className="section-title">💰 Financial</div>
-                  <div className="detail-item">
-                    <span className="detail-label">Total Payments:</span>
-                    <span className="detail-value">${selectedUser.financial.totalPayments.toFixed(2)}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Payment Count:</span>
-                    <span className="detail-value">{selectedUser.financial.paymentCount}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Last Payment:</span>
-                    <span className="detail-value">{selectedUser.financial.lastPaymentDate || 'No payments'}</span>
-                  </div>
-                </div>
-              )}
-
-              {selectedUser.queue && (
-                <div className="detail-section">
-                  <div className="section-title">📋 Queue Status</div>
-                  <div className="detail-item">
-                    <span className="detail-label">Position:</span>
-                    <span className="detail-value">{selectedUser.queue.position || 'Not in queue'}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Status:</span>
-                    <span className="detail-value">{selectedUser.queue.status}</span>
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="no-selection">
-              <p>Select a user from the list to view detailed information</p>
+            <div className="dashboard-header">
+                <h2 className="dashboard-title">👥 User Management Dashboard</h2>
             </div>
-          )}
+
+            {stats && (
+                <div className="stats-grid">
+                    <div className="stat-card">
+                        <div className="stat-value">{stats.totalUsers}</div>
+                        <div className="stat-label">Total Users</div>
+                    </div>
+                    <div className="stat-card">
+                        <div className="stat-value">{stats.activeUsers}</div>
+                        <div className="stat-label">Active Users</div>
+                    </div>
+                    <div className="stat-card">
+                        <div className="stat-value">{stats.pendingUsers}</div>
+                        <div className="stat-label">Pending Users</div>
+                    </div>
+                    <div className="stat-card">
+                        <div className="stat-value">${stats.totalRevenue.toFixed(0)}</div>
+                        <div className="stat-label">Total Revenue</div>
+                    </div>
+                    <div className="stat-card">
+                        <div className="stat-value">{stats.averagePayments.toFixed(1)}</div>
+                        <div className="stat-label">Avg Payments/User</div>
+                    </div>
+                </div>
+            )}
+
+            <div className="user-section">
+                <div className="users-list">
+                    <div className="list-header">
+                        <h3 className="list-title">Users ({filteredUsers.length})</h3>
+                        <input
+                            type="text"
+                            placeholder="Search users..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="search-input"
+                        />
+                    </div>
+
+                    <table className="users-table">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Verified</th>
+                                <th>Joined</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredUsers.map((user) => (
+                                <tr
+                                    key={user.id}
+                                    className={`user-row ${selectedUser?.id === user.id ? 'selected' : ''}`}
+                                    onClick={() => fetchUserDetails(user.id)}
+                                >
+                                    <td>{user.email}</td>
+                                    <td>
+                                        <span className={`status-badge status-${user.status.toLowerCase()}`}>
+                                            {user.status}
+                                        </span>
+                                    </td>
+                                    <td>{user.email_verified ? '✅' : '❌'}</td>
+                                    <td>{new Date(user.created_at).toLocaleDateString()}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="user-details">
+                    {selectedUser ? (
+                        <>
+                            <div className="details-header">
+                                User Details: {selectedUser.email}
+                            </div>
+
+                            <div className="detail-section">
+                                <div className="section-title">📧 Account Information</div>
+                                <div className="detail-item">
+                                    <span className="detail-label">Email:</span>
+                                    <span className="detail-value">{selectedUser.email}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">Status:</span>
+                                    <span className={`detail-value status-badge status-${selectedUser.status.toLowerCase()}`}>
+                                        {selectedUser.status}
+                                    </span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">Verified:</span>
+                                    <span className="detail-value">{selectedUser.email_verified ? 'Yes' : 'No'}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">Joined:</span>
+                                    <span className="detail-value">{new Date(selectedUser.created_at).toLocaleDateString()}</span>
+                                </div>
+                            </div>
+
+                            {selectedUser.profile && (
+                                <div className="detail-section">
+                                    <div className="section-title">👤 Profile</div>
+                                    <div className="detail-item">
+                                        <span className="detail-label">Name:</span>
+                                        <span className="detail-value">{selectedUser.profile.fullName || 'Not provided'}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <span className="detail-label">Phone:</span>
+                                        <span className="detail-value">{selectedUser.profile.phoneNumber || 'Not provided'}</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedUser.financial && (
+                                <div className="detail-section">
+                                    <div className="section-title">💰 Financial</div>
+                                    <div className="detail-item">
+                                        <span className="detail-label">Total Payments:</span>
+                                        <span className="detail-value">${selectedUser.financial.totalPayments.toFixed(2)}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <span className="detail-label">Payment Count:</span>
+                                        <span className="detail-value">{selectedUser.financial.paymentCount}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <span className="detail-label">Last Payment:</span>
+                                        <span className="detail-value">{selectedUser.financial.lastPaymentDate || 'No payments'}</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedUser.queue && (
+                                <div className="detail-section">
+                                    <div className="section-title">📋 Queue Status</div>
+                                    <div className="detail-item">
+                                        <span className="detail-label">Position:</span>
+                                        <span className="detail-value">{selectedUser.queue.position || 'Not in queue'}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <span className="detail-label">Status:</span>
+                                        <span className="detail-value">{selectedUser.queue.status}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="no-selection">
+                            <p>Select a user from the list to view detailed information</p>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  )
+    )
 }
 
 export default UserManagementDashboard

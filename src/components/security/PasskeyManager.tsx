@@ -29,14 +29,11 @@ const PasskeyManager = () => {
   const loadPasskeys = async () => {
     try {
       setLoading(true);
-      const result = await authClient.passkey.list();
-      
-      if (result.error) {
-        console.error("Failed to load passkeys:", result.error);
-        return;
+      const response = await fetch('/api/passkeys');
+      if (response.ok) {
+        const data = await response.json();
+        setPasskeys(data);
       }
-
-      setPasskeys(result.data || []);
     } catch (error) {
       console.error("Error loading passkeys:", error);
     } finally {
@@ -53,12 +50,14 @@ const PasskeyManager = () => {
     try {
       setRegistering(true);
       
-      const result = await authClient.passkey.register({
-        name: newPasskeyName.trim()
+      const response = await fetch('/api/passkeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newPasskeyName.trim() }),
       });
 
-      if (result.error) {
-        toast.error(`Failed to register passkey: ${result.error.message}`);
+      if (!response.ok) {
+        toast.error("Failed to register passkey");
         return;
       }
 
@@ -76,9 +75,11 @@ const PasskeyManager = () => {
 
   const deletePasskey = async (passkeyId: string) => {
     try {
-      const result = await authClient.passkey.delete({ id: passkeyId });
+      const response = await fetch(`/api/passkeys/${passkeyId}`, {
+        method: 'DELETE',
+      });
 
-      if (result.error) {
+      if (!response.ok) {
         toast.error("Failed to delete passkey");
         return;
       }

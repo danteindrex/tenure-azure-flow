@@ -6,9 +6,8 @@ import { Progress } from "@/components/ui/progress";
 import { useCounterAnimation } from "@/hooks/use-counter-animation";
 import { QueueRow } from "@/components/QueueRow";
 import { useSession } from "@/lib/auth-client";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import PaymentNotificationBanner from "@/components/PaymentNotificationBanner";
-import BusinessLogicService, { BUSINESS_RULES } from "@/lib/business-logic";
+import { businessLogicService as BusinessLogicService, BUSINESS_RULES } from "@/lib/business-logic";
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -35,7 +34,7 @@ const Dashboard = () => {
     timeStatus: 'Loading...',
   });
 
-  const supabase = useSupabaseClient();
+
   const { data: session } = useSession();
   const user = session?.user;
 
@@ -93,51 +92,26 @@ const Dashboard = () => {
       try {
         setLoading(true);
         
-        // Get user data from normalized tables
-        const { data: dbUser, error: userError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('auth_user_id', user.id)
-          .single();
+        // Get dashboard data from API
+        const response = await fetch('/api/dashboard/data', {
+          method: 'GET',
+          credentials: 'include'
+        });
 
-        if (userError) {
-          console.error('Error fetching user data:', userError);
+        if (!response.ok) {
+          throw new Error('Failed to fetch dashboard data');
         }
 
-        // Get queue position from membership_queue
-        const { data: queueData, error: queueError } = await supabase
-          .from('membership_queue')
-          .select('queue_position, is_active, months_in_queue, last_payment_date, total_amount_paid')
-          .eq('user_id', dbUser?.id)
-          .single();
-
-        if (queueError) {
-          console.error('Error fetching queue data:', queueError);
-        }
-
-        // Get latest payment from user_payments
-        const { data: latestPayment, error: paymentError } = await supabase
-          .from('user_payments')
-          .select('payment_date, amount, status')
-          .eq('user_id', dbUser?.id)
-          .order('payment_date', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (paymentError && paymentError.code !== 'PGRST116') {
-          console.error('Error fetching payment data:', paymentError);
-        }
+        const dashboardData = await response.json();
+        const { dbUser, queueData, latestPayment } = dashboardData;
 
 
 
-        // Initialize business logic service
-        const businessLogic = new BusinessLogicService(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
+        // Use business logic service singleton
+        const businessLogic = BusinessLogicService;
 
         // Get payout status using correct business rules
-        const payoutStatus = await businessLogic.getPayoutStatus();
+        const payoutStatus = await businessLogic.checkPayoutConditions();
 
         // Get member payment status
         const memberPaymentStatus = await businessLogic.getMemberPaymentStatus(dbUser?.id);
@@ -187,23 +161,27 @@ const Dashboard = () => {
         };
 
         // Set dashboard statistics with correct business rules
+        const daysUntilDraw = payoutStatus.nextPayoutDate 
+          ? Math.max(0, Math.floor((new Date(payoutStatus.nextPayoutDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+          : 0;
+
         const stats = {
           totalRevenue: payoutStatus.totalRevenue,
           potentialWinners: payoutStatus.potentialWinners,
-          daysUntilDraw: payoutStatus.daysUntilEligible,
+          daysUntilDraw,
           daysUntilPayment: Math.max(0, daysUntilPayment),
           paymentAmount: memberPaymentStatus.hasJoiningFee ? BUSINESS_RULES.MONTHLY_FEE : BUSINESS_RULES.JOINING_FEE,
           fundReady: payoutStatus.fundReady,
           timeReady: payoutStatus.timeReady,
           payoutReady: payoutStatus.payoutReady,
-          fundStatus: payoutStatus.fundStatus,
-          timeStatus: payoutStatus.timeStatus,
+          fundStatus: payoutStatus.fundReady ? 'Ready' : 'Not Ready',
+          timeStatus: payoutStatus.timeReady ? 'Ready' : 'Not Ready',
         };
 
         // Get winner order for queue display (BR-5, BR-6, BR-10)
-        const winnerOrder = await businessLogic.getWinnerOrder();
+        const winnerOrder = await businessLogic.getMembersWithContinuousTenure();
         const queueDisplay = winnerOrder.slice(0, 10).map((member, index) => ({
-          rank: member.queuePosition,
+          rank: member.position,
           name: member.memberName,
           tenureMonths: Math.floor(
             (Date.now() - member.tenureStart.getTime()) / (1000 * 60 * 60 * 24 * 30)
@@ -236,7 +214,7 @@ const Dashboard = () => {
           if (!payoutStatus.timeReady) {
             activities.push({
               title: "⏰ Time Requirement Progress", 
-              message: `${payoutStatus.daysUntilEligible} days remaining until 12-month business launch requirement is met.`,
+              message: `${daysUntilDraw} days remaining until 12-month business launch requirement is met.`,
               timestamp: "Live",
               type: "info"
             });
@@ -322,7 +300,7 @@ const Dashboard = () => {
     };
 
     loadDashboardData();
-  }, [user, supabase]);
+  }, [user]);
 
   // Queue data state
   const [queueData, setQueueData] = useState([]);

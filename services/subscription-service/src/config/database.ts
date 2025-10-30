@@ -7,9 +7,11 @@ const poolConfig: PoolConfig = {
   ssl: {
     rejectUnauthorized: false,
   },
-  max: 20,
-  idleTimeoutMillis: 30000,
+  max: 10,
+  min: 2,
+  idleTimeoutMillis: 60000,
   connectionTimeoutMillis: 15000, // Increased to 15 seconds for Supabase
+  //acquireTimeoutMillis: 15000,
 };
 
 export const pool = new Pool(poolConfig);

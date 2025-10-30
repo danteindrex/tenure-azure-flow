@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Head from "next/head";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
+import { authClient } from "@/lib/auth-client";
 import { Card } from "../src/components/ui/card";
 import { Button } from "../src/components/ui/button";
 
 export default function ClearCookiesPage() {
-  const supabase = useSupabaseClient();
   const [status, setStatus] = useState<"idle" | "clearing" | "done" | "error">("idle");
   const [detail, setDetail] = useState<string>("");
 
@@ -15,12 +14,11 @@ export default function ClearCookiesPage() {
     async function run() {
       setStatus("clearing");
       try {
-        // Sign out Supabase session (client-side tokens)
-        await supabase.auth.signOut();
+        // Sign out Better Auth session
+        await authClient.signOut();
       } catch {}
       try {
         // Clear custom auth cookie and any other cookies
-        await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
         const res = await fetch("/api/auth/clear-cookies", { method: "POST" });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json?.message || "Failed to clear cookies");
@@ -46,7 +44,7 @@ export default function ClearCookiesPage() {
     return () => {
       mounted = false;
     };
-  }, [supabase]);
+  }, []);
 
   return (
     <>

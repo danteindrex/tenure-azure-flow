@@ -13,8 +13,22 @@ const authenticateUser = async (req, res, next) => {
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     
+    // For Better Auth, we'll validate the user ID directly
+    // The main app will send the user ID as the token
+    if (!token || token.length < 10) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid token format'
+      });
+    }
+
+    // Verify the user exists in our database
     const supabase = database.getClient();
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('id', token)
+      .single();
 
     if (error || !user) {
       return res.status(401).json({

@@ -145,6 +145,24 @@ export class StripeService {
       `;
       await pool.query(updateUserQuery, [userId]);
 
+      // Also notify the main app about payment completion
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/onboarding/update-progress`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.INTERNAL_API_KEY || 'internal'}`
+          },
+          body: JSON.stringify({
+            step: 'payment-completed',
+            userId: userId
+          })
+        });
+      } catch (error) {
+        console.warn('Failed to notify main app about payment completion:', error);
+        // Don't fail the webhook if this fails
+      }
+
       // Create subscription record in database
       const subscriptionQuery = `
         INSERT INTO user_billing_schedules (user_id, billing_cycle, next_billing_date, amount, currency, is_active, created_at)

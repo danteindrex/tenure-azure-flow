@@ -283,6 +283,274 @@ svg[class*="icon"] {
   }
 }
 
+/* ===================================
+   ADMIN SIDEBAR NAVIGATION REDESIGN
+   Matching reference image style
+   ================================== */
+
+/* Admin Sidebar Navigation Container */
+.admin-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #000000;
+  color: #ffffff;
+  width: 240px;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  padding: 0;
+  margin: 0;
+  border-right: 1px solid #1a1a1a;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s ease;
+}
+
+/* User Profile Section at Top */
+.admin-user-profile {
+  display: flex;
+  align-items: center;
+  padding: 20px 16px;
+  border-bottom: 1px solid #1a1a1a;
+  margin-bottom: 8px;
+}
+
+.admin-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #8b5cf6, #a855f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+  transition: box-shadow 0.2s ease;
+  
+  &:hover {
+    box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4);
+  }
+}
+
+.admin-user-initial {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.admin-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-username {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Navigation Links */
+.admin-nav-links {
+  flex: 1;
+  padding: 0 8px;
+  overflow-y: auto;
+}
+
+.admin-nav-link {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  margin: 2px 0;
+  border-radius: 6px;
+  color: #a3a3a3;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #1a1a1a;
+    color: #ffffff;
+    text-decoration: none;
+  }
+  
+  &:focus {
+    outline: none;
+    background-color: #1a1a1a;
+    color: #ffffff;
+  }
+  
+  &.active {
+    background-color: #262626;
+    color: #ffffff;
+  }
+}
+
+.admin-nav-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+  
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.admin-nav-link:hover .admin-nav-icon {
+  opacity: 1;
+}
+
+.admin-nav-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Bottom User Section */
+.admin-bottom-user {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  border-top: 1px solid #1a1a1a;
+  margin-top: auto;
+}
+
+.admin-user-avatar-small {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #8b5cf6, #a855f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.admin-user-initial-small {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.admin-username-small {
+  color: #a3a3a3;
+  font-size: 12px;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* Override Payload's default navigation styles */
+.nav {
+  display: none !important;
+}
+
+/* Position the admin sidebar navigation */
+.admin-sidebar-nav {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 9999 !important;
+}
+
+/* Ensure main content area accounts for fixed sidebar */
+.app {
+  margin-left: 240px !important;
+  transition: margin-left 0.3s ease;
+}
+
+/* Ensure the admin navigation is always visible */
+body .admin-sidebar-nav {
+  display: flex !important;
+}
+
+/* Hide Payload's default navigation */
+.nav {
+  display: none !important;
+}
+
+/* Hide the default beforeNavLinks container */
+.app-header .nav,
+.app-header nav {
+  display: none !important;
+}
+
+/* Adjust main content wrapper */
+.template-default,
+.dashboard {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* Ensure proper spacing for main content */
+.app-header {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* Make sure the sidebar doesn't interfere with modals */
+.modal,
+.drawer,
+.popup {
+  z-index: 10000 !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .admin-sidebar-nav {
+    width: 200px;
+  }
+  
+  .app {
+    margin-left: 200px !important;
+  }
+  
+  .admin-nav-text {
+    font-size: 13px;
+  }
+  
+  .admin-username {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-sidebar-nav {
+    width: 180px;
+  }
+  
+  .app {
+    margin-left: 180px !important;
+  }
+  
+  .admin-nav-link {
+    padding: 8px 10px;
+  }
+  
+  .admin-nav-icon {
+    margin-right: 8px;
+  }
+}
+
 /* Navigation Enhancement - Add Dashboard link */
 .nav {
   background-color: var(--theme-elevation-50);

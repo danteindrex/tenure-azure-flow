@@ -9,14 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Crown, Check, ChevronRight, ChevronLeft, Loader2, Mail, Phone, Fingerprint, Shield } from "lucide-react";
 import { toast } from "sonner";
-import { authClient, useSession } from "@/lib/auth-client";
+import { authClient, useSession, signUp, updateUser, signIn } from "@/lib/auth-client";
 import { logPageVisit, logSignup, logError } from "@/lib/audit";
 import { COUNTRY_DIAL_CODES } from "@/lib/countryDialCodes";
+import baseLogger from "@/lib/baseLogger";
 
 const SignUp = () => {
   const navigate = useRouter();
   const { data: session, isPending } = useSession();
-  const [step, setStep] = useState(1); // 1: Email+Password, 2: Email Verification, 3: Personal Info, 4: Advanced Security, 5: Payment
+  const [step, setStep] = useState(1); // 1: Email+Password, 2: Email Verification, 3: Personal Info + Address, 4: Phone Verification, 5: Payment
   const [formData, setFormData] = useState({
     // Step 1: Email + Password
     email: "",
@@ -24,36 +25,122 @@ const SignUp = () => {
     confirmPassword: "",
     agreeToTerms: false,
     // Step 2: Email Verification
-    emailVerificationCode: "",
-    // Step 3: Personal Info
+    emailOtpCode: "",
+    // Step 3: Personal Info + Phone
     firstName: "",
     lastName: "",
     middleName: "",
     dateOfBirth: "",
-    phoneCountryCode: "+1",
+    phoneCountryCode: "+256", // Default to Uganda
     phoneNumber: "",
+    phoneOtpCode: "",
     streetAddress: "",
     addressLine2: "",
     city: "",
     state: "",
     zipCode: "",
-    country: "US",
-    // Step 4: Advanced Security
-    enablePasskey: false,
-    enable2FA: false,
+    country: "UG", // Default to Uganda
   });
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [dateValidation, setDateValidation] = useState<{ isValid: boolean; message: string } | null>(null);
   const [autoSubmitting, setAutoSubmitting] = useState(false);
+  
+  // Field validation states
+  const [fieldValidation, setFieldValidation] = useState({
+    email: { isValid: false, touched: false },
+    password: { isValid: false, touched: false },
+    confirmPassword: { isValid: false, touched: false },
+    firstName: { isValid: false, touched: false },
+    lastName: { isValid: false, touched: false },
+    dateOfBirth: { isValid: false, touched: false },
+    phoneNumber: { isValid: false, touched: false },
+    streetAddress: { isValid: false, touched: false },
+    city: { isValid: false, touched: false },
+    zipCode: { isValid: false, touched: false },
+  });
 
   // Log page visit and check for existing session
   useEffect(() => {
     logPageVisit('/signup');
+
+    // Check URL parameters for step and OAuth info
+    const urlParams = new URLSearchParams(window.location.search);
+    const stepParam = urlParams.get('step');
+    const oauthParam = urlParams.get('oauth');
     
-    // If user is already authenticated, redirect to dashboard
-    if (session?.user && !isPending) {
-      navigate.push('/dashboard');
+    // If OAuth user, pre-fill data from session
+    if (oauthParam && session?.user) {
+      const fullName = session.user.name || "";
+      const nameParts = fullName.split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts[nameParts.length - 1] || "";
+      const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(" ") : "";
+
+      setFormData(prev => ({
+        ...prev,
+        email: session.user.email || "",
+        firstName,
+        lastName,
+        middleName,
+      }));
+    }
+    
+    // If user is authenticated, check their database state to determine correct step
+    if (session?.user && !isPending && !bypassed) {
+      fetch('/api/onboarding/status', {
+        method: 'GET',
+        credentials: 'include'
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.status) {
+            if (data.status.canAccessDashboard) {
+              // User completed everything, go to dashboard
+              // User completed everything, go to dashboard
+              navigate.push('/dashboard');
+            } else {
+              // Set step based on database state, not URL parameter
+              const correctStep = data.status.nextStep;
+              console.log(`User should be on step ${correctStep} based on database state`);
+              
+              // Handle legacy step 5 users by redirecting to step 3 (merged step)
+              if (correctStep === 7) {
+                setStep(5); // Payment step
+              } else if (correctStep >= 1 && correctStep <= 6) {
+                setStep(correctStep);
+              }
+              
+              // Pre-fill email if available
+              if (session.user.email) {
+                setFormData(prev => ({
+                  ...prev,
+                  email: session.user.email || "",
+                }));
+              }
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Error checking onboarding status:', error);
+          // Fallback to URL parameter if API fails
+          if (stepParam) {
+            const stepNumber = parseInt(stepParam, 10);
+            if (stepNumber === 5) {
+              setStep(3);
+            } else if (stepNumber >= 1 && stepNumber <= 5) {
+              setStep(stepNumber);
+            }
+          }
+        });
+    } else if (!session?.user && stepParam) {
+      // Not authenticated, use URL parameter
+      const stepNumber = parseInt(stepParam, 10);
+      if (stepNumber === 5) {
+        setStep(3);
+      } else if (stepNumber >= 1 && stepNumber <= 5) {
+        setStep(stepNumber);
+      }
     }
   }, [session, isPending, navigate]);
 
@@ -106,6 +193,78 @@ const SignUp = () => {
 
     // For other countries, minimum 10 digits
     return cleanPhone.length >= 10;
+  };
+
+  // Validation helper functions
+  const validateEmail = (email: string): boolean => {
+    // Check if email is empty
+    if (!email || email.trim().length === 0) {
+      return false;
+    }
+    
+    const trimmedEmail = email.trim();
+    
+    // Check if email contains @ symbol
+    if (!trimmedEmail.includes('@')) {
+      return false;
+    }
+    
+    // Split email into local and domain parts
+    const parts = trimmedEmail.split('@');
+    if (parts.length !== 2) {
+      return false;
+    }
+    
+    const [localPart, domainPart] = parts;
+    
+    // Check if both parts exist
+    if (!localPart || !domainPart) {
+      return false;
+    }
+    
+    // Check for consecutive dots
+    if (localPart.includes('..') || domainPart.includes('..')) {
+      return false;
+    }
+    
+    // Domain must contain at least one dot (for TLD)
+    if (!domainPart.includes('.')) {
+      return false;
+    }
+    
+    // Basic email validation regex
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    return emailRegex.test(trimmedEmail);
+  };
+
+  const validatePassword = (password: string): boolean => {
+    return password.length >= 8;
+  };
+
+  const validateConfirmPassword = (password: string, confirmPassword: string): boolean => {
+    return password === confirmPassword && password.length >= 8;
+  };
+
+  const validateRequired = (value: string): boolean => {
+    return value.trim().length > 0;
+  };
+
+  const updateFieldValidation = (field: string, value: string, isValid: boolean) => {
+    setFieldValidation(prev => ({
+      ...prev,
+      [field]: { isValid, touched: true }
+    }));
+  };
+
+  // Validation asterisk component
+  const ValidationAsterisk = ({ isValid, touched }: { isValid: boolean; touched: boolean }) => {
+    let colorClass = 'text-gray-500'; // Default gray for untouched
+    
+    if (touched) {
+      colorClass = isValid ? 'text-green-500' : 'text-red-500';
+    }
+    
+    return <span className={colorClass}>*</span>;
   };
 
   // US States data
@@ -164,6 +323,44 @@ const SignUp = () => {
 
   const handleInputChange = (field: string, value: string | boolean): void => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    
+    // Validate fields and update validation state
+    if (typeof value === 'string') {
+      let isValid = false;
+      
+      switch (field) {
+        case 'email':
+          isValid = validateEmail(value);
+          break;
+        case 'password':
+          isValid = validatePassword(value);
+          // Also revalidate confirm password if it exists
+          if (formData.confirmPassword) {
+            updateFieldValidation('confirmPassword', formData.confirmPassword, validateConfirmPassword(value, formData.confirmPassword));
+          }
+          break;
+        case 'confirmPassword':
+          isValid = validateConfirmPassword(formData.password, value);
+          break;
+        case 'firstName':
+        case 'lastName':
+        case 'streetAddress':
+        case 'city':
+        case 'zipCode':
+          isValid = validateRequired(value);
+          break;
+        case 'dateOfBirth':
+          isValid = value.length > 0 && validateAge(value).isValid;
+          break;
+        case 'phoneNumber':
+          isValid = validatePhoneNumber(value);
+          break;
+        default:
+          return;
+      }
+      
+      updateFieldValidation(field, value, isValid);
+    }
   };
 
   // Special handler for phone number input with formatting
@@ -185,7 +382,7 @@ const SignUp = () => {
   // Special handler for verification code input with auto-submit
   const handleVerificationCodeChange = (value: string): void => {
     const cleanValue = value.replace(/\D/g, '').slice(0, 6);
-    setFormData((prev) => ({ ...prev, emailVerificationCode: cleanValue }));
+    setFormData((prev) => ({ ...prev, emailOtpCode: cleanValue }));
 
     // Auto-submit when 6 digits are entered
     if (cleanValue.length === 6 && !loading && !autoSubmitting) {
@@ -196,6 +393,25 @@ const SignUp = () => {
         }
         setAutoSubmitting(false);
       }, 800); // Small delay to show the complete code before submitting
+    }
+  };
+
+  // Generic OTP input handler for both email and phone verification
+  const handleOtpInputChange = (field: string, value: string): void => {
+    const cleanValue = value.replace(/\D/g, '').slice(0, 6);
+    setFormData((prev) => ({ ...prev, [field]: cleanValue }));
+
+    // Auto-submit when 6 digits are entered
+    if (cleanValue.length === 6 && !loading && !autoSubmitting) {
+      setAutoSubmitting(true);
+      setTimeout(() => {
+        if (field === 'emailOtpCode' && step === 2) {
+          handleEmailVerification();
+        } else if (field === 'phoneOtpCode' && step === 4) {
+          handlePhoneOtpVerification();
+        }
+        setAutoSubmitting(false);
+      }, 800);
     }
   };
 
@@ -255,6 +471,10 @@ const SignUp = () => {
       return;
     }
 
+    if (!validateEmail(formData.email)) {
+      toast.error("Please enter a valid email address with @ symbol (e.g., user@example.com)");
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       toast.error("Passwords do not match");
       return;
@@ -266,15 +486,26 @@ const SignUp = () => {
     }
 
     try {
+
+      console.log("The current formdata extracted from the form", formData)
       setLoading(true);
       const email = formData.email.trim();
+      const username = `${formData.firstName} ${formData.lastName}`
+      baseLogger("authentication", "WillCreateAccount");
+
+
+      const currentProviededEmail = formData.email;
+      const currentProvidedPassword = formData.password
 
       // Create user with Better Auth
-      const result = await authClient.signUp.email({
-        email: email,
-        password: formData.password,
+      const result = await signUp.email({
+        email: currentProviededEmail,
+        password: currentProvidedPassword,
         name: "User", // Temporary name, will be updated in step 3
       });
+
+      console.log("The current credentials", result.data)
+      baseLogger("authentication", "DidCreateAccount")
 
       if (result.error) {
         console.error("Account creation error:", result.error);
@@ -298,9 +529,27 @@ const SignUp = () => {
       setUserId(result.data?.user?.id || null);
       await logSignup(email, true, result.data?.user?.id);
 
-      // Move to email verification step
-      setStep(2);
-      toast.success("Account created! Please check your email for verification.");
+      // Send email verification OTP
+      try {
+        const otpResult = await authClient.emailOtp.sendVerificationOtp({
+          email: currentProviededEmail,
+          type: "email-verification"
+        });
+
+        if (otpResult.error) {
+          console.error('Failed to send verification OTP:', otpResult.error);
+          toast.error("Account created but failed to send verification email. Please try again.");
+          return;
+        }
+
+        // Move to email verification step
+        setStep(2);
+        toast.success("Account created! Please check your email for the 6-digit verification code.");
+        
+      } catch (otpError) {
+        console.error('Error sending verification OTP:', otpError);
+        toast.error("Account created but failed to send verification email. Please try again.");
+      }
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Unexpected error during signup";
@@ -316,7 +565,7 @@ const SignUp = () => {
 
   // Step 2: Handle email verification
   const handleEmailVerification = async (): Promise<void> => {
-    if (!formData.emailVerificationCode || formData.emailVerificationCode.length !== 6) {
+    if (!formData.emailOtpCode || formData.emailOtpCode.length !== 6) {
       toast.error("Please enter the 6-digit verification code");
       return;
     }
@@ -324,10 +573,10 @@ const SignUp = () => {
     try {
       setLoading(true);
 
-      // Verify email with Better Auth
-      const result = await authClient.verifyEmail({
+      // Verify email with Better Auth Email OTP plugin
+      const result = await authClient.emailOtp.verifyEmail({
         email: formData.email.trim(),
-        token: formData.emailVerificationCode
+        otp: formData.emailOtpCode
       });
 
       if (result.error) {
@@ -335,6 +584,26 @@ const SignUp = () => {
         toast.error(`Verification failed: ${result.error.message}`);
         return;
       }
+
+      // Update progress in database
+      await fetch('/api/onboarding/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          step: 'email-verified'
+        })
+      });
+
+      // Update progress in database
+      await fetch('/api/onboarding/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          step: 'email-verified'
+        })
+      });
 
       setStep(3);
       toast.success("Email verified successfully! Please complete your profile.");
@@ -353,28 +622,49 @@ const SignUp = () => {
     try {
       setLoading(true);
 
-      const result = await authClient.sendVerificationEmail({
-        email: formData.email.trim()
+      const result = await authClient.emailOtp.sendVerificationOtp({
+        email: formData.email.trim(),
+        type: "email-verification"
       });
 
       if (result.error) {
-        toast.error("Failed to resend verification email");
+        toast.error("Failed to resend verification code");
         return;
       }
 
-      toast.success("Verification email sent! Please check your inbox.");
+      toast.success("New 6-digit verification code sent! Please check your inbox.");
     } catch (err) {
-      toast.error("Failed to resend verification email");
+      toast.error("Failed to resend verification code");
     } finally {
       setLoading(false);
     }
   };
 
-  // Step 3: Collect phone number and send OTP
+  // Step 3: Collect personal info, address, and phone number
   const handleStep3Submit = async (): Promise<void> => {
+    if (!formData.firstName || !formData.lastName) {
+      toast.error("Please enter your first and last name");
+      return;
+    }
+
+    if (!formData.dateOfBirth) {
+      toast.error("Please enter your date of birth");
+      return;
+    }
+
+    if (dateValidation && !dateValidation.isValid) {
+      toast.error(dateValidation.message);
+      return;
+    }
+
+    if (!formData.streetAddress || !formData.city || !formData.zipCode) {
+      toast.error("Please complete your address information");
+      return;
+    }
+
     if (!validatePhoneNumber(formData.phoneNumber)) {
-      const errorMessage = formData.phoneCountryCode === '+1'
-        ? "Please enter a valid 10-digit US phone number"
+      const errorMessage = formData.phoneCountryCode === '+256'
+        ? "Please enter a valid Ugandan phone number"
         : "Please enter a valid phone number";
       toast.error(errorMessage);
       return;
@@ -382,13 +672,12 @@ const SignUp = () => {
 
     try {
       setLoading(true);
-      const formattedPhone = formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode);
 
-      // Send phone OTP via Twilio (Better Auth)
+      // Send phone OTP via Twilio
       await sendPhoneOtp();
 
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to save phone number";
+      const errorMessage = err instanceof Error ? err.message : "Failed to send verification code";
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -420,10 +709,10 @@ const SignUp = () => {
         return;
       }
 
-      // Move to verification step
+      // Move to phone verification step
       setStep(4);
 
-      toast.success("OTP sent to your phone! Please check your messages.");
+      toast.success("Verification code sent to your phone! Please check your messages.");
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to send verification code";
@@ -463,9 +752,22 @@ const SignUp = () => {
         return;
       }
 
-      // Phone is now verified in Better Auth and user_contacts table
+      // Phone is now verified, save profile and move to payment
+      await saveCompleteProfile();
+      
+      // Update progress in database
+      await fetch('/api/onboarding/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          step: 'phone-verified',
+          data: { phone: formattedPhone }
+        })
+      });
+
       setStep(5);
-      toast.success("Phone verified successfully! Please complete your profile.");
+      toast.success("Phone verified successfully! Please proceed to payment.");
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "OTP verification failed";
@@ -476,51 +778,14 @@ const SignUp = () => {
     }
   };
 
-  // Step 3: Complete personal information
-  const handleStep3Submit = async (): Promise<void> => {
-    if (!formData.firstName || !formData.lastName) {
-      toast.error("Please enter your first and last name");
-      return;
-    }
-
-    if (!formData.dateOfBirth) {
-      toast.error("Please enter your date of birth");
-      return;
-    }
-
-    if (dateValidation && !dateValidation.isValid) {
-      toast.error(dateValidation.message);
-      return;
-    }
-
-    if (!formData.streetAddress || !formData.city || !formData.state || !formData.zipCode) {
-      toast.error("Please complete your address information");
-      return;
-    }
-
+  // Save complete profile after phone verification
+  const saveCompleteProfile = async (): Promise<void> => {
     try {
-      setLoading(true);
-
       // Update user profile with Better Auth
       const fullName = `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim();
-      
-      const result = await authClient.updateUser({
-        name: fullName,
-        // Store additional profile data in user metadata
-        metadata: {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          middleName: formData.middleName,
-          dateOfBirth: formData.dateOfBirth,
-          phone: formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode),
-          streetAddress: formData.streetAddress,
-          addressLine2: formData.addressLine2,
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.zipCode,
-          country: formData.country,
-          profileCompleted: true
-        }
+
+      const result = await updateUser({
+        name: fullName
       });
 
       if (result.error) {
@@ -548,64 +813,91 @@ const SignUp = () => {
         }),
       });
 
-      // Move to advanced security step
-      setStep(4);
-      toast.success("Profile completed! Let's set up advanced security features.");
+      // Update progress in database
+      await fetch('/api/onboarding/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          step: 'profile-completed'
+        })
+      });
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Unexpected error during profile completion";
       await logError(`Profile completion error: ${errorMessage}`, userId || undefined);
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
+      throw new Error(errorMessage);
     }
   };
 
-  // Step 4: Advanced Security Setup
-  const handleStep4Submit = async (): Promise<void> => {
+  // Bypass Phone OTP verification for development
+  const handlePhoneBypass = async (): Promise<void> => {
     try {
       setLoading(true);
 
-      // Set up passkey if enabled
-      if (formData.enablePasskey) {
-        try {
-          const passkeyResult = await authClient.passkey.register({
-            name: `${formData.firstName}'s Device`
-          });
+      // Update user profile with Better Auth
+      const fullName = `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim();
 
-          if (passkeyResult.error) {
-            toast.error("Failed to set up passkey, but continuing with signup");
-          } else {
-            toast.success("Passkey registered successfully!");
-          }
-        } catch (err) {
-          console.error("Passkey registration error:", err);
-          toast.error("Failed to set up passkey, but continuing with signup");
-        }
+      const result = await updateUser({
+        name: fullName
+      });
+
+      if (result.error) {
+        toast.error("Failed to save profile information");
+        setLoading(false);
+        return;
       }
 
-      // Set up 2FA if enabled
-      if (formData.enable2FA) {
-        try {
-          const twoFactorResult = await authClient.twoFactor.enable();
+      // Also save to normalized tables via API
+      await fetch("/api/profiles/upsert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          middle_name: formData.middleName,
+          date_of_birth: formData.dateOfBirth,
+          phone: formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode),
+          street_address: formData.streetAddress,
+          address_line_2: formData.addressLine2,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zipCode,
+          country_code: formData.country,
+        }),
+      });
 
-          if (twoFactorResult.error) {
-            toast.error("Failed to set up 2FA, but continuing with signup");
-          } else {
-            toast.success("Two-factor authentication enabled!");
-          }
-        } catch (err) {
-          console.error("2FA setup error:", err);
-          toast.error("Failed to set up 2FA, but continuing with signup");
-        }
-      }
+      // Update progress in database
+      await fetch('/api/onboarding/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          step: 'profile-completed'
+        })
+      });
+      
+      const formattedPhone = formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode);
 
-      // Move to payment step
+      // Update progress in database
+      await fetch('/api/onboarding/update-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          step: 'phone-verified',
+          data: { phone: formattedPhone }
+        })
+      });
+
+      setBypassed(true);
       setStep(5);
-      toast.success("Security features configured! Please proceed to payment.");
+      toast.success("Phone bypassed for development! Please proceed to payment.");
 
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unexpected error during security setup";
+      const errorMessage = err instanceof Error ? err.message : "Bypass failed";
+      console.error('Phone bypass error:', err);
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -661,9 +953,9 @@ const SignUp = () => {
       await logSignup("google_oauth", false);
 
       // Use Better Auth for Google OAuth
-      const result = await authClient.signIn.social({
+      const result = await signIn.social({
         provider: 'google',
-        callbackURL: `${window.location.origin}/signup/complete-profile`
+        callbackURL: `${window.location.origin}/signup?step=3&oauth=google`
       });
 
       if (result.error) {
@@ -690,37 +982,38 @@ const SignUp = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
-      {/* Animated Background */}
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-black">
+      {/* Next.js Dark Theme Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent/5 rounded-full blur-[100px] animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-cyan-500/5 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      <Card className="glass-card w-full max-w-lg p-8 hover-float relative z-10">
+      <Card className="w-full max-w-lg p-8 relative z-10 backdrop-blur-xl border border-gray-800 shadow-2xl" style={{ backgroundColor: '#171717' }}>
         {/* Logo */}
         <div className="flex justify-center mb-6">
-          <div className="flex items-center gap-2 text-accent">
-            <Crown className="w-8 h-8" />
-            <span className="text-2xl font-bold">Tenure</span>
+          <div className="flex items-center gap-2 text-blue-400">
+            <Crown className="w-8 h-8 text-blue-400" />
+            <span className="text-2xl font-bold text-white">Home Solutions</span>
           </div>
         </div>
 
         {/* Progress Indicator */}
-        <div className="flex items-center justify-center gap-2 mb-8">
+        <div className="flex items-center justify-center gap-1 mb-8">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ${step >= i
-                  ? "bg-accent text-background"
-                  : "bg-card border border-border text-muted-foreground"
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${step >= i
+                  ? "bg-blue-500 text-white shadow-lg shadow-blue-500/25"
+                  : "bg-gray-800 border border-gray-700 text-gray-400"
                   }`}
               >
-                {step > i ? <Check className="w-5 h-5" /> : i}
+                {step > i ? <Check className="w-4 h-4" /> : i}
               </div>
               {i < 5 && (
                 <div
-                  className={`w-8 h-1 mx-1 transition-all duration-300 ${step > i ? "bg-accent" : "bg-border"
+                  className={`w-6 h-1 mx-1 transition-all duration-300 ${step > i ? "bg-blue-500" : "bg-gray-700"
                     }`}
                 />
               )}
@@ -732,50 +1025,76 @@ const SignUp = () => {
         {step === 1 && (
           <>
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold mb-2">Create Your Account</h1>
-              <p className="text-muted-foreground">Enter your email and create a password</p>
+              <h1 className="text-2xl font-bold mb-2 text-white">Create Your Account</h1>
+              <p className="text-gray-400">Enter your email and create a password</p>
             </div>
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
+                <Label htmlFor="email" className="text-gray-200">
+                  Email Address <ValidationAsterisk isValid={fieldValidation.email.isValid} touched={fieldValidation.email.touched} />
+                </Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@example.com"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
-                  className="bg-background/50 border-border focus:border-accent transition-colors"
+                  className={`bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${
+                    fieldValidation.email.touched 
+                      ? fieldValidation.email.isValid 
+                        ? 'border-green-500 focus:border-green-500' 
+                        : 'border-red-500 focus:border-red-500'
+                      : ''
+                  }`}
                   required
                 />
-                <p className="text-xs text-muted-foreground">
-                  We'll send you a verification code to confirm your email
-                </p>
+                {fieldValidation.email.touched && !fieldValidation.email.isValid && formData.email.length > 0 && (
+                  <p className="text-xs text-red-400 flex items-center gap-1">
+                    <span>⚠</span>
+                    Please enter a valid email address with @ symbol (e.g., user@example.com)
+                  </p>
+                )}
+                {fieldValidation.email.touched && fieldValidation.email.isValid && (
+                  <p className="text-xs text-green-400 flex items-center gap-1">
+                    <span>✓</span>
+                    Valid email address
+                  </p>
+                )}
+                {!fieldValidation.email.touched && (
+                  <p className="text-xs text-gray-400">
+                    We'll send you a verification code to confirm your email
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password *</Label>
+                  <Label htmlFor="password" className="text-gray-200">
+                    Password <ValidationAsterisk isValid={fieldValidation.password.isValid} touched={fieldValidation.password.touched} />
+                  </Label>
                   <Input
                     id="password"
                     type="password"
                     placeholder="At least 8 characters"
                     value={formData.password}
                     onChange={(e) => handleInputChange("password", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
+                    className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                  <Label htmlFor="confirmPassword" className="text-gray-200">
+                    Confirm Password <ValidationAsterisk isValid={fieldValidation.confirmPassword.isValid} touched={fieldValidation.confirmPassword.touched} />
+                  </Label>
                   <Input
                     id="confirmPassword"
                     type="password"
                     placeholder="Confirm your password"
                     value={formData.confirmPassword}
                     onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
+                    className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                     required
                   />
                 </div>
@@ -787,24 +1106,24 @@ const SignUp = () => {
                   checked={formData.agreeToTerms}
                   onCheckedChange={(checked: boolean) => handleInputChange("agreeToTerms", checked)}
                 />
-                <Label htmlFor="agreeToTerms" className="text-sm">
+                <Label htmlFor="agreeToTerms" className="text-sm text-gray-200">
                   I agree to the{" "}
-                  <a href="#" className="text-accent hover:underline">
+                  <a href="#" className="text-blue-400 hover:text-blue-300 hover:underline transition-colors">
                     Terms & Conditions
                   </a>{" "}
                   and{" "}
-                  <a href="#" className="text-accent hover:underline">
+                  <a href="#" className="text-blue-400 hover:text-blue-300 hover:underline transition-colors">
                     Privacy Policy
                   </a>
                 </Label>
               </div>
             </div>
 
-            <div className="flex justify-end mt-6">
+            <div className="flex justify-center mt-6">
               <Button
                 onClick={handleStep1Submit}
-                disabled={loading || !formData.email || !formData.password || !formData.confirmPassword || !formData.agreeToTerms}
-                className="bg-primary hover:glow-blue-lg px-8 py-2"
+                disabled={loading || !formData.email || !validateEmail(formData.email) || !formData.password || !formData.confirmPassword || !formData.agreeToTerms || !fieldValidation.email.isValid || !fieldValidation.password.isValid || !fieldValidation.confirmPassword.isValid}
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 px-8 py-2 transition-all duration-200"
                 size="lg"
               >
                 {loading ? (
@@ -827,25 +1146,25 @@ const SignUp = () => {
         {step === 2 && (
           <>
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Mail className="w-8 h-8 text-accent" />
+              <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mail className="w-8 h-8 text-blue-400" />
               </div>
-              <h1 className="text-2xl font-bold mb-2">Verify Your Email</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl font-bold mb-2 text-white">Verify Your Email</h1>
+              <p className="text-gray-400">
                 Enter the verification code sent to<br />
-                <span className="font-medium text-foreground">{formData.email}</span>
+                <span className="font-medium text-white">{formData.email}</span>
               </p>
             </div>
 
             <form onSubmit={(e) => {
               e.preventDefault();
               if (formData.emailOtpCode.length === 6) {
-                handleEmailOtpVerification();
+                handleEmailVerification();
               }
             }}>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="emailOtpCode">Verification Code *</Label>
+                  <Label htmlFor="emailOtpCode" className="text-gray-200">Verification Code *</Label>
                   <Input
                     id="emailOtpCode"
                     type="text"
@@ -857,9 +1176,8 @@ const SignUp = () => {
                       const otpCode = pastedText.replace(/\D/g, '').slice(0, 6);
                       handleOtpInputChange('emailOtpCode', otpCode);
                     }}
-                    className={`text-center text-2xl tracking-widest bg-background/50 border-border focus:border-accent transition-colors ${
-                      autoSubmitting ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''
-                    }`}
+                    className={`text-center text-2xl tracking-widest bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${autoSubmitting ? 'border-green-500 bg-green-900/20' : ''
+                      }`}
                     placeholder="000000"
                     maxLength={6}
                     autoComplete="one-time-code"
@@ -868,11 +1186,11 @@ const SignUp = () => {
                     autoFocus
                     disabled={autoSubmitting}
                   />
-                  <div className="text-xs text-muted-foreground space-y-1">
+                  <div className="text-xs text-gray-400 space-y-1">
                     {autoSubmitting ? (
-                      <p className="text-green-600 dark:text-green-400">Verifying code...</p>
+                      <p className="text-green-400">Verifying code...</p>
                     ) : (
-                      <p>Enter the 6-digit code from your email</p>
+                      <p className="text-gray-400">Enter the 6-digit code from your email</p>
                     )}
                   </div>
                 </div>
@@ -881,9 +1199,9 @@ const SignUp = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={sendEmailOtp}
+                    onClick={resendEmailVerification}
                     disabled={loading}
-                    className="text-accent"
+                    className="text-blue-400 hover:text-blue-300 border-gray-700 hover:border-blue-500"
                   >
                     Resend Code
                   </Button>
@@ -895,7 +1213,7 @@ const SignUp = () => {
                   type="button"
                   variant="outline"
                   onClick={() => setStep(1)}
-                  className="px-8 py-2"
+                  className="px-8 py-2 border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                   disabled={loading || autoSubmitting}
                 >
                   <ChevronLeft className="mr-2 h-4 w-4" />
@@ -904,7 +1222,7 @@ const SignUp = () => {
                 <Button
                   type="submit"
                   disabled={loading || autoSubmitting || !formData.emailOtpCode || formData.emailOtpCode.length !== 6}
-                  className="bg-primary hover:glow-blue-lg px-8 py-2"
+                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
                   size="lg"
                 >
                   {loading || autoSubmitting ? (
@@ -924,62 +1242,220 @@ const SignUp = () => {
           </>
         )}
 
-        {/* Step 3: Phone Number Collection */}
+        {/* Step 3: Personal Information & Address */}
         {step === 3 && (
           <>
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Phone className="w-8 h-8 text-accent" />
-              </div>
-              <h1 className="text-2xl font-bold mb-2">Add Your Phone Number</h1>
-              <p className="text-muted-foreground">We'll send you a code to verify your number</p>
+              <h1 className="text-2xl font-bold mb-2 text-white">Complete Your Profile</h1>
+              <p className="text-gray-400">
+                {new URLSearchParams(window.location.search).get('oauth')
+                  ? "Complete your profile to continue"
+                  : "Tell us about yourself and your address"
+                }
+              </p>
+              {new URLSearchParams(window.location.search).get('oauth') && (
+                <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-green-900/20 text-green-400 rounded-full text-sm border border-green-700">
+                  <Check className="w-4 h-4" />
+                  Email verified via {new URLSearchParams(window.location.search).get('oauth')}
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Phone Number *</Label>
-                <div className="flex gap-2">
-                  <Select
-                    value={formData.phoneCountryCode}
-                    onValueChange={(value) => {
-                      handleInputChange("phoneCountryCode", value);
-                      if (formData.phoneNumber) {
-                        const cleanPhone = getCleanPhoneNumber(formData.phoneNumber);
-                        if (value === '+1') {
-                          setFormData(prev => ({ ...prev, phoneNumber: formatPhoneForDisplay(cleanPhone) }));
-                        } else {
-                          setFormData(prev => ({ ...prev, phoneNumber: cleanPhone }));
-                        }
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-24 bg-background/50 border-border focus:border-accent">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COUNTRY_DIAL_CODES.map((dialCode) => (
-                        <SelectItem key={dialCode} value={dialCode}>
-                          {dialCode}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {/* Personal Information Section */}
+              <div className="space-y-4 p-4 bg-gray-800/30 rounded-lg border border-gray-700">
+                <h3 className="font-semibold text-white">Personal Information</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName" className="text-gray-200">
+                      First Name <ValidationAsterisk isValid={fieldValidation.firstName.isValid} touched={fieldValidation.firstName.touched} />
+                    </Label>
+                    <Input
+                      id="firstName"
+                      placeholder="John"
+                      value={formData.firstName}
+                      onChange={(e) => handleInputChange("firstName", e.target.value)}
+                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="middleName" className="text-gray-200">Middle Name</Label>
+                    <Input
+                      id="middleName"
+                      placeholder="Michael"
+                      value={formData.middleName}
+                      onChange={(e) => handleInputChange("middleName", e.target.value)}
+                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName" className="text-gray-200">
+                      Last Name <ValidationAsterisk isValid={fieldValidation.lastName.isValid} touched={fieldValidation.lastName.touched} />
+                    </Label>
+                    <Input
+                      id="lastName"
+                      placeholder="Doe"
+                      value={formData.lastName}
+                      onChange={(e) => handleInputChange("lastName", e.target.value)}
+                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="dateOfBirth" className="text-gray-200">
+                    Date of Birth <ValidationAsterisk isValid={fieldValidation.dateOfBirth.isValid} touched={fieldValidation.dateOfBirth.touched} />
+                  </Label>
                   <Input
-                    id="phoneNumber"
-                    type="tel"
-                    placeholder={formData.phoneCountryCode === '+1' ? '(555) 123-4567' : 'Enter phone number'}
-                    value={formData.phoneNumber}
-                    onChange={(e) => handlePhoneInputChange(e.target.value)}
-                    className="flex-1 bg-background/50 border-border focus:border-accent transition-colors"
-                    maxLength={formData.phoneCountryCode === '+1' ? 14 : 20}
+                    id="dateOfBirth"
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) => handleDateOfBirthChange(e.target.value)}
+                    className={`bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${dateValidation && !dateValidation.isValid
+                      ? 'border-red-500 focus:border-red-500'
+                      : dateValidation && dateValidation.isValid
+                        ? 'border-green-500 focus:border-green-500'
+                        : ''
+                      }`}
+                    required
+                    max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
+                  />
+                  {dateValidation && (
+                    <p className={`text-xs ${dateValidation.isValid ? 'text-green-600' : 'text-red-600'}`}>
+                      {dateValidation.message || 'Age verified: You are eligible to join'}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phoneNumber" className="text-gray-200">
+                    Phone Number <ValidationAsterisk isValid={fieldValidation.phoneNumber.isValid} touched={fieldValidation.phoneNumber.touched} />
+                  </Label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={formData.phoneCountryCode}
+                      onValueChange={(value) => {
+                        handleInputChange("phoneCountryCode", value);
+                        if (formData.phoneNumber) {
+                          const cleanPhone = getCleanPhoneNumber(formData.phoneNumber);
+                          if (value === '+256') {
+                            setFormData(prev => ({ ...prev, phoneNumber: cleanPhone }));
+                          } else {
+                            setFormData(prev => ({ ...prev, phoneNumber: cleanPhone }));
+                          }
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-24 bg-gray-800/50 border-gray-700 focus:border-blue-500">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COUNTRY_DIAL_CODES.map((dialCode) => (
+                          <SelectItem key={dialCode} value={dialCode}>
+                            {dialCode}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      id="phoneNumber"
+                      type="tel"
+                      placeholder={formData.phoneCountryCode === '+256' ? '745315809' : 'Enter phone number'}
+                      value={formData.phoneNumber}
+                      onChange={(e) => handlePhoneInputChange(e.target.value)}
+                      className="flex-1 bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                      maxLength={20}
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    We'll send you a verification code to confirm your number
+                  </p>
+                </div>
+              </div>
+
+              {/* Address Information Section */}
+              <div className="space-y-4 p-4 bg-gray-800/30 rounded-lg border border-gray-700">
+                <h3 className="font-semibold text-white">Address Information</h3>
+
+                <div className="space-y-2">
+                  <Label htmlFor="streetAddress" className="text-gray-200">
+                    Street Address <ValidationAsterisk isValid={fieldValidation.streetAddress.isValid} touched={fieldValidation.streetAddress.touched} />
+                  </Label>
+                  <Input
+                    id="streetAddress"
+                    placeholder="123 Main St"
+                    value={formData.streetAddress}
+                    onChange={(e) => handleInputChange("streetAddress", e.target.value)}
+                    className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
                     required
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {formData.phoneCountryCode === '+1'
-                    ? "Enter your 10-digit US phone number"
-                    : "Enter your phone number"}
-                </p>
+
+                <div className="space-y-2">
+                  <Label htmlFor="addressLine2" className="text-gray-200">Address Line 2 (Optional)</Label>
+                  <Input
+                    id="addressLine2"
+                    placeholder="Apt, Suite, Unit, etc."
+                    value={formData.addressLine2}
+                    onChange={(e) => handleInputChange("addressLine2", e.target.value)}
+                    className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="city" className="text-gray-200">
+                      City <ValidationAsterisk isValid={fieldValidation.city.isValid} touched={fieldValidation.city.touched} />
+                    </Label>
+                    <Input
+                      id="city"
+                      placeholder="New York"
+                      value={formData.city}
+                      onChange={(e) => handleInputChange("city", e.target.value)}
+                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="state" className="text-gray-200">State <span className="text-gray-500">*</span></Label>
+                    <Select
+                      value={formData.state}
+                      onValueChange={(value) => handleInputChange("state", value)}
+                    >
+                      <SelectTrigger className="bg-gray-800/50 border-gray-700 focus:border-blue-500">
+                        <SelectValue placeholder="Select state" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {usStates.map((state) => (
+                          <SelectItem key={state.value} value={state.value}>
+                            {state.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="zipCode" className="text-gray-200">
+                      ZIP Code <ValidationAsterisk isValid={fieldValidation.zipCode.isValid} touched={fieldValidation.zipCode.touched} />
+                    </Label>
+                    <Input
+                      id="zipCode"
+                      placeholder="10001"
+                      value={formData.zipCode}
+                      onChange={(e) => handleInputChange("zipCode", e.target.value)}
+                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                      required
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -987,7 +1463,7 @@ const SignUp = () => {
               <Button
                 variant="outline"
                 onClick={() => setStep(2)}
-                className="px-8 py-2"
+                className="px-8 py-2 border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                 disabled={loading}
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
@@ -995,8 +1471,8 @@ const SignUp = () => {
               </Button>
               <Button
                 onClick={handleStep3Submit}
-                disabled={loading || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber)}
-                className="bg-primary hover:glow-blue-lg px-8 py-2"
+                disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
                 size="lg"
               >
                 {loading ? (
@@ -1011,6 +1487,15 @@ const SignUp = () => {
                   </>
                 )}
               </Button>
+              <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePhoneBypass}
+                  className="px-8 py-2"
+                  disabled={loading}
+                >
+                  Bypass for Dev
+                </Button>
             </div>
           </>
         )}
@@ -1023,9 +1508,9 @@ const SignUp = () => {
                 <Phone className="w-8 h-8 text-accent" />
               </div>
               <h1 className="text-2xl font-bold mb-2">Verify Your Phone</h1>
-              <p className="text-muted-foreground">
+              <p className="text-gray-400">
                 Enter the code sent to<br />
-                <span className="font-medium text-foreground">{formData.phoneCountryCode} {formData.phoneNumber}</span>
+                <span className="font-medium text-white">{formData.phoneCountryCode} {formData.phoneNumber}</span>
               </p>
             </div>
 
@@ -1037,7 +1522,7 @@ const SignUp = () => {
             }}>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="phoneOtpCode">Verification Code *</Label>
+                  <Label htmlFor="phoneOtpCode" className="text-gray-200">Verification Code *</Label>
                   <Input
                     id="phoneOtpCode"
                     type="text"
@@ -1049,9 +1534,8 @@ const SignUp = () => {
                       const otpCode = pastedText.replace(/\D/g, '').slice(0, 6);
                       handleOtpInputChange('phoneOtpCode', otpCode);
                     }}
-                    className={`text-center text-2xl tracking-widest bg-background/50 border-border focus:border-accent transition-colors ${
-                      autoSubmitting ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''
-                    }`}
+                    className={`text-center text-2xl tracking-widest bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${autoSubmitting ? 'border-green-500 bg-green-900/20' : ''
+                      }`}
                     placeholder="000000"
                     maxLength={6}
                     autoComplete="one-time-code"
@@ -1060,7 +1544,7 @@ const SignUp = () => {
                     autoFocus
                     disabled={autoSubmitting}
                   />
-                  <div className="text-xs text-muted-foreground space-y-1">
+                  <div className="text-xs text-gray-400 space-y-1">
                     {autoSubmitting ? (
                       <p className="text-green-600 dark:text-green-400">Verifying code...</p>
                     ) : (
@@ -1075,7 +1559,7 @@ const SignUp = () => {
                     variant="outline"
                     onClick={sendPhoneOtp}
                     disabled={loading}
-                    className="text-accent"
+                    className="text-blue-400 hover:text-blue-300 border-gray-700 hover:border-blue-500"
                   >
                     Resend Code
                   </Button>
@@ -1087,7 +1571,7 @@ const SignUp = () => {
                   type="button"
                   variant="outline"
                   onClick={() => setStep(3)}
-                  className="px-8 py-2"
+                  className="px-8 py-2 border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                   disabled={loading || autoSubmitting}
                 >
                   <ChevronLeft className="mr-2 h-4 w-4" />
@@ -1096,7 +1580,7 @@ const SignUp = () => {
                 <Button
                   type="submit"
                   disabled={loading || autoSubmitting || !formData.phoneOtpCode || formData.phoneOtpCode.length !== 6}
-                  className="bg-primary hover:glow-blue-lg px-8 py-2"
+                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
                   size="lg"
                 >
                   {loading || autoSubmitting ? (
@@ -1116,218 +1600,33 @@ const SignUp = () => {
           </>
         )}
 
-        {/* Step 5: Personal Information */}
+        {/* Step 5: Payment */}
         {step === 5 && (
           <>
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold mb-2">Complete Your Profile</h1>
-              <p className="text-muted-foreground">Tell us about yourself</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name *</Label>
-                  <Input
-                    id="firstName"
-                    placeholder="John"
-                    value={formData.firstName}
-                    onChange={(e) => handleInputChange("firstName", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="middleName">Middle Name</Label>
-                  <Input
-                    id="middleName"
-                    placeholder="Michael"
-                    value={formData.middleName}
-                    onChange={(e) => handleInputChange("middleName", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name *</Label>
-                  <Input
-                    id="lastName"
-                    placeholder="Doe"
-                    value={formData.lastName}
-                    onChange={(e) => handleInputChange("lastName", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dateOfBirth">Date of Birth *</Label>
-                <Input
-                  id="dateOfBirth"
-                  type="date"
-                  value={formData.dateOfBirth}
-                  onChange={(e) => handleDateOfBirthChange(e.target.value)}
-                  className={`bg-background/50 border-border focus:border-accent transition-colors ${
-                    dateValidation && !dateValidation.isValid
-                      ? 'border-red-500 focus:border-red-500'
-                      : dateValidation && dateValidation.isValid
-                        ? 'border-green-500 focus:border-green-500'
-                        : ''
-                  }`}
-                  required
-                  max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
-                />
-                {dateValidation && !dateValidation.isValid ? (
-                  <p className="text-xs text-red-500 flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {dateValidation.message}
-                  </p>
-                ) : dateValidation && dateValidation.isValid ? (
-                  <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    Age verified - you are eligible to create an account
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    You must be at least 18 years old to create an account
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="streetAddress">Street Address *</Label>
-                <Input
-                  id="streetAddress"
-                  placeholder="123 Main St"
-                  value={formData.streetAddress}
-                  onChange={(e) => handleInputChange("streetAddress", e.target.value)}
-                  className="bg-background/50 border-border focus:border-accent transition-colors"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="addressLine2">Address Line 2 (Optional)</Label>
-                <Input
-                  id="addressLine2"
-                  placeholder="Apt, Suite, Unit, etc."
-                  value={formData.addressLine2}
-                  onChange={(e) => handleInputChange("addressLine2", e.target.value)}
-                  className="bg-background/50 border-border focus:border-accent transition-colors"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="city">City *</Label>
-                  <Input
-                    id="city"
-                    placeholder="New York"
-                    value={formData.city}
-                    onChange={(e) => handleInputChange("city", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="state">State *</Label>
-                  <Select
-                    value={formData.state}
-                    onValueChange={(value) => handleInputChange("state", value)}
-                  >
-                    <SelectTrigger className="bg-background/50 border-border focus:border-accent">
-                      <SelectValue placeholder="Select state" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {usStates.map((state) => (
-                        <SelectItem key={state.value} value={state.value}>
-                          {state.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="zipCode">ZIP Code *</Label>
-                  <Input
-                    id="zipCode"
-                    placeholder="10001"
-                    value={formData.zipCode}
-                    onChange={(e) => handleInputChange("zipCode", e.target.value)}
-                    className="bg-background/50 border-border focus:border-accent transition-colors"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-between mt-6">
-              <Button
-                variant="outline"
-                onClick={() => setStep(4)}
-                className="px-8 py-2"
-                disabled={loading}
-              >
-                <ChevronLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <Button
-                onClick={handleStep5Submit}
-                disabled={loading || !formData.firstName || !formData.lastName || !formData.streetAddress || !formData.city || !formData.state || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
-                className="bg-primary hover:glow-blue-lg px-8 py-2"
-                size="lg"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving Profile...
-                  </>
-                ) : (
-                  <>
-                    Complete Profile
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
-            </div>
-          </>
-        )}
-
-        {/* Step 6: Payment */}
-        {step === 6 && (
-          <>
-            <div className="text-center mb-6">
               <h1 className="text-2xl font-bold mb-2">Complete Your Membership</h1>
-              <p className="text-muted-foreground">Choose your payment plan to join the queue</p>
+              <p className="text-gray-400">Choose your payment plan to join the queue</p>
             </div>
 
             <div className="space-y-6">
               <Card className="p-6 border-2 border-accent glow-blue">
                 <div className="text-center space-y-4">
                   <div>
-                    <p className="text-muted-foreground">Initial Payment</p>
+                    <p className="text-gray-400">Initial Payment</p>
                     <p className="text-4xl font-bold text-accent">$300</p>
-                    <p className="text-sm text-muted-foreground">Includes first month</p>
+                    <p className="text-sm text-gray-400">Includes first month</p>
                   </div>
                   <div className="border-t pt-4">
-                    <p className="text-muted-foreground">Then Monthly</p>
-                    <p className="text-2xl font-semibold text-foreground">$25</p>
-                    <p className="text-sm text-muted-foreground">Starting month 2</p>
+                    <p className="text-gray-400">Then Monthly</p>
+                    <p className="text-2xl font-semibold text-white">$25</p>
+                    <p className="text-sm text-gray-400">Starting month 2</p>
                   </div>
                 </div>
               </Card>
 
-              <div className="space-y-4 p-4 bg-background/50 rounded-lg border">
-                <h3 className="font-semibold text-foreground">What happens next:</h3>
-                <ul className="space-y-2 text-sm text-muted-foreground">
+              <div className="space-y-4 p-4 bg-gray-800/50 rounded-lg border">
+                <h3 className="font-semibold text-white">What happens next:</h3>
+                <ul className="space-y-2 text-sm text-gray-400">
                   <li className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-accent" />
                     You'll be redirected to our secure payment processor
@@ -1351,8 +1650,8 @@ const SignUp = () => {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setStep(5)}
-                  className="w-full"
+                  onClick={() => setStep(4)}
+                  className="w-full border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                   disabled={loading}
                 >
                   <ChevronLeft className="mr-2 h-4 w-4" />
@@ -1383,17 +1682,16 @@ const SignUp = () => {
           <>
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border"></div>
+                <div className="w-full border-t border-gray-700"></div>
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                <span className="bg-card px-2 text-gray-400">Or continue with</span>
               </div>
             </div>
 
             {/* Google Signup */}
             <Button
-              variant="glass"
-              className="w-full mb-6"
+              className="w-full mb-6 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white transition-colors"
               onClick={handleGoogleSignup}
               disabled={loading}
             >
@@ -1409,9 +1707,9 @@ const SignUp = () => {
         )}
 
         {/* Login Link */}
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="text-center text-sm text-gray-400">
           Already have an account?{" "}
-          <Link href="/login" className="text-accent hover:underline font-medium">
+          <Link href="/login" className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors">
             Back to Login
           </Link>
         </p>

@@ -4,10 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useSession } from "@/lib/auth-client";
-import { useSupabaseClient } from "@supabase/auth-helpers-react";
 
 const DashboardSimple = () => {
-  const supabase = useSupabaseClient();
+
   const { data: session } = useSession();
   const user = session?.user;
 
@@ -41,10 +40,9 @@ const DashboardSimple = () => {
     const fetchQueueAndUsers = async () => {
       try {
         // Total revenue from completed payments using normalized schema
-        const { data: payments, error: paymentsError } = await supabase
-          .from('user_payments')
-          .select('amount, payment_date, user_id, status')
-          .eq('status', 'succeeded');
+        // Temporarily disabled - TODO: Replace with Better Auth API calls
+        const payments = []
+        const paymentsError = null
         if (!paymentsError && payments) {
           const sum = payments.reduce((s, p: any) => s + (p.amount || 0), 0);
           setTotalRevenue(sum);
@@ -54,17 +52,23 @@ const DashboardSimple = () => {
         let currentUserId: string | null = null;
         if (user?.id) {
           // Find user by auth_user_id in normalized users table
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('id')
-            .eq('auth_user_id', user.id)
-            .maybeSingle();
+          // Temporarily disabled - TODO: Replace with Better Auth API calls
+          const userData = null
+          const userError = null
           if (!userError && userData?.id) {
             currentUserId = userData.id;
           }
         }
 
         // Fetch queue ordered by position using normalized schema
+        // Temporarily disabled - TODO: Replace with Better Auth API calls
+        const queue = []
+        const queueError = null
+      } catch (e) {
+        // console.error('Error in fetchQueueAndUsers:', e);
+      }
+    };
+    /*
         const { data: queue, error: queueError } = await supabase
           .from('membership_queue')
           .select('user_id, queue_position, total_months_subscribed, subscription_active')
@@ -181,7 +185,6 @@ const DashboardSimple = () => {
     fetchQueueAndUsers();
 
     // Subscribe to realtime changes in membership_queue to update the UI live
-    let channel: any = null;
     try {
       if ((supabase as any)?.channel) {
         channel = (supabase as any)
@@ -203,22 +206,16 @@ const DashboardSimple = () => {
       console.warn('Realtime subscription failed, falling back to polling:', e);
       pollRef.current = window.setInterval(() => fetchQueueAndUsers(), 5000);
     }
+    */
 
     return () => {
-      // cleanup realtime subscription or polling
-      try {
-        if (channel && typeof channel.unsubscribe === 'function') {
-          channel.unsubscribe();
-        }
-      } catch (e) {
-        // ignore
-      }
+      // cleanup polling
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
       }
     };
-  }, [supabase, user?.id, BUSINESS_LAUNCH_DATE, totalRevenue]);
+  }, [user?.id, BUSINESS_LAUNCH_DATE, totalRevenue]);
 
   const userData = {
     memberId: queuePosition ? `#${queuePosition.toString().padStart(3, '0')}` : "Not in queue",

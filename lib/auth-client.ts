@@ -13,13 +13,14 @@
 'use client'
 
 import { createAuthClient } from 'better-auth/react'
-import { passkeyClient, twoFactorClient, organizationClient } from 'better-auth/client/plugins'
+import { passkeyClient, twoFactorClient, organizationClient, emailOTPClient } from 'better-auth/client/plugins'
 
 export const authClient = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
 
   // Enable client-side plugins
   plugins: [
+    emailOTPClient(),     // Email OTP support
     passkeyClient(),      // Passkey (WebAuthn) support
     twoFactorClient(),    // 2FA support
     organizationClient()  // Organization management
