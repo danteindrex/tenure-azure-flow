@@ -148,7 +148,6 @@ export class PhoneAuthService {
       if (!verificationResult.success) {
         return {
           success: false,
-          verified: false,
           error: {
             message: verificationResult.error || 'Invalid or expired code',
             code: 'INVALID_OTP',
@@ -179,7 +178,6 @@ export class PhoneAuthService {
     } catch (err: any) {
       return {
         success: false,
-        verified: false,
         error: {
           message: err.message || 'Failed to verify OTP',
           code: 'VERIFY_OTP_ERROR',

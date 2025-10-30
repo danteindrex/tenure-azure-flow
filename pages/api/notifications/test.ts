@@ -1,6 +1,25 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import { db } from "@/drizzle/db";
+import { pgTable, uuid, text, varchar, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
 import { BUSINESS_RULES } from '@/lib/business-logic';
+
+// Define notifications table inline
+const notifications = pgTable('notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  type: varchar('type', { length: 50 }).notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  message: text('message').notNull(),
+  priority: varchar('priority', { length: 20 }).default('medium'),
+  actionUrl: text('action_url'),
+  actionText: varchar('action_text', { length: 100 }),
+  metadata: jsonb('metadata').default({}),
+  isRead: boolean('is_read').default(false),
+  isArchived: boolean('is_archived').default(false),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+});
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -14,15 +33,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
     const testNotifications = [];
 
     // Define all test scenarios
-    const scenarios = {
+    const scenarios: Record<string, any> = {
       joining_fee_required: {
         type: 'payment',
         title: 'Joining Fee Required',
@@ -135,49 +149,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (allScenarios) {
       // Create all test notifications
       for (const [key, notificationData] of Object.entries(scenarios)) {
-        const { data, error } = await supabase
-          .from('notifications')
-          .insert({
-            user_id: userId,
-            ...notificationData,
-            is_read: false,
-            action_url: '/dashboard/payments',
-            action_text: notificationData.type === 'payment' ? 'Pay Now' : 'View Details'
-          })
-          .select()
-          .single();
+        try {
+          const result = await db.insert(notifications)
+            .values({
+              userId: userId,
+              ...notificationData,
+              isRead: false,
+              actionUrl: '/dashboard/payments',
+              actionText: notificationData.type === 'payment' ? 'Pay Now' : 'View Details'
+            })
+            .returning();
 
-        if (error) {
+          testNotifications.push(result[0]);
+
+          // Small delay between notifications
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error) {
           console.error(`Error creating ${key} notification:`, error);
-        } else {
-          testNotifications.push(data);
         }
-
-        // Small delay between notifications
-        await new Promise(resolve => setTimeout(resolve, 100));
       }
     } else if (scenario && scenarios[scenario]) {
       // Create single test notification
       const notificationData = scenarios[scenario];
-      
-      const { data, error } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: userId,
-          ...notificationData,
-          is_read: false,
-          action_url: '/dashboard/payments',
-          action_text: notificationData.type === 'payment' ? 'Pay Now' : 'View Details'
-        })
-        .select()
-        .single();
 
-      if (error) {
+      try {
+        const result = await db.insert(notifications)
+          .values({
+            userId: userId,
+            ...notificationData,
+            isRead: false,
+            actionUrl: '/dashboard/payments',
+            actionText: notificationData.type === 'payment' ? 'Pay Now' : 'View Details'
+          })
+          .returning();
+
+        testNotifications.push(result[0]);
+      } catch (error) {
         console.error(`Error creating ${scenario} notification:`, error);
         return res.status(500).json({ error: `Failed to create ${scenario} notification` });
       }
-
-      testNotifications.push(data);
     } else {
       return res.status(400).json({ error: 'Invalid scenario or missing allScenarios flag' });
     }
@@ -191,7 +201,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   } catch (error) {
     console.error('Test notification creation error:', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'Unknown error'
     });

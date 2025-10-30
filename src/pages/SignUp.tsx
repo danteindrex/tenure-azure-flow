@@ -45,6 +45,7 @@ const SignUp = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [dateValidation, setDateValidation] = useState<{ isValid: boolean; message: string } | null>(null);
   const [autoSubmitting, setAutoSubmitting] = useState(false);
+  const [bypassed, setBypassed] = useState(false);
   
   // Field validation states
   const [fieldValidation, setFieldValidation] = useState({

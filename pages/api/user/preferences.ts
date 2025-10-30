@@ -1,34 +1,37 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { auth } from "@/lib/auth";
-import { createClient } from "@supabase/supabase-js";
+import { db } from "@/drizzle/db";
+import { users } from "@/drizzle/schema";
+import { eq } from "drizzle-orm";
+import { pgTable, uuid, timestamp, jsonb } from "drizzle-orm/pg-core";
+
+// Define user_preferences table inline since it might not be in the schema yet
+const userPreferences = pgTable('user_preferences', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  preferences: jsonb('preferences'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+});
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     // Get current user session using Better Auth
-    const session = await auth.api.getSession({ 
+    const session = await auth.api.getSession({
       headers: new Headers(req.headers as any)
     });
-    
+
     if (!session?.user) {
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !serviceKey) {
-      return res.status(500).json({ error: "Supabase server configuration missing" });
-    }
-
-    const admin = createClient(url, serviceKey);
-
     // Get user ID from our users table
-    const { data: userData, error: userError } = await admin
-      .from("users")
-      .select("id")
-      .eq("auth_user_id", session.user.id)
-      .single();
+    const userData = await db.query.users.findFirst({
+      where: eq(users.authUserId, session.user.id),
+      columns: { id: true }
+    });
 
-    if (userError || !userData) {
+    if (!userData) {
       return res.status(404).json({ error: "User not found" });
     }
 
@@ -36,15 +39,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === "GET") {
       // Fetch user preferences
-      const { data: preferences, error: preferencesError } = await admin
-        .from("user_preferences")
-        .select("*")
-        .eq("user_id", userId)
-        .single();
-
-      if (preferencesError && preferencesError.code !== 'PGRST116') {
-        return res.status(500).json({ error: preferencesError.message });
-      }
+      const preferencesData = await db.select()
+        .from(userPreferences)
+        .where(eq(userPreferences.userId, userId))
+        .limit(1);
 
       // Return default preferences if none exist
       const defaultPreferences = {
@@ -57,27 +55,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         timezone: 'UTC',
       };
 
-      return res.status(200).json(preferences?.preferences || defaultPreferences);
+      return res.status(200).json(
+        preferencesData[0]?.preferences || defaultPreferences
+      );
     }
 
     if (req.method === "POST") {
       const preferences = req.body;
 
       // Upsert preferences
-      const { error: upsertError } = await admin
-        .from("user_preferences")
-        .upsert(
-          {
-            user_id: userId,
+      await db.insert(userPreferences)
+        .values({
+          userId: userId,
+          preferences: preferences,
+          updatedAt: new Date()
+        })
+        .onConflictDoUpdate({
+          target: userPreferences.userId,
+          set: {
             preferences: preferences,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" }
-        );
-
-      if (upsertError) {
-        return res.status(500).json({ error: upsertError.message });
-      }
+            updatedAt: new Date()
+          }
+        });
 
       return res.status(200).json({ success: true });
     }
