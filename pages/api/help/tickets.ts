@@ -1,5 +1,24 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import { auth } from "@/lib/auth";
+import { db } from "@/drizzle/db";
+import { users } from "@/drizzle/schema";
+import { eq } from "drizzle-orm";
+import { pgTable, uuid, text, varchar, timestamp } from "drizzle-orm/pg-core";
+
+// Define support_tickets table inline since it's not in the schema yet
+const supportTickets = pgTable('support_tickets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  subject: varchar('subject', { length: 255 }).notNull(),
+  description: text('description').notNull(),
+  category: varchar('category', { length: 50 }).notNull(),
+  priority: varchar('priority', { length: 20 }).default('medium'),
+  status: varchar('status', { length: 20 }).default('open'),
+  userEmail: varchar('user_email', { length: 255 }),
+  userName: varchar('user_name', { length: 255 }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+});
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -11,29 +30,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const tickets = await db.select()
+        .from(supportTickets)
+        .where(eq(supportTickets.userId, userId as string))
+        .orderBy(supportTickets.createdAt);
 
-      if (!url || !serviceKey) {
-        return res.status(500).json({ error: 'Supabase server configuration missing' });
-      }
-
-      const adminSupabase = createClient(url, serviceKey);
-
-      const { data, error } = await adminSupabase
-        .from('support_tickets')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching support tickets:', error);
-        return res.status(500).json({ error: 'Failed to fetch support tickets' });
-      }
-
-      return res.status(200).json({ tickets: data || [] });
+      return res.status(200).json({ tickets: tickets || [] });
     } catch (err: any) {
-      console.error('Support tickets error:', err);
+      console.error('Error fetching support tickets:', err);
       return res.status(500).json({ error: err?.message || 'Unexpected server error' });
     }
   }
@@ -47,42 +51,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      // Get current user session using Better Auth
+      const session = await auth.api.getSession({
+        headers: new Headers(req.headers as any)
+      });
 
-      if (!url || !serviceKey) {
-        return res.status(500).json({ error: 'Supabase server configuration missing' });
+      if (!session?.user) {
+        return res.status(401).json({ error: "Not authenticated" });
       }
 
-      const adminSupabase = createClient(url, serviceKey);
+      // Get user info from Better Auth session
+      const userEmail = session.user.email;
+      const userName = session.user.name || session.user.email?.split('@')[0];
 
-      // Get user info for caching
-      const { data: userData, error: userError } = await adminSupabase.auth.admin.getUserById(userId);
-      
-      if (userError || !userData.user) {
-        return res.status(400).json({ error: 'User not found' });
-      }
-
-      const { data, error } = await adminSupabase
-        .from('support_tickets')
-        .insert({
-          user_id: userId,
+      const result = await db.insert(supportTickets)
+        .values({
+          userId: userId,
           subject,
           description,
           category,
           priority: priority || 'medium',
-          user_email: userData.user.email,
-          user_name: userData.user.user_metadata?.full_name || userData.user.email?.split('@')[0]
+          userEmail: userEmail,
+          userName: userName
         })
-        .select()
-        .single();
+        .returning();
 
-      if (error) {
-        console.error('Error creating support ticket:', error);
-        return res.status(500).json({ error: 'Failed to create support ticket' });
-      }
-
-      return res.status(201).json({ ticket: data });
+      return res.status(201).json({ ticket: result[0] });
     } catch (err: any) {
       console.error('Create ticket error:', err);
       return res.status(500).json({ error: err?.message || 'Unexpected server error' });

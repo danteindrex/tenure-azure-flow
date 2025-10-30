@@ -1,5 +1,25 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import { db } from "@/drizzle/db";
+import { pgTable, uuid, text, varchar, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { eq, and, desc, sql } from "drizzle-orm";
+
+// Define notifications table inline
+const notifications = pgTable('notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  type: varchar('type', { length: 50 }).notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  message: text('message').notNull(),
+  priority: varchar('priority', { length: 20 }).default('medium'),
+  actionUrl: text('action_url'),
+  actionText: varchar('action_text', { length: 100 }),
+  metadata: jsonb('metadata').default({}),
+  isRead: boolean('is_read').default(false),
+  isArchived: boolean('is_archived').default(false),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+});
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -11,47 +31,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-      if (!url || !serviceKey) {
-        return res.status(500).json({ error: 'Supabase server configuration missing' });
-      }
-
-      const adminSupabase = createClient(url, serviceKey);
-
-      let query = adminSupabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (limit) {
-        query = query.limit(parseInt(limit as string));
-      }
-
-      if (offset) {
-        query = query.range(parseInt(offset as string), parseInt(offset as string) + (parseInt(limit as string) || 50) - 1);
-      }
+      // Build where conditions
+      const conditions: any[] = [eq(notifications.userId, userId as string)];
 
       if (type) {
-        query = query.eq('type', type);
+        conditions.push(eq(notifications.type, type as string));
       }
 
       if (is_read !== undefined) {
-        query = query.eq('is_read', is_read === 'true');
+        conditions.push(eq(notifications.isRead, is_read === 'true'));
       }
 
       if (is_archived !== undefined) {
-        query = query.eq('is_archived', is_archived === 'true');
+        conditions.push(eq(notifications.isArchived, is_archived === 'true'));
       }
 
-      const { data, error } = await query;
+      const limitNum = limit ? parseInt(limit as string) : 50;
+      const offsetNum = offset ? parseInt(offset as string) : 0;
 
-      if (error) {
-        console.error('Error fetching notifications:', error);
-        return res.status(500).json({ error: 'Failed to fetch notifications' });
-      }
+      const data = await db.select()
+        .from(notifications)
+        .where(and(...conditions))
+        .orderBy(desc(notifications.createdAt))
+        .limit(limitNum)
+        .offset(offsetNum);
 
       return res.status(200).json({ notifications: data || [] });
     } catch (err: any) {
@@ -69,36 +72,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-      if (!url || !serviceKey) {
-        return res.status(500).json({ error: 'Supabase server configuration missing' });
-      }
-
-      const adminSupabase = createClient(url, serviceKey);
-
-      const { data, error } = await adminSupabase
-        .from('notifications')
-        .insert({
-          user_id: userId,
+      const result = await db.insert(notifications)
+        .values({
+          userId,
           type,
           title,
           message,
           priority: priority || 'medium',
-          action_url,
-          action_text,
+          actionUrl: action_url,
+          actionText: action_text,
           metadata: metadata || {}
         })
-        .select()
-        .single();
+        .returning();
 
-      if (error) {
-        console.error('Error creating notification:', error);
-        return res.status(500).json({ error: 'Failed to create notification' });
-      }
-
-      return res.status(201).json({ notification: data });
+      return res.status(201).json({ notification: result[0] });
     } catch (err: any) {
       console.error('Create notification error:', err);
       return res.status(500).json({ error: err?.message || 'Unexpected server error' });

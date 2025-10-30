@@ -1,17 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createClient } from "@supabase/supabase-js";
+import { auth } from "@/lib/auth";
+import { db } from "@/drizzle/db";
+import { users } from "@/drizzle/schema";
+import { eq } from "drizzle-orm";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Method Not Allowed" });
-  }
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !anon || !serviceKey) {
-    return res.status(500).json({ error: "Supabase environment variables missing" });
   }
 
   const body = req.body || {};
@@ -26,43 +22,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     zip_code: "90001",
   };
 
-  const client = createClient(url, anon);
-  const admin = createClient(url, serviceKey);
-
   try {
-    const { data: signUpData, error: signUpError } = await client.auth.signUp({
-      email,
-      password,
-      options: {
-        data: meta,
-        emailRedirectTo: typeof req !== "undefined" ? `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3337"}/login` : undefined,
+    // Sign up using Better Auth
+    const signUpResult = await auth.api.signUpEmail({
+      body: {
+        email,
+        password,
+        name: meta.full_name,
+        callbackURL: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3337"}/login`,
       },
     });
 
-    if (signUpError) {
-      return res.status(500).json({ email, signUpError: signUpError.message });
+    if (!signUpResult || !signUpResult.user) {
+      return res.status(500).json({
+        email,
+        signUpError: "Failed to create user account"
+      });
     }
 
-    // Check if user row exists after signup (trigger or server upsert)
-    const { data: users, error: userErr } = await admin
-      .from("users_complete")
-      .select("auth_user_id, email, full_name, phone, city, state, postal_code, street_address, user_created_at")
-      .eq("email", email)
-      .limit(1);
+    // Check if user row exists after signup
+    const userRecord = await db.query.users.findFirst({
+      where: eq(users.email, email),
+      columns: {
+        authUserId: true,
+        email: true,
+        createdAt: true,
+      }
+    });
 
-    if (userErr) {
-      return res.status(500).json({ email, error: userErr.message });
-    }
+    // For complete user data, you might want to join with profile table
+    // But for this test, we'll just return basic info
+    const found = userRecord || null;
 
-    const found = Array.isArray(users) && users.length > 0 ? users[0] : null;
     return res.status(200).json({
       email,
-      signup_session: !!signUpData.session,
-      user_id: signUpData.user?.id || null,
+      signup_token: !!signUpResult.token,
+      user_id: signUpResult.user?.id || null,
       member_found: !!found,
       member: found,
     });
   } catch (e: any) {
-    return res.status(500).json({ email, error: e?.message || "Unexpected error" });
+    console.error('Test signup error:', e);
+    return res.status(500).json({
+      email,
+      error: e?.message || "Unexpected error"
+    });
   }
 }

@@ -1,5 +1,45 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import { db } from "@/drizzle/db";
+import { pgTable, uuid, text, varchar, timestamp, boolean, integer } from "drizzle-orm/pg-core";
+import { eq, or, ilike, and, sql } from "drizzle-orm";
+
+// Define FAQ and knowledge base tables inline
+const faqCategories = pgTable('faq_categories', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 100 }).notNull(),
+  icon: varchar('icon', { length: 50 }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+});
+
+const faqItems = pgTable('faq_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  categoryId: uuid('category_id').references(() => faqCategories.id),
+  question: text('question').notNull(),
+  answer: text('answer').notNull(),
+  isActive: boolean('is_active').default(true),
+  helpfulCount: integer('helpful_count').default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+});
+
+const knowledgeBaseArticles = pgTable('knowledge_base_articles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: varchar('title', { length: 255 }).notNull(),
+  content: text('content').notNull(),
+  excerpt: text('excerpt'),
+  isPublished: boolean('is_published').default(false),
+  helpfulCount: integer('helpful_count').default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+});
+
+const helpSearchLogs = pgTable('help_search_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id'),
+  searchQuery: varchar('search_query', { length: 255 }).notNull(),
+  resultsCount: integer('results_count').default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+});
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -14,62 +54,78 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Search query is required' });
     }
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!url || !serviceKey) {
-      return res.status(500).json({ error: 'Supabase server configuration missing' });
-    }
-
-    const adminSupabase = createClient(url, serviceKey);
+    const searchPattern = `%${searchQuery}%`;
 
     // Search FAQ items
-    const { data: faqItems, error: faqError } = await adminSupabase
-      .from('faq_items')
-      .select(`
-        *,
-        faq_categories (
-          id,
-          name,
-          icon
+    let faqItemsResult: any[] = [];
+    try {
+      faqItemsResult = await db.select({
+        id: faqItems.id,
+        question: faqItems.question,
+        answer: faqItems.answer,
+        helpfulCount: faqItems.helpfulCount,
+        categoryId: faqItems.categoryId,
+        category: {
+          id: faqCategories.id,
+          name: faqCategories.name,
+          icon: faqCategories.icon
+        }
+      })
+        .from(faqItems)
+        .leftJoin(faqCategories, eq(faqItems.categoryId, faqCategories.id))
+        .where(
+          and(
+            eq(faqItems.isActive, true),
+            or(
+              ilike(faqItems.question, searchPattern),
+              ilike(faqItems.answer, searchPattern)
+            )
+          )
         )
-      `)
-      .eq('is_active', true)
-      .or(`question.ilike.%${searchQuery}%,answer.ilike.%${searchQuery}%`)
-      .order('helpful_count', { ascending: false });
-
-    if (faqError) {
-      console.error('Error searching FAQ items:', faqError);
+        .orderBy(sql`${faqItems.helpfulCount} DESC`);
+    } catch (err) {
+      console.error('Error searching FAQ items:', err);
     }
 
     // Search knowledge base articles
-    const { data: articles, error: articlesError } = await adminSupabase
-      .from('knowledge_base_articles')
-      .select('*')
-      .eq('is_published', true)
-      .or(`title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%,excerpt.ilike.%${searchQuery}%`)
-      .order('helpful_count', { ascending: false });
-
-    if (articlesError) {
-      console.error('Error searching knowledge base:', articlesError);
+    let articlesResult: any[] = [];
+    try {
+      articlesResult = await db.select()
+        .from(knowledgeBaseArticles)
+        .where(
+          and(
+            eq(knowledgeBaseArticles.isPublished, true),
+            or(
+              ilike(knowledgeBaseArticles.title, searchPattern),
+              ilike(knowledgeBaseArticles.content, searchPattern),
+              ilike(knowledgeBaseArticles.excerpt, searchPattern)
+            )
+          )
+        )
+        .orderBy(sql`${knowledgeBaseArticles.helpfulCount} DESC`);
+    } catch (err) {
+      console.error('Error searching knowledge base:', err);
     }
 
-    const totalResults = (faqItems?.length || 0) + (articles?.length || 0);
+    const totalResults = (faqItemsResult?.length || 0) + (articlesResult?.length || 0);
 
     // Log the search
     if (userId) {
-      await adminSupabase
-        .from('help_search_logs')
-        .insert({
-          user_id: userId,
-          search_query: searchQuery,
-          results_count: totalResults
+      try {
+        await db.insert(helpSearchLogs).values({
+          userId: userId as string,
+          searchQuery: searchQuery,
+          resultsCount: totalResults
         });
+      } catch (err) {
+        // Don't fail the request if logging fails
+        console.error('Error logging search:', err);
+      }
     }
 
     return res.status(200).json({
-      faqItems: faqItems || [],
-      articles: articles || [],
+      faqItems: faqItemsResult || [],
+      articles: articlesResult || [],
       totalResults
     });
   } catch (err: any) {

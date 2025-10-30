@@ -1,34 +1,27 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { auth } from "@/lib/auth";
-import { createClient } from "@supabase/supabase-js";
+import { db } from "@/drizzle/db";
+import { users, userContacts } from "@/drizzle/schema";
+import { eq, and } from "drizzle-orm";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     // Get current user session using Better Auth
-    const session = await auth.api.getSession({ 
+    const session = await auth.api.getSession({
       headers: new Headers(req.headers as any)
     });
-    
+
     if (!session?.user) {
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !serviceKey) {
-      return res.status(500).json({ error: "Supabase server configuration missing" });
-    }
-
-    const admin = createClient(url, serviceKey);
-
     // Get user ID from our users table
-    const { data: userData, error: userError } = await admin
-      .from("users")
-      .select("id")
-      .eq("auth_user_id", session.user.id)
-      .single();
+    const userData = await db.query.users.findFirst({
+      where: eq(users.authUserId, session.user.id),
+      columns: { id: true }
+    });
 
-    if (userError || !userData) {
+    if (!userData) {
       return res.status(404).json({ error: "User not found" });
     }
 
@@ -36,14 +29,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === "GET") {
       // Fetch user contacts
-      const { data: contacts, error: contactsError } = await admin
-        .from("user_contacts")
-        .select("*")
-        .eq("user_id", userId);
-
-      if (contactsError) {
-        return res.status(500).json({ error: contactsError.message });
-      }
+      const contacts = await db.query.userContacts.findMany({
+        where: eq(userContacts.userId, userId)
+      });
 
       return res.status(200).json(contacts || []);
     }
@@ -56,22 +44,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Upsert contact
-      const { error: upsertError } = await admin
-        .from("user_contacts")
-        .upsert(
-          {
-            user_id: userId,
-            contact_type,
-            contact_value,
-            is_primary: is_primary || false,
-            is_verified: false, // New contacts need verification
-          },
-          { onConflict: "user_id,contact_type,contact_value" }
-        );
-
-      if (upsertError) {
-        return res.status(500).json({ error: upsertError.message });
-      }
+      await db.insert(userContacts)
+        .values({
+          userId: userId,
+          contactType: contact_type,
+          contactValue: contact_value,
+          isPrimary: is_primary || false,
+          isVerified: false, // New contacts need verification
+        })
+        .onConflictDoUpdate({
+          target: [userContacts.userId, userContacts.contactType, userContacts.contactValue],
+          set: {
+            isPrimary: is_primary || false,
+            updatedAt: new Date()
+          }
+        });
 
       return res.status(200).json({ success: true });
     }

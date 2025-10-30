@@ -1,5 +1,25 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import { db } from "@/drizzle/db";
+import { pgTable, uuid, text, varchar, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { eq, and } from "drizzle-orm";
+
+// Define notifications table inline
+const notifications = pgTable('notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  type: varchar('type', { length: 50 }).notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  message: text('message').notNull(),
+  priority: varchar('priority', { length: 20 }).default('medium'),
+  actionUrl: text('action_url'),
+  actionText: varchar('action_text', { length: 100 }),
+  metadata: jsonb('metadata').default({}),
+  isRead: boolean('is_read').default(false),
+  isArchived: boolean('is_archived').default(false),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+});
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'DELETE') {
@@ -14,25 +34,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Notification ID and User ID are required' });
     }
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!url || !serviceKey) {
-      return res.status(500).json({ error: 'Supabase server configuration missing' });
-    }
-
-    const adminSupabase = createClient(url, serviceKey);
-
-    const { error } = await adminSupabase
-      .from('notifications')
-      .delete()
-      .eq('id', notificationId)
-      .eq('user_id', userId);
-
-    if (error) {
-      console.error('Error deleting notification:', error);
-      return res.status(500).json({ error: 'Failed to delete notification' });
-    }
+    await db.delete(notifications)
+      .where(
+        and(
+          eq(notifications.id, notificationId as string),
+          eq(notifications.userId, userId as string)
+        )
+      );
 
     return res.status(200).json({ success: true });
   } catch (err: any) {

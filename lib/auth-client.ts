@@ -15,8 +15,24 @@
 import { createAuthClient } from 'better-auth/react'
 import { passkeyClient, twoFactorClient, organizationClient, emailOTPClient } from 'better-auth/client/plugins'
 
+// Automatically detect the base URL
+const getBaseURL = () => {
+  // If explicitly set, use that
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL
+  }
+
+  // In browser, use current origin
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+
+  // Default for SSR
+  return 'http://localhost:3000'
+}
+
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  baseURL: getBaseURL(),
 
   // Enable client-side plugins
   plugins: [
