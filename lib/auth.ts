@@ -1,15 +1,15 @@
 /**
- * Better Auth Configuration
- *
- * This file configures Better Auth with:
- * - Drizzle ORM adapter for database
- * - Gmail SMTP for email verification
- * - Gmail SMTP for email verification
- * - Google OAuth provider
- * - Passkey (WebAuthn) support
- * - Two-factor authentication (TOTP + backup codes)
- * - Organization management
- */
+* Better Auth Configuration
+*
+* This file configures Better Auth with:
+* - Drizzle ORM adapter for database
+* - Gmail SMTP for email verification
+* - Gmail SMTP for email verification
+* - Google OAuth provider
+* - Passkey (WebAuthn) support
+* - Two-factor authentication (TOTP + backup codes)
+* - Organization management
+*/
 
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
