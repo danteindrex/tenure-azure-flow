@@ -88,7 +88,7 @@ const SignUp = () => {
     }
     
     // If user is authenticated, check their database state to determine correct step
-    if (session?.user && !isPending && !isBypassed) {
+    if (session?.user && !isPending && !bypassed) {
       fetch('/api/onboarding/status', {
         method: 'GET',
         credentials: 'include'
@@ -143,7 +143,7 @@ const SignUp = () => {
         setStep(stepNumber);
       }
     }
-  }, [session, isPending, navigate, isBypassed]);
+  }, [session, isPending, navigate, bypassed]);
 
   // Format phone number for display (US format: (555) 123-4567)
   const formatPhoneForDisplay = (phone: string): string => {
@@ -892,7 +892,7 @@ const SignUp = () => {
         })
       });
 
-      setIsBypassed(true);
+      setBypassed(true);
       setStep(5);
       toast.success("Phone bypassed for development! Please proceed to payment.");
 

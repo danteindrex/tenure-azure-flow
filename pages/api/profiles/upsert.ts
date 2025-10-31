@@ -120,7 +120,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             countryCode: country_code ?? 'US',
             isPrimary: true,
           })
-          .onConflictDoNothing(); // Use DoNothing for addresses to avoid conflicts
+                    .onConflictDoUpdate({
+            target: userAddresses.userId,
+            set: {
+              addressType: 'primary',
+              streetAddress: street_address ?? null,
+              addressLine2: address_line_2 ?? null,
+              city: city ?? null,
+              state: state ?? null,
+              postalCode: zip_code ?? null,
+              countryCode: country_code ?? 'US',
+              isPrimary: true,
+              updatedAt: new Date()
+            }
+          });
       }
 
       // 5. Upsert membership record

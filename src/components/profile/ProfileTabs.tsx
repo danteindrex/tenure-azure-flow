@@ -2,11 +2,15 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { User, Shield, Settings } from "lucide-react"
-import ProfileTab from "./ProfileTab"
-import SecurityTab from "./SecurityTab"
+import { ProfileTab } from "./ProfileTab"
+import { SecurityTab } from "./SecurityTab"
 import AccountTab from "./AccountTab"
+import { useSession } from "@/lib/auth-client"
 
 export default function ProfileTabs() {
+  const { data: session } = useSession()
+  const user = session?.user
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -32,11 +36,11 @@ export default function ProfileTabs() {
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
-          <ProfileTab />
+          <ProfileTab user={user} />
         </TabsContent>
 
         <TabsContent value="security" className="space-y-4">
-          <SecurityTab />
+          <SecurityTab user={user} />
         </TabsContent>
 
         <TabsContent value="account" className="space-y-4">

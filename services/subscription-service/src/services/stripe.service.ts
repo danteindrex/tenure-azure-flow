@@ -165,14 +165,34 @@ export class StripeService {
 
       // Create subscription record in database
       const subscriptionQuery = `
-        INSERT INTO user_billing_schedules (user_id, billing_cycle, next_billing_date, amount, currency, is_active, created_at)
-        VALUES ($1, 'MONTHLY', $2, $3, $4, true, NOW())
+        INSERT INTO user_subscriptions (
+          user_id, provider, provider_subscription_id, provider_customer_id,
+          status, current_period_start, current_period_end
+        )
+        VALUES ($1, 'stripe', $2, $3, $4, $5, $6)
+        RETURNING id
+      `;
+      
+      const subscriptionResult = await pool.query(subscriptionQuery, [
+        userId,
+        subscription.id,
+        subscription.customer,
+        subscription.status,
+        new Date(subscription.current_period_start * 1000),
+        new Date(subscription.current_period_end * 1000)
+      ]);
+
+      // Create billing schedule
+      const billingQuery = `
+        INSERT INTO user_billing_schedules (user_id, subscription_id, billing_cycle, next_billing_date, amount, currency, is_active, created_at)
+        VALUES ($1, $2, 'MONTHLY', $3, $4, $5, true, NOW())
         RETURNING id
       `;
       
       const nextBillingDate = new Date(subscription.current_period_end * 1000);
-      await pool.query(subscriptionQuery, [
+      await pool.query(billingQuery, [
         userId,
+        subscriptionResult.rows[0].id,
         nextBillingDate,
         config.pricing.recurringAmount,
         config.pricing.currency.toUpperCase()
@@ -200,13 +220,80 @@ export class StripeService {
         })
       ]);
 
-      // Add member to queue
+      // Add member to queue with payment stats
       const queueQuery = `
-        INSERT INTO membership_queue (user_id, queue_position, joined_queue_at, is_eligible, created_at)
-        VALUES ($1, (SELECT COALESCE(MAX(queue_position), 0) + 1 FROM membership_queue), NOW(), true, NOW())
-        ON CONFLICT (user_id) DO NOTHING
+        INSERT INTO membership_queue (
+          user_id, queue_position, joined_queue_at, is_eligible, 
+          subscription_active, total_months_subscribed, lifetime_payment_total,
+          last_payment_date, created_at
+        )
+        VALUES (
+          $1, 
+          (SELECT COALESCE(MAX(queue_position), 0) + 1 FROM membership_queue), 
+          NOW(), 
+          true, 
+          true, 
+          0, 
+          0.00, 
+          NOW(), 
+          NOW()
+        )
+        ON CONFLICT (user_id) DO UPDATE SET
+          subscription_active = true,
+          total_months_subscribed = 0,
+          lifetime_payment_total = 0.00,
+          last_payment_date = NOW(),
+          updated_at = NOW()
       `;
       await pool.query(queueQuery, [userId]);
+
+      // Get the actual invoice details from Stripe
+      let initialPaymentAmount = config.pricing.initialAmount;
+      let paymentIntentId = null;
+      let chargeId = null;
+      
+      if (subscription.latest_invoice) {
+        try {
+          const invoice = await stripe.invoices.retrieve(subscription.latest_invoice as string);
+          initialPaymentAmount = invoice.amount_paid / 100; // Convert from cents
+          paymentIntentId = invoice.payment_intent as string;
+          chargeId = invoice.charge as string;
+        } catch (error) {
+          logger.warn('Could not retrieve invoice details, using config amount', error);
+        }
+      }
+
+      // Create initial payment record with real Stripe data
+      const paymentQuery = `
+        INSERT INTO user_payments (
+          user_id, subscription_id, provider_payment_id, provider_invoice_id,
+          provider_charge_id, amount, currency, payment_type, status, is_first_payment, payment_date
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'initial', 'succeeded', true, NOW())
+        RETURNING id
+      `;
+      
+      await pool.query(paymentQuery, [
+        userId,
+        subscriptionResult.rows[0].id,
+        paymentIntentId,
+        subscription.latest_invoice,
+        chargeId,
+        initialPaymentAmount,
+        subscription.currency || config.pricing.currency
+      ]);
+
+      // Update queue stats with actual payment data
+      const updateQueueStatsQuery = `
+        UPDATE membership_queue 
+        SET 
+          total_months_subscribed = 1,
+          lifetime_payment_total = $2,
+          last_payment_date = NOW(),
+          updated_at = NOW()
+        WHERE user_id = $1
+      `;
+      await pool.query(updateQueueStatsQuery, [userId, initialPaymentAmount]);
 
       // Create user agreement records
       const agreementQuery = `
@@ -220,10 +307,11 @@ export class StripeService {
 
       logger.info(`Initial payment + subscription created for member ${userId}`, {
         subscriptionId: subscription.id,
-        initialPayment: config.pricing.initialAmount, // $300 (includes first month)
-        monthlyRecurring: config.pricing.recurringAmount, // $25
+        actualPaymentAmount: initialPaymentAmount,
+        configuredInitialAmount: config.pricing.initialAmount,
+        monthlyRecurring: config.pricing.recurringAmount,
         nextBilling: nextBillingDate,
-        setupFee: config.pricing.initialAmount - config.pricing.recurringAmount, // $275
+        currency: subscription.currency || config.pricing.currency
       });
     } catch (error) {
       logger.error('Error handling checkout complete:', error);

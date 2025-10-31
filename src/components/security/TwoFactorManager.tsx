@@ -3,13 +3,18 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Shield, QrCode, Copy, Check, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { authClient } from "@/lib/auth-client";
+import { authClient, useSession } from "@/lib/auth-client";
 
 const TwoFactorManager = () => {
+  const { data: session, isPending } = useSession();
   const [isEnabled, setIsEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [password, setPassword] = useState("");
+  const [actionToConfirm, setActionToConfirm] = useState<'enable' | 'disable' | null>(null);
   const [setting, setSetting] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [qrCode, setQrCode] = useState("");
@@ -20,29 +25,35 @@ const TwoFactorManager = () => {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   useEffect(() => {
-    checkTwoFactorStatus();
-  }, []);
-
-  const checkTwoFactorStatus = async () => {
-    try {
-      setLoading(true);
-      // Check if user has twoFactorEnabled from session
-      // This is available directly from the Better Auth session
-      setIsEnabled(false); // Will be set from session data
-    } catch (error) {
-      console.error("Error checking 2FA status:", error);
-    } finally {
-      setLoading(false);
+    if (!isPending) {
+      checkTwoFactorStatus();
     }
+  }, [isPending, session]);
+
+  const checkTwoFactorStatus = () => {
+    setLoading(true);
+    const twoFactorEnabled = session?.user?.twoFactorEnabled ?? false;
+    setIsEnabled(twoFactorEnabled);
+    setLoading(false);
   };
 
-  const enableTwoFactor = async () => {
+  const handleConfirm = async () => {
+    if (!actionToConfirm) return;
+
+    setSetting(true);
+    if (actionToConfirm === 'enable') {
+      await enableTwoFactor(password);
+    } else if (actionToConfirm === 'disable') {
+      await disableTwoFactor(password);
+    }
+    setSetting(false);
+    setIsConfirming(false);
+    setPassword("");
+  };
+
+  const enableTwoFactor = async (password: string) => {
     try {
-      setSetting(true);
-      
-      const result = await authClient.twoFactor.enable({
-        password: "user_password" // This should come from a form
-      });
+      const result = await authClient.twoFactor.enable({ password });
 
       if (result.error) {
         toast.error(`Failed to enable 2FA: ${result.error.message}`);
@@ -56,8 +67,6 @@ const TwoFactorManager = () => {
     } catch (error) {
       console.error("2FA enable error:", error);
       toast.error("Failed to enable two-factor authentication");
-    } finally {
-      setSetting(false);
     }
   };
 
@@ -91,13 +100,9 @@ const TwoFactorManager = () => {
     }
   };
 
-  const disableTwoFactor = async () => {
+  const disableTwoFactor = async (password: string) => {
     try {
-      setSetting(true);
-      
-      const result = await authClient.twoFactor.disable({
-        password: "user_password" // This should come from a form
-      });
+      const result = await authClient.twoFactor.disable({ password });
 
       if (result.error) {
         toast.error("Failed to disable 2FA");
@@ -110,8 +115,6 @@ const TwoFactorManager = () => {
     } catch (error) {
       console.error("Error disabling 2FA:", error);
       toast.error("Failed to disable 2FA");
-    } finally {
-      setSetting(false);
     }
   };
 
@@ -154,7 +157,7 @@ const TwoFactorManager = () => {
           </span>
           {!isEnabled ? (
             <Button
-              onClick={enableTwoFactor}
+              onClick={() => { setActionToConfirm('enable'); setIsConfirming(true); }}
               disabled={setting}
               className="bg-accent hover:bg-accent/90"
             >
@@ -168,7 +171,7 @@ const TwoFactorManager = () => {
           ) : (
             <Button
               variant="destructive"
-              onClick={disableTwoFactor}
+              onClick={() => { setActionToConfirm('disable'); setIsConfirming(true); }}
               disabled={setting}
             >
               {setting ? (
@@ -306,6 +309,36 @@ const TwoFactorManager = () => {
           </p>
         </div>
       )}
+
+      <Dialog open={isConfirming} onOpenChange={setIsConfirming}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Action</DialogTitle>
+            <DialogDescription>
+              To continue, please enter your current password.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfirming(false)}>Cancel</Button>
+            <Button onClick={handleConfirm} disabled={setting || !password}>
+              {setting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

@@ -9,10 +9,16 @@ import { authClient } from "@/lib/auth-client";
 
 interface Passkey {
   id: string;
-  name: string;
-  deviceType: 'platform' | 'cross-platform';
-  createdAt: string;
-  lastUsedAt?: string;
+  name?: string;
+  publicKey?: string;
+  userId?: string;
+  credentialID?: string;
+  counter?: number;
+  deviceType?: string;
+  backedUp?: boolean;
+  transports?: string;
+  createdAt: Date;
+  aaguid?: string;
 }
 
 const PasskeyManager = () => {
@@ -29,10 +35,9 @@ const PasskeyManager = () => {
   const loadPasskeys = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/passkeys');
-      if (response.ok) {
-        const data = await response.json();
-        setPasskeys(data);
+      const result = await authClient.passkey.listUserPasskeys();
+      if (result.data) {
+        setPasskeys(result.data);
       }
     } catch (error) {
       console.error("Error loading passkeys:", error);
@@ -49,15 +54,10 @@ const PasskeyManager = () => {
 
     try {
       setRegistering(true);
-      
-      const response = await fetch('/api/passkeys', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newPasskeyName.trim() }),
-      });
+      const result = await authClient.passkey.addPasskey({ name: newPasskeyName.trim() });
 
-      if (!response.ok) {
-        toast.error("Failed to register passkey");
+      if (result.error) {
+        toast.error(`Failed to register passkey: ${result.error.message}`);
         return;
       }
 
@@ -75,12 +75,10 @@ const PasskeyManager = () => {
 
   const deletePasskey = async (passkeyId: string) => {
     try {
-      const response = await fetch(`/api/passkeys/${passkeyId}`, {
-        method: 'DELETE',
-      });
+      const result = await authClient.passkey.deletePasskey({ id: passkeyId });
 
-      if (!response.ok) {
-        toast.error("Failed to delete passkey");
+      if (result.error) {
+        toast.error(`Failed to delete passkey: ${result.error.message}`);
         return;
       }
 
@@ -92,8 +90,10 @@ const PasskeyManager = () => {
     }
   };
 
-  const getDeviceIcon = (deviceType: string) => {
-    return deviceType === 'platform' ? <Smartphone className="w-4 h-4" /> : <Monitor className="w-4 h-4" />;
+  const getDeviceIcon = (deviceType?: string) => {
+    return deviceType === 'platform' || deviceType === 'singleDevice' ? 
+      <Smartphone className="w-4 h-4" /> : 
+      <Monitor className="w-4 h-4" />;
   };
 
   if (loading) {
@@ -187,12 +187,9 @@ const PasskeyManager = () => {
               <div className="flex items-center gap-3">
                 {getDeviceIcon(passkey.deviceType)}
                 <div>
-                  <h4 className="font-medium">{passkey.name}</h4>
+                  <h4 className="font-medium">{passkey.name || 'Unnamed Passkey'}</h4>
                   <p className="text-sm text-muted-foreground">
-                    Created {new Date(passkey.createdAt).toLocaleDateString()}
-                    {passkey.lastUsedAt && (
-                      <> • Last used {new Date(passkey.lastUsedAt).toLocaleDateString()}</>
-                    )}
+                    Created {passkey.createdAt.toLocaleDateString()}
                   </p>
                 </div>
               </div>

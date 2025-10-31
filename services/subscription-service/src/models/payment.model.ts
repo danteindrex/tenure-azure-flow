@@ -17,11 +17,11 @@ export class PaymentModel {
   }): Promise<Payment> {
     const query = `
       INSERT INTO user_payments (
-        user_id, subscription_id, stripe_payment_intent_id, stripe_invoice_id,
-        stripe_charge_id, amount, currency, payment_type, status,
-        is_first_payment, receipt_url
+        user_id, subscription_id, provider_payment_id, provider_invoice_id,
+        provider_charge_id, amount, currency, payment_type, status,
+        is_first_payment, receipt_url, payment_date
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
       RETURNING *
     `;
 
@@ -55,7 +55,7 @@ export class PaymentModel {
   }
 
   static async findByStripePaymentIntentId(intentId: string): Promise<Payment | null> {
-    const query = 'SELECT * FROM user_payments WHERE stripe_payment_intent_id = $1';
+    const query = 'SELECT * FROM user_payments WHERE provider_payment_id = $1';
     const result = await pool.query<Payment>(query, [intentId]);
     return result.rows[0] || null;
   }

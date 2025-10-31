@@ -47,9 +47,10 @@ export class QueueModel {
     const query = `
       UPDATE membership_queue
       SET
-        months_in_queue = $2,
-        total_amount_paid = $3,
+        total_months_subscribed = $2,
+        lifetime_payment_total = $3,
         last_payment_date = $4,
+        subscription_active = true,
         updated_at = NOW()
       WHERE user_id = $1
       RETURNING *
