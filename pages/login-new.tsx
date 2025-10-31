@@ -19,9 +19,11 @@ const LoginNew = () => {
     password: "",
     rememberMe: false,
     twoFactorCode: "",
+
   });
   const [loading, setLoading] = useState(false);
   const [showTwoFactor, setShowTwoFactor] = useState(false);
+
   const [showPasskeyOption, setShowPasskeyOption] = useState(false);
 
   // Log page visit and redirect if already authenticated
@@ -72,7 +74,11 @@ const LoginNew = () => {
       });
 
       if (result.error) {
-        console.error("Login error:", result.error);
+        console.error("🚨 Login error detected:", result.error);
+        console.log("📝 Full error object:", JSON.stringify(result.error, null, 2));
+        console.log("📝 Exact error message:", result.error.message);
+        console.log("📝 Error message type:", typeof result.error.message);
+        
         await logLogin(email, false);
         await logError(`Login failed: ${result.error.message}`, undefined, {
           email: email,
@@ -86,10 +92,46 @@ const LoginNew = () => {
           return;
         }
 
+        // Handle email verification - send OTP and redirect to step 2
+        const errorMsg = result.error.message.toLowerCase();
+        if (errorMsg.includes("email not verified") || 
+            errorMsg.includes("not verified") || 
+            errorMsg.includes("verify") ||
+            errorMsg.includes("verification")) {
+          
+          console.log("🔍 Email verification needed, sending OTP and redirecting...");
+          console.log("📧 Email:", email);
+          
+          try {
+            // Send OTP for email verification
+            const otpResult = await authClient.emailOtp.sendVerificationOtp({
+              email: email,
+              type: "email-verification"
+            });
+
+            if (otpResult.error) {
+              console.error("❌ Failed to send OTP:", otpResult.error);
+              toast.error("Email not verified. Failed to send verification code. Please try again.");
+            } else {
+              console.log("✅ OTP sent successfully, redirecting...");
+              // Redirect to signup step 2 with email pre-filled
+              toast.success("Email not verified. We've sent a 6-digit verification code to your email.");
+              const redirectUrl = `/signup?step=2&email=${encodeURIComponent(email)}`;
+              console.log("🔄 Redirecting to:", redirectUrl);
+              
+              // Use window.location for immediate redirect
+              window.location.href = redirectUrl;
+              return;
+            }
+          } catch (verifyError) {
+            console.error("❌ Exception during OTP send:", verifyError);
+            toast.error("Email not verified. Please try again or contact support.");
+          }
+          return;
+        }
+
         let userMessage = "Invalid email or password";
-        if (result.error.message.includes("not verified")) {
-          userMessage = "Please verify your email address before signing in";
-        } else if (result.error.message.includes("too many")) {
+        if (result.error.message.includes("too many")) {
           userMessage = "Too many login attempts. Please try again later";
         }
 
@@ -173,6 +215,8 @@ const LoginNew = () => {
       setLoading(false);
     }
   };
+
+
 
   // Handle Google login
   const handleGoogleLogin = async (): Promise<void> => {

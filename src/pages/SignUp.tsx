@@ -64,11 +64,23 @@ const SignUp = () => {
   // Log page visit and check for existing session
   useEffect(() => {
     logPageVisit('/signup');
+    
 
-    // Check URL parameters for step and OAuth info
+
+    // Check URL parameters for step, OAuth info, and email
     const urlParams = new URLSearchParams(window.location.search);
     const stepParam = urlParams.get('step');
     const oauthParam = urlParams.get('oauth');
+    const emailParam = urlParams.get('email');
+    const needsVerificationParam = urlParams.get('needsVerification');
+    
+    // Pre-fill email from URL parameter (from login redirect)
+    if (emailParam) {
+      setFormData(prev => ({
+        ...prev,
+        email: decodeURIComponent(emailParam),
+      }));
+    }
     
     // If OAuth user, pre-fill data from session
     if (oauthParam && session?.user) {
@@ -137,10 +149,41 @@ const SignUp = () => {
     } else if (!session?.user && stepParam) {
       // Not authenticated, use URL parameter
       const stepNumber = parseInt(stepParam, 10);
-      if (stepNumber === 5) {
-        setStep(3);
-      } else if (stepNumber >= 1 && stepNumber <= 5) {
-        setStep(stepNumber);
+      
+      // Special case: if coming from login redirect for email verification
+      if (stepNumber === 2 && emailParam && needsVerificationParam) {
+        // Pre-fill email and set step
+        setFormData(prev => ({
+          ...prev,
+          email: decodeURIComponent(emailParam),
+        }));
+        setStep(2);
+        
+        // Auto-send OTP for the existing user
+        setTimeout(async () => {
+          try {
+            const otpResult = await authClient.emailOtp.sendVerificationOtp({
+              email: decodeURIComponent(emailParam),
+              type: "email-verification"
+            });
+
+            if (otpResult.error) {
+              toast.error("Failed to send verification code. Please use the resend button.");
+            } else {
+              toast.success("We've sent a verification code to your email.");
+            }
+          } catch (error) {
+            toast.error("Failed to send verification code. Please use the resend button.");
+          }
+        }, 1000); // Small delay to ensure UI is ready
+        
+      } else {
+        // Normal case
+        if (stepNumber === 5) {
+          setStep(3);
+        } else if (stepNumber >= 1 && stepNumber <= 5) {
+          setStep(stepNumber);
+        }
       }
     }
   }, [session, isPending, navigate, bypassed]);
@@ -574,6 +617,7 @@ const SignUp = () => {
     try {
       setLoading(true);
 
+
       // Verify email with Better Auth Email OTP plugin
       const result = await authClient.emailOtp.verifyEmail({
         email: formData.email.trim(),
@@ -581,20 +625,21 @@ const SignUp = () => {
       });
 
       if (result.error) {
-        console.error('Email verification error:', result.error);
-        toast.error(`Verification failed: ${result.error.message}`);
+        
+        // Handle specific error cases
+        if (result.error.code === 'INVALID_OTP') {
+          toast.error("Invalid or expired verification code. Please check your email or request a new code.");
+        } else if (result.error.code === 'OTP_EXPIRED') {
+          toast.error("Verification code has expired. Please request a new code.");
+        } else if (result.error.code === 'TOO_MANY_ATTEMPTS') {
+          toast.error("Too many failed attempts. Please request a new verification code.");
+        } else {
+          toast.error(`Verification failed: ${result.error.message}`);
+        }
         return;
       }
 
-      // Update progress in database
-      await fetch('/api/onboarding/update-progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          step: 'email-verified'
-        })
-      });
+
 
       // Update progress in database
       await fetch('/api/onboarding/update-progress', {
@@ -835,19 +880,8 @@ const SignUp = () => {
   const handlePhoneBypass = async (): Promise<void> => {
     try {
       setLoading(true);
-
-      // Update user profile with Better Auth
-      const fullName = `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim();
-
-      const result = await updateUser({
-        name: fullName
-      });
-
-      if (result.error) {
-        toast.error("Failed to save profile information");
-        setLoading(false);
-        return;
-      }
+      // Skip the updateUser call since it requires authentication
+      // Just save the profile data directly via API
 
       // Also save to normalized tables via API
       await fetch("/api/profiles/upsert", {

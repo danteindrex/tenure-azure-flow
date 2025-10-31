@@ -69,12 +69,31 @@ const Login = () => {
       });
 
       if (error) {
+
+        
         // Log failed login attempt
         await logLogin(email.trim(), false);
         await logError(`Login failed: ${error.message}`, undefined, {
           email: email.trim(),
           error_code: error.message
         });
+
+        // Handle email verification - send OTP for existing user
+        const errorMsg = error.message.toLowerCase();
+        if (errorMsg.includes("email not verified") || 
+            errorMsg.includes("not verified") || 
+            errorMsg.includes("verify") ||
+            errorMsg.includes("verification")) {
+          
+          // Redirect to signup for email verification - let signup page handle OTP
+          toast.info("Email not verified. Redirecting to complete verification...");
+          const redirectUrl = `/signup?step=2&email=${encodeURIComponent(email.trim())}&needsVerification=true`;
+          
+          // Use window.location for immediate redirect
+          window.location.href = redirectUrl;
+          return;
+        }
+        
         throw error;
       }
 
