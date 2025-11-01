@@ -1,3 +1,109 @@
 @import '~@payloadcms/ui/scss';
 
 /* Default Payload CMS Dark Theme */
+
+/* Custom Home Solutions Branding */
+.app-header {
+  position: relative;
+}
+
+/* Replace page title with "Home Solutions" */
+.template-default h1,
+.dashboard h1,
+.collection-list h1,
+.doc-header h1 {
+  &::before {
+    content: "Home Solutions";
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--theme-text);
+  }
+  
+  /* Hide original text */
+  span,
+  text {
+    display: none !important;
+  }
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  background: var(--theme-elevation-100);
+  border: 1px solid var(--theme-elevation-200);
+  border-radius: 6px;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--theme-text);
+  font-size: 0.875rem;
+  
+  &:hover {
+    background: var(--theme-elevation-200);
+    transform: translateY(-1px);
+  }
+}
+
+/* Light Theme Variables */
+[data-theme="light"] {
+  --theme-bg: #ffffff;
+  --theme-elevation-0: #ffffff;
+  --theme-elevation-50: #f9fafb;
+  --theme-elevation-100: #f3f4f6;
+  --theme-elevation-150: #e5e7eb;
+  --theme-elevation-200: #d1d5db;
+  --theme-elevation-300: #9ca3af;
+  --theme-text: #111827;
+  --theme-text-dim: #6b7280;
+}
+
+/* Apply theme variables to body */
+body {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+.app {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+.app-header {
+  background-color: var(--theme-elevation-50);
+  border-bottom: 1px solid var(--theme-elevation-200);
+}
+
+/* Navigation styling */
+.nav__link {
+  color: var(--theme-text-dim);
+  
+  &:hover {
+    background-color: var(--theme-elevation-100);
+    color: var(--theme-text);
+  }
+  
+  &--active {
+    background-color: var(--theme-elevation-200);
+    color: var(--theme-text);
+  }
+}
+
+/* Form elements */
+.input,
+.textarea,
+.select {
+  background-color: var(--theme-elevation-0);
+  border: 1px solid var(--theme-elevation-200);
+  color: var(--theme-text);
+}
+
+/* Collection cards */
+.collection-card {
+  background-color: var(--theme-elevation-50);
+  border: 1px solid var(--theme-elevation-200);
+  color: var(--theme-text);
+}

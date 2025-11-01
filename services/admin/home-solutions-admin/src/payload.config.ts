@@ -30,6 +30,7 @@ import { Users } from './collections/Users'
 import FinancialDashboard from './components/FinancialDashboard'
 import AnalyticsGraphs from './components/AnalyticsGraphs'
 import AdminNavigation from './components/AdminNavigation'
+import ThemeToggle from './components/ThemeToggle'
 import UserManagementView from './pages/UserManagementView'
 import ComplianceCenterView from './pages/ComplianceCenterView'
 import PaymentsCenterView from './pages/PaymentsCenterView'
@@ -41,7 +42,7 @@ export default buildConfig({
   admin: {
     user: Admin.slug,
     components: {
-      beforeDashboard: [FinancialDashboard, AnalyticsGraphs],
+      beforeDashboard: [FinancialDashboard, AnalyticsGraphs, ThemeToggle],
       beforeNavLinks: [AdminNavigation],
       views: {
         userManagement: {
