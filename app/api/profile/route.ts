@@ -1,29 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/drizzle/db'
-import { users, userProfiles, userContacts, userAddresses, userMemberships } from '@/drizzle/schema/users'
+import { user, userProfiles, userContacts, userAddresses, userMemberships } from '@/drizzle/schema'
 import { eq } from 'drizzle-orm'
 
 export async function GET(req: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: req.headers })
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user profile data
-    const userProfile = await db.query.users.findFirst({
-      where: eq(users.id, session.user.id),
-      with: {
-        profiles: true,
-        contacts: true,
-        addresses: true,
-        memberships: true
+    const userId = session.user.id;
+
+    // Get user from Better Auth table
+    const dbUser = await db.select().from(user)
+      .where(eq(user.id, userId))
+      .limit(1)
+      .then(rows => rows[0]);
+
+    if (!dbUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Get profile
+    const profile = await db.select().from(userProfiles)
+      .where(eq(userProfiles.userId, userId))
+      .limit(1)
+      .then(rows => rows[0]);
+
+    // Get contacts
+    const contacts = await db.select().from(userContacts)
+      .where(eq(userContacts.userId, userId));
+
+    // Get addresses
+    const addresses = await db.select().from(userAddresses)
+      .where(eq(userAddresses.userId, userId));
+
+    // Get memberships
+    const memberships = await db.select().from(userMemberships)
+      .where(eq(userMemberships.userId, userId));
+
+    return NextResponse.json({
+      profile: {
+        ...dbUser,
+        profiles: profile ? [profile] : [],
+        contacts: contacts,
+        addresses: addresses,
+        memberships: memberships
       }
     })
-
-    return NextResponse.json({ profile: userProfile })
   } catch (error) {
     console.error('Error fetching profile:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -40,16 +67,18 @@ export async function POST(req: NextRequest) {
 
     const profileData = await req.json()
 
-    // Get the user's database ID (not the auth user ID)
-    const userRecord = await db.query.users.findFirst({
-      where: eq(users.authUserId, session.user.id)
-    })
+    // Use the Better Auth user ID directly
+    const userId = session.user.id;
+
+    // Verify user exists in database
+    const userRecord = await db.select().from(user)
+      .where(eq(user.id, userId))
+      .limit(1)
+      .then(rows => rows[0]);
 
     if (!userRecord) {
       return NextResponse.json({ error: 'User record not found' }, { status: 404 })
     }
-
-    const userId = userRecord.id
 
     // Update user profile
     if (profileData.firstName !== undefined || profileData.lastName !== undefined ||

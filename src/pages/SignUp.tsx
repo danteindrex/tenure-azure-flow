@@ -17,7 +17,23 @@ import baseLogger from "@/lib/baseLogger";
 const SignUp = () => {
   const navigate = useRouter();
   const { data: session, isPending } = useSession();
-  const [step, setStep] = useState(1); // 1: Email+Password, 2: Email Verification, 3: Personal Info + Address, 4: Phone Verification, 5: Payment
+
+  // Initialize step from URL parameter to prevent flashing
+  const getInitialStep = (): number => {
+    if (typeof window === 'undefined') return 1;
+    const urlParams = new URLSearchParams(window.location.search);
+    const stepParam = urlParams.get('step');
+    if (stepParam) {
+      const stepNumber = parseInt(stepParam, 10);
+      if (stepNumber >= 1 && stepNumber <= 5) {
+        return stepNumber;
+      }
+    }
+    return 1;
+  };
+
+  const [step, setStep] = useState(getInitialStep()); // 1: Email+Password, 2: Email Verification, 3: Personal Info + Address, 4: Phone Verification, 5: Payment
+  const [isLoadingStep, setIsLoadingStep] = useState(false);
   const [formData, setFormData] = useState({
     // Step 1: Email + Password
     email: "",
@@ -140,6 +156,8 @@ const SignUp = () => {
     // If user is authenticated, check their database state to determine correct step
     // Skip the check if coming from Stripe (session_id in URL) or if bypassed
     if (session?.user && !isPending && !bypassed && !sessionIdParam) {
+      setIsLoadingStep(true);
+
       // Add small delay to ensure webhook has processed (if just completed payment)
       const checkDelay = stepParam === '5' ? 2000 : 0;
 
@@ -155,15 +173,24 @@ const SignUp = () => {
                 // User completed everything, go to dashboard
                 navigate.push('/dashboard');
               } else {
-                // Set step based on database state, not URL parameter
+                // Validate step based on database state
                 const correctStep = data.status.nextStep;
-                console.log(`User should be on step ${correctStep} based on database state`);
+                console.log(`Database says user should be on step ${correctStep}, URL says step ${step}`);
 
                 // Handle legacy step 5 users by redirecting to step 3 (merged step)
+                let targetStep = correctStep;
                 if (correctStep === 7) {
-                  setStep(5); // Payment step
+                  targetStep = 5; // Payment step
                 } else if (correctStep >= 1 && correctStep <= 6) {
-                  setStep(correctStep);
+                  targetStep = correctStep;
+                }
+
+                // Only update step if database says different step than URL
+                if (targetStep !== step) {
+                  console.log(`Redirecting from step ${step} to step ${targetStep} based on database state`);
+                  // Update URL silently without page reload
+                  window.history.replaceState(null, '', `?step=${targetStep}`);
+                  setStep(targetStep);
                 }
 
                 // Pre-fill email if available
@@ -175,33 +202,26 @@ const SignUp = () => {
                 }
               }
             }
+            setIsLoadingStep(false);
           })
           .catch(error => {
             console.error('Error checking onboarding status:', error);
-            // Fallback to URL parameter if API fails
-            if (stepParam) {
-              const stepNumber = parseInt(stepParam, 10);
-              if (stepNumber === 5) {
-                setStep(3);
-              } else if (stepNumber >= 1 && stepNumber <= 5) {
-                setStep(stepNumber);
-              }
-            }
+            setIsLoadingStep(false);
+            // Keep the step from URL if API fails
           });
       }, checkDelay);
     } else if (!session?.user && stepParam) {
-      // Not authenticated, use URL parameter
+      // Not authenticated, use URL parameter (already set in initial state)
       const stepNumber = parseInt(stepParam, 10);
-      
+
       // Special case: if coming from login redirect for email verification
       if (stepNumber === 2 && emailParam && needsVerificationParam) {
-        // Pre-fill email and set step
+        // Pre-fill email
         setFormData(prev => ({
           ...prev,
           email: decodeURIComponent(emailParam),
         }));
-        setStep(2);
-        
+
         // Auto-send OTP for the existing user (only once)
         if (!otpSent) {
           setOtpSent(true);
@@ -223,14 +243,6 @@ const SignUp = () => {
               setOtpSent(false); // Reset flag on error so user can try again
             }
           }, 1000); // Small delay to ensure UI is ready
-        }
-        
-      } else {
-        // Normal case
-        if (stepNumber === 5) {
-          setStep(3);
-        } else if (stepNumber >= 1 && stepNumber <= 5) {
-          setStep(stepNumber);
         }
       }
     }
@@ -623,7 +635,7 @@ const SignUp = () => {
         setTimeout(async () => {
           try {
             const otpResult = await authClient.emailOtp.sendVerificationOtp({
-              email: currentProviededEmail,
+              email: email,
               type: "email-verification"
             });
 
@@ -1881,7 +1893,7 @@ const SignUp = () => {
 
                   // Small delay to ensure session is cleared
                   setTimeout(() => {
-                    router.push('/login');
+                    navigate.push('/login');
                   }, 500);
                 } catch (error) {
                   console.error('❌ Logout error:', error);
