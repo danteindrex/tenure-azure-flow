@@ -11,8 +11,9 @@
  */
 
 import { db } from '../../drizzle/db'
-import { users, userProfiles, userContacts } from '../../drizzle/schema/users'
+import { userProfiles, userContacts } from '../../drizzle/schema/users'
 import { userSubscriptions } from '../../drizzle/schema/financial'
+import { user } from '../../drizzle/schema/auth'
 import { eq, and } from 'drizzle-orm'
 
 export type OnboardingStep = 
@@ -43,16 +44,16 @@ export class OnboardingService {
    */
   static async getUserOnboardingStatus(userId: string, isOAuthUser?: boolean): Promise<UserOnboardingStatus> {
     try {
-      // Get user data
-      const user = await db
+      // Get user data directly from Better Auth user table
+      const betterAuthUser = await db
         .select()
-        .from(users)
-        .where(eq(users.id, userId))
+        .from(user)
+        .where(eq(user.id, userId))
         .limit(1)
         .then(rows => rows[0])
 
-      if (!user) {
-        throw new Error('User not found')
+      if (!betterAuthUser) {
+        throw new Error('User not found in Better Auth')
       }
 
       // Get user profile
@@ -92,12 +93,12 @@ export class OnboardingService {
 
       const status: UserOnboardingStatus = {
         step: 'email-verification',
-        isEmailVerified: user.emailVerified || isOAuthUser || false,
+        isEmailVerified: betterAuthUser.emailVerified || isOAuthUser || false,
         hasProfile: !!profile,
         isPhoneVerified: !!phoneContact,
         hasActiveSubscription: !!subscription,
         canAccessDashboard: false,
-        userId: user.id,
+        userId: betterAuthUser.id,
         profileId: profile?.id,
         nextRoute: '/signup',
         nextStep: 1
@@ -105,7 +106,7 @@ export class OnboardingService {
 
       // Determine current step based on actual database state
       // Users with status 'Active' can access dashboard regardless of other checks
-      if (user.status === 'Active' && status.hasActiveSubscription) {
+      if (betterAuthUser.status === 'Active' && status.hasActiveSubscription) {
         status.step = 'dashboard'
         status.canAccessDashboard = true
         status.nextRoute = '/dashboard'

@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { auth } from "@/lib/auth";
 import { db } from "@/drizzle/db";
-import { users, userContacts } from "@/drizzle/schema/users";
+import { userContacts } from "@/drizzle/schema/users";
+import { user } from "@/drizzle/schema/auth";
 import { eq, and } from "drizzle-orm";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -83,12 +84,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       case 'payment-completed':
         // Update user status to Active when payment is completed
         await db
-          .update(users)
+          .update(user)
           .set({
             status: 'Active',
             updatedAt: new Date()
           })
-          .where(eq(users.id, currentUserId));
+          .where(eq(user.id, currentUserId));
         break;
 
       default:

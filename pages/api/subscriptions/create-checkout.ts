@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { auth } from "@/lib/auth";
 import { db } from "@/drizzle/db";
-import { users } from "@/drizzle/schema/users";
+import { user } from "@/drizzle/schema/auth";
 import { eq } from "drizzle-orm";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Get current user session
-    const session = await auth.api.getSession({ 
+    const session = await auth.api.getSession({
       headers: new Headers(req.headers as any)
     });
 
@@ -20,36 +20,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    // Get user from database
+    // Get user from Better Auth user table
     const userQuery = await db
       .select()
-      .from(users)
-      .where(eq(users.id, session.user.id))
+      .from(user)
+      .where(eq(user.id, session.user.id))
       .limit(1);
 
-    let userData = userQuery[0];
+    const userData = userQuery[0];
 
-    // If user record doesn't exist, create it
+    // Better Auth should have already created the user record
+    // If somehow it doesn't exist, this is an error state
     if (!userData) {
-      console.log('User record not found, creating new record for:', session.user.email);
-
-      const newUserData = await db
-        .insert(users)
-        .values({
-          id: session.user.id,
-          authUserId: session.user.id,
-          email: session.user.email || '',
-          emailVerified: true,
-          status: 'Pending'
-        })
-        .returning();
-
-      if (!newUserData || newUserData.length === 0) {
-        console.error('Failed to create user record');
-        return res.status(500).json({ error: 'Failed to create user record' });
-      }
-
-      userData = newUserData[0];
+      console.error('User not found in Better Auth table:', session.user.id);
+      return res.status(500).json({
+        error: 'User record not found. Please contact support.'
+      });
     }
 
     // Call subscription service to create Stripe checkout session

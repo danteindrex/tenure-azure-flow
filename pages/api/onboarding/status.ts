@@ -3,6 +3,12 @@ import { auth } from "@/lib/auth";
 import OnboardingService from "../../../src/lib/onboarding";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Force no cache - always get fresh data
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('ETag', ''); // Remove ETag to prevent 304
+
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ error: "Method Not Allowed" });

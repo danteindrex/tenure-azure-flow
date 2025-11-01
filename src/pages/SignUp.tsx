@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Crown, Check, ChevronRight, ChevronLeft, Loader2, Mail, Phone, Fingerprint, Shield } from "lucide-react";
 import { toast } from "sonner";
-import { authClient, useSession, signUp, updateUser, signIn } from "@/lib/auth-client";
+import { authClient, useSession, signUp, updateUser, signIn, signOut } from "@/lib/auth-client";
 import { logPageVisit, logSignup, logError } from "@/lib/audit";
 import { COUNTRY_DIAL_CODES } from "@/lib/countryDialCodes";
 import baseLogger from "@/lib/baseLogger";
@@ -46,6 +46,7 @@ const SignUp = () => {
   const [dateValidation, setDateValidation] = useState<{ isValid: boolean; message: string } | null>(null);
   const [autoSubmitting, setAutoSubmitting] = useState(false);
   const [bypassed, setBypassed] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
   
   // Field validation states
   const [fieldValidation, setFieldValidation] = useState({
@@ -81,21 +82,59 @@ const SignUp = () => {
       }));
     }
 
-    // If OAuth user, pre-fill data from session
+    // If OAuth user, pre-fill data from session (name and email)
     if (oauthParam && session?.user) {
-      const fullName = session.user.name || "";
-      const nameParts = fullName.split(" ");
-      const firstName = nameParts[0] || "";
-      const lastName = nameParts[nameParts.length - 1] || "";
-      const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(" ") : "";
+      console.log('📝 Pre-filling form with Google OAuth data:', session.user);
 
+      const fullName = session.user.name || "";
+      const nameParts = fullName.trim().split(/\s+/); // Split by any whitespace
+
+      let firstName = "";
+      let lastName = "";
+      let middleName = "";
+
+      if (nameParts.length === 1) {
+        // Single name (just first name)
+        firstName = nameParts[0];
+      } else if (nameParts.length === 2) {
+        // Two names (first and last)
+        firstName = nameParts[0];
+        lastName = nameParts[1];
+      } else if (nameParts.length >= 3) {
+        // Three or more names (first, middle(s), last)
+        firstName = nameParts[0];
+        lastName = nameParts[nameParts.length - 1];
+        middleName = nameParts.slice(1, -1).join(" ");
+      }
+
+      // Pre-fill form data with Google OAuth information
       setFormData(prev => ({
         ...prev,
-        email: session.user.email || "",
-        firstName,
-        lastName,
-        middleName,
+        email: session.user.email || prev.email,
+        firstName: firstName || prev.firstName,
+        lastName: lastName || prev.lastName,
+        middleName: middleName || prev.middleName,
+        // Note: Google OAuth doesn't typically provide birthdate, phone, or address
+        // These fields will remain empty and user must fill them
       }));
+
+      // Update field validation for pre-filled fields to show them as valid
+      if (firstName) {
+        updateFieldValidation('firstName', firstName, validateRequired(firstName));
+      }
+      if (lastName) {
+        updateFieldValidation('lastName', lastName, validateRequired(lastName));
+      }
+      if (session.user.email) {
+        updateFieldValidation('email', session.user.email, validateEmail(session.user.email));
+      }
+
+      console.log('✅ Form pre-filled with Google data:', {
+        firstName,
+        middleName,
+        lastName,
+        email: session.user.email
+      });
     }
 
     // If user is authenticated, check their database state to determine correct step
@@ -163,23 +202,28 @@ const SignUp = () => {
         }));
         setStep(2);
         
-        // Auto-send OTP for the existing user
-        setTimeout(async () => {
-          try {
-            const otpResult = await authClient.emailOtp.sendVerificationOtp({
-              email: decodeURIComponent(emailParam),
-              type: "email-verification"
-            });
+        // Auto-send OTP for the existing user (only once)
+        if (!otpSent) {
+          setOtpSent(true);
+          setTimeout(async () => {
+            try {
+              const otpResult = await authClient.emailOtp.sendVerificationOtp({
+                email: decodeURIComponent(emailParam),
+                type: "email-verification"
+              });
 
-            if (otpResult.error) {
+              if (otpResult.error) {
+                toast.error("Failed to send verification code. Please use the resend button.");
+                setOtpSent(false); // Reset flag on error so user can try again
+              } else {
+                toast.success("We've sent a verification code to your email.");
+              }
+            } catch (error) {
               toast.error("Failed to send verification code. Please use the resend button.");
-            } else {
-              toast.success("We've sent a verification code to your email.");
+              setOtpSent(false); // Reset flag on error so user can try again
             }
-          } catch (error) {
-            toast.error("Failed to send verification code. Please use the resend button.");
-          }
-        }, 1000); // Small delay to ensure UI is ready
+          }, 1000); // Small delay to ensure UI is ready
+        }
         
       } else {
         // Normal case
@@ -534,25 +578,17 @@ const SignUp = () => {
     }
 
     try {
-
-      console.log("The current formdata extracted from the form", formData)
       setLoading(true);
       const email = formData.email.trim();
-      const username = `${formData.firstName} ${formData.lastName}`
       baseLogger("authentication", "WillCreateAccount");
-
-
-      const currentProviededEmail = formData.email;
-      const currentProvidedPassword = formData.password
 
       // Create user with Better Auth
       const result = await signUp.email({
-        email: currentProviededEmail,
-        password: currentProvidedPassword,
+        email: formData.email.trim(),
+        password: formData.password,
         name: "User", // Temporary name, will be updated in step 3
       });
 
-      console.log("The current credentials", result.data)
       baseLogger("authentication", "DidCreateAccount")
 
       if (result.error) {
@@ -577,26 +613,33 @@ const SignUp = () => {
       setUserId(result.data?.user?.id || null);
       await logSignup(email, true, result.data?.user?.id);
 
-      // Send email verification OTP
-      try {
-        const otpResult = await authClient.emailOtp.sendVerificationOtp({
-          email: currentProviededEmail,
-          type: "email-verification"
-        });
+      // Move to email verification step first
+      setStep(2);
+      toast.success("Account created! We'll send you a verification code shortly.");
 
-        if (otpResult.error) {
-          console.error('Failed to send verification OTP:', otpResult.error);
-          toast.error("Account created but failed to send verification email. Please try again.");
-          return;
-        }
+      // Send email verification OTP with delay to ensure user is fully created
+      if (!otpSent) {
+        setOtpSent(true);
+        setTimeout(async () => {
+          try {
+            const otpResult = await authClient.emailOtp.sendVerificationOtp({
+              email: currentProviededEmail,
+              type: "email-verification"
+            });
 
-        // Move to email verification step
-        setStep(2);
-        toast.success("Account created! Please check your email for the 6-digit verification code.");
-        
-      } catch (otpError) {
-        console.error('Error sending verification OTP:', otpError);
-        toast.error("Account created but failed to send verification email. Please try again.");
+            if (otpResult.error) {
+              console.error('Failed to send verification OTP:', otpResult.error);
+              toast.error("Failed to send verification email. Please use the 'Resend Code' button.");
+              setOtpSent(false); // Reset flag on error
+            } else {
+              toast.success("Verification code sent! Please check your email for the 6-digit code.");
+            }
+          } catch (otpError) {
+            console.error('Error sending verification OTP:', otpError);
+            toast.error("Failed to send verification email. Please use the 'Resend Code' button.");
+            setOtpSent(false); // Reset flag on error
+          }
+        }, 2000); // 2 second delay to ensure user is fully created
       }
 
     } catch (err: unknown) {
@@ -622,11 +665,21 @@ const SignUp = () => {
       setLoading(true);
 
 
+      // Debug: Log what we're sending
+      console.log('🔍 Verifying email OTP:', {
+        email: formData.email.trim(),
+        otp: formData.emailOtpCode,
+        otpLength: formData.emailOtpCode.length
+      });
+
       // Verify email with Better Auth Email OTP plugin
       const result = await authClient.emailOtp.verifyEmail({
         email: formData.email.trim(),
         otp: formData.emailOtpCode
       });
+
+      console.log('🔍 Verification result:', result);
+      console.log('🔍 Error details:', JSON.stringify(result.error, null, 2));
 
       if (result.error) {
         
@@ -646,7 +699,7 @@ const SignUp = () => {
 
 
       // Update progress in database
-      await fetch('/api/onboarding/update-progress', {
+      const progressResponse = await fetch('/api/onboarding/update-progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -654,6 +707,16 @@ const SignUp = () => {
           step: 'email-verified'
         })
       });
+
+      if (!progressResponse.ok) {
+        console.error('Failed to update progress:', progressResponse.status, progressResponse.statusText);
+        const errorData = await progressResponse.json().catch(() => ({}));
+        console.error('Progress update error:', errorData);
+        // Don't fail the verification, just log the error
+        toast.warning("Email verified, but failed to update progress. Please continue.");
+      } else {
+        console.log('✅ Progress updated successfully');
+      }
 
       setStep(3);
       toast.success("Email verified successfully! Please complete your profile.");
@@ -671,6 +734,7 @@ const SignUp = () => {
   const resendEmailVerification = async (): Promise<void> => {
     try {
       setLoading(true);
+      setOtpSent(false); // Reset the flag to allow new sends
 
       const result = await authClient.emailOtp.sendVerificationOtp({
         email: formData.email.trim(),
@@ -682,6 +746,7 @@ const SignUp = () => {
         return;
       }
 
+      setOtpSent(true); // Mark as sent
       toast.success("New 6-digit verification code sent! Please check your inbox.");
     } catch (err) {
       toast.error("Failed to resend verification code");
@@ -723,11 +788,15 @@ const SignUp = () => {
     try {
       setLoading(true);
 
-      // Send phone OTP via Twilio
-      await sendPhoneOtp();
+      // DEVELOPMENT MODE: Auto-bypass phone verification
+      // In production, uncomment sendPhoneOtp() and remove the bypass logic
+      await handlePhoneVerificationBypass();
+
+      // PRODUCTION MODE: Send phone OTP via Twilio (COMMENTED OUT FOR DEVELOPMENT)
+      // await sendPhoneOtp();
 
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to send verification code";
+      const errorMessage = err instanceof Error ? err.message : "Failed to process verification";
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -880,14 +949,14 @@ const SignUp = () => {
     }
   };
 
-  // Bypass Phone OTP verification for development
-  const handlePhoneBypass = async (): Promise<void> => {
+  // Auto-bypass phone verification for development (replaces manual bypass button)
+  const handlePhoneVerificationBypass = async (): Promise<void> => {
     try {
-      setLoading(true);
-
       const formattedPhone = formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode);
 
-      // Step 1: Save profile data via API
+      console.log('🔧 Development Mode: Auto-bypassing phone verification');
+
+      // Step 1: Save complete profile data via API
       const profileResp = await fetch("/api/profiles/upsert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -910,10 +979,25 @@ const SignUp = () => {
 
       if (!profileResp.ok) {
         const errorData = await profileResp.json().catch(() => ({}));
+        console.error('Profile save error:', errorData);
         throw new Error(errorData.error || 'Failed to save profile');
       }
 
-      // Step 2: Update progress - profile completed
+      console.log('✅ Profile data saved successfully');
+
+      // Step 2: Update Better Auth user with full name
+      const fullName = `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}`.trim();
+      const userUpdateResult = await updateUser({
+        name: fullName
+      });
+
+      if (userUpdateResult.error) {
+        console.warn('Failed to update user name:', userUpdateResult.error);
+      } else {
+        console.log('✅ Better Auth user name updated');
+      }
+
+      // Step 3: Mark profile as completed
       const profileProgressResp = await fetch('/api/onboarding/update-progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -925,9 +1009,11 @@ const SignUp = () => {
 
       if (!profileProgressResp.ok) {
         console.warn('Failed to update profile progress:', await profileProgressResp.text());
+      } else {
+        console.log('✅ Profile completion progress updated');
       }
 
-      // Step 3: Mark phone as verified (CRITICAL for bypass to work)
+      // Step 4: Mark phone as verified (CRITICAL for bypass to work)
       const phoneProgressResp = await fetch('/api/onboarding/update-progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -940,20 +1026,24 @@ const SignUp = () => {
 
       if (!phoneProgressResp.ok) {
         const errorData = await phoneProgressResp.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to verify phone');
+        console.error('Phone verification error:', errorData);
+        throw new Error(errorData.error || 'Failed to mark phone as verified');
       }
 
-      console.log('Bypass successful: Profile saved and phone marked as verified');
+      console.log('✅ Phone marked as verified');
+      console.log('🎉 All profile data saved, progressing to payment step');
+
+      // Update local state
       setBypassed(true);
       setStep(5);
-      toast.success("Phone bypassed for development! Please proceed to payment.");
+
+      toast.success("Profile complete! Proceeding to payment...");
 
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Bypass failed";
-      console.error('Phone bypass error:', err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to save profile";
+      console.error('❌ Profile verification bypass error:', err);
       toast.error(errorMessage);
-    } finally {
-      setLoading(false);
+      throw err; // Re-throw to be caught by handleStep3Submit
     }
   };
 
@@ -1302,14 +1392,21 @@ const SignUp = () => {
               <h1 className="text-2xl font-bold mb-2 text-white">Complete Your Profile</h1>
               <p className="text-gray-400">
                 {new URLSearchParams(window.location.search).get('oauth')
-                  ? "Complete your profile to continue"
+                  ? "Review and complete your profile information"
                   : "Tell us about yourself and your address"
                 }
               </p>
               {new URLSearchParams(window.location.search).get('oauth') && (
-                <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-green-900/20 text-green-400 rounded-full text-sm border border-green-700">
-                  <Check className="w-4 h-4" />
-                  Email verified via {new URLSearchParams(window.location.search).get('oauth')}
+                <div className="mt-3 space-y-2">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-900/20 text-green-400 rounded-full text-sm border border-green-700">
+                    <Check className="w-4 h-4" />
+                    Email verified via Google
+                  </div>
+                  {(formData.firstName || formData.lastName) && (
+                    <p className="text-xs text-blue-400">
+                      ✓ Name pre-filled from Google (you can edit if needed)
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -1523,36 +1620,24 @@ const SignUp = () => {
                 Back
               </Button>
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button
-                  onClick={handleStep3Submit}
-                  disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
-                  size="lg"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending Code...
-                    </>
-                  ) : (
-                    <>
-                      Send Verification Code
-                      <ChevronRight className="ml-2 h-4 w-4" />
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handlePhoneBypass}
-                  className="px-8 py-2 border-yellow-600 text-yellow-500 hover:bg-yellow-600/10"
-                  disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.zipCode}
-                >
-                  Bypass for Dev
-                </Button>
-              </div>
+              <Button
+                onClick={handleStep3Submit}
+                disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
+                size="lg"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving Profile...
+                  </>
+                ) : (
+                  <>
+                    Continue to Payment
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
             </div>
           </>
         )}
@@ -1763,13 +1848,55 @@ const SignUp = () => {
           </>
         )}
 
-        {/* Login Link */}
-        <p className="text-center text-sm text-gray-400">
-          Already have an account?{" "}
-          <Link href="/login" className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors">
-            Back to Login
-          </Link>
-        </p>
+        {/* Login Link / Logout Button */}
+        {step === 1 ? (
+          <p className="text-center text-sm text-gray-400">
+            Already have an account?{" "}
+            <Link href="/login" className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors">
+              Back to Login
+            </Link>
+          </p>
+        ) : (
+          <div className="text-center mt-1.5">
+            <p className="text-xs text-gray-500 mb-2">
+              Logged in as {session?.user?.email || formData.email}
+            </p>
+            <Button
+              variant="ghost"
+              onClick={async () => {
+                // Confirm logout to prevent accidental clicks
+                const confirmLogout = window.confirm(
+                  "Are you sure you want to logout? Your progress has been saved and you can continue later."
+                );
+
+                if (!confirmLogout) return;
+
+                try {
+                  setLoading(true);
+                  console.log('🔓 Logging out user...');
+
+                  await signOut();
+
+                  toast.success("Logged out successfully. Your progress is saved!");
+
+                  // Small delay to ensure session is cleared
+                  setTimeout(() => {
+                    router.push('/login');
+                  }, 500);
+                } catch (error) {
+                  console.error('❌ Logout error:', error);
+                  toast.error("Failed to logout. Please try again.");
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              disabled={loading}
+              className="text-sm text-gray-400 hover:text-red-400 hover:bg-red-900/10 transition-colors px-4 py-2"
+            >
+              {loading ? "Logging out..." : "Logout"}
+            </Button>
+          </div>
+        )}
       </Card>
     </div>
   );

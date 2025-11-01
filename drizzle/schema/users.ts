@@ -16,28 +16,16 @@ import { pgTable, uuid, text, varchar, boolean, timestamp, date, numeric, intege
 import { relations } from 'drizzle-orm'
 import { user } from './auth'
 
-// ============================================================================
-// 1. USERS: Core Identity Table (EXISTING TABLE - EXACT MAPPING)
-// ============================================================================
-export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  authUserId: text('auth_user_id'),
-  email: varchar('email', { length: 255 }).notNull(),
-  emailVerified: boolean('email_verified').default(false),
-  status: text('status').notNull().default('Pending'), // This will be enum_users_status in DB
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
-}, (table) => ({
-  emailIdx: index('idx_users_email').on(table.email),
-  updatedAtIdx: index('idx_users_updated_at').on(table.updatedAt)
-}))
+// Note: We now use Better Auth's user table directly instead of a custom users table
+// Export the Better Auth user for convenience
+export { user } from './auth'
 
 // ============================================================================
-// 2. USER PROFILES: Personal Information (EXISTING TABLE - EXACT MAPPING)
+// 1. USER PROFILES: Personal Information (EXISTING TABLE - EXACT MAPPING)
 // ============================================================================
 export const userProfiles = pgTable('user_profiles', {
   id: varchar('id').primaryKey(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => user.id, { onDelete: 'cascade' }),
   firstName: varchar('first_name'),
   lastName: varchar('last_name'),
   middleName: varchar('middle_name'),
@@ -54,7 +42,7 @@ export const userProfiles = pgTable('user_profiles', {
 // ============================================================================
 export const userContacts = pgTable('user_contacts', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => user.id, { onDelete: 'cascade' }),
   contactType: varchar('contact_type', { length: 20 }).notNull(), // 'phone', 'email', 'emergency'
   contactValue: varchar('contact_value', { length: 255 }).notNull(),
   isPrimary: boolean('is_primary').default(false),
@@ -77,7 +65,7 @@ export const userContacts = pgTable('user_contacts', {
 // ============================================================================
 export const userAddresses = pgTable('user_addresses', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => user.id, { onDelete: 'cascade' }),
   addressType: varchar('address_type', { length: 20 }).default('primary'),
   streetAddress: varchar('street_address', { length: 255 }),
   addressLine2: varchar('address_line_2', { length: 255 }),
@@ -98,7 +86,7 @@ export const userAddresses = pgTable('user_addresses', {
 // ============================================================================
 export const userMemberships = pgTable('user_memberships', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').unique().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').unique().references(() => user.id, { onDelete: 'cascade' }),
   joinDate: date('join_date').notNull().defaultNow(),
   tenure: numeric('tenure').default('0'),
   verificationStatus: varchar('verification_status', { length: 20 }).default('PENDING'),
@@ -115,50 +103,31 @@ export const userMemberships = pgTable('user_memberships', {
 // DRIZZLE RELATIONS
 // ============================================================================
 
-export const usersRelations = relations(users, ({ one, many }) => ({
-  // Link to Better Auth user - temporarily disabled due to import issues
-  // betterAuthUser: one(user, {
-  //   fields: [users.userId],
-  //   references: [user.id]
-  // }),
-  // One-to-one relationships
-  profile: one(userProfiles, {
-    fields: [users.id],
-    references: [userProfiles.userId]
-  }),
-  membership: one(userMemberships, {
-    fields: [users.id],
-    references: [userMemberships.userId]
-  }),
-  // One-to-many relationships
-  contacts: many(userContacts),
-  addresses: many(userAddresses)
-}))
-
+// Relations now use Better Auth's user table directly
 export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userProfiles.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const userContactsRelations = relations(userContacts, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userContacts.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const userAddressesRelations = relations(userAddresses, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userAddresses.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const userMembershipsRelations = relations(userMemberships, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userMemberships.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))

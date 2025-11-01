@@ -13,14 +13,14 @@
 
 import { pgTable, uuid, text, varchar, boolean, timestamp, decimal, integer, date, index, jsonb } from 'drizzle-orm/pg-core'
 import { relations, sql } from 'drizzle-orm'
-import { users } from './users'
+import { user } from './users'
 
 // ============================================================================
 // 1. MEMBERSHIP QUEUE (EXISTING TABLE - EXACT MAPPING)
 // ============================================================================
 export const membershipQueue = pgTable('membership_queue', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').unique().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').unique().references(() => user.id, { onDelete: 'cascade' }),
   queuePosition: integer('queue_position'),
   joinedQueueAt: timestamp('joined_queue_at', { withTimezone: true }).defaultNow(),
   isEligible: boolean('is_eligible').default(true),
@@ -44,7 +44,7 @@ export const membershipQueue = pgTable('membership_queue', {
 // ============================================================================
 export const kycVerification = pgTable('kyc_verification', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   status: text('status').notNull().default('pending'),
   verificationMethod: text('verification_method'),
   documentType: text('document_type'),
@@ -78,7 +78,7 @@ export const kycVerification = pgTable('kyc_verification', {
 export const payoutManagement = pgTable('payout_management', {
   id: uuid('id').primaryKey().defaultRandom(),
   payoutId: text('payout_id').notNull().unique(),
-  userId: uuid('user_id').notNull().references(() => users.id),
+  userId: uuid('user_id').notNull().references(() => user.id),
   queuePosition: integer('queue_position').notNull(),
   amount: decimal('amount', { precision: 12, scale: 2 }).notNull().default('100000.00'),
   currency: text('currency').default('USD'),
@@ -107,7 +107,7 @@ export const disputes = pgTable('disputes', {
   id: uuid('id').primaryKey().defaultRandom(),
   disputeId: text('dispute_id').notNull(),
   paymentId: uuid('payment_id'),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   type: text('type').notNull(),
   status: text('status').notNull().default('needs_response'),
   reason: text('reason').notNull(),
@@ -135,29 +135,29 @@ export const disputes = pgTable('disputes', {
 // ============================================================================
 
 export const membershipQueueRelations = relations(membershipQueue, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [membershipQueue.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const kycVerificationRelations = relations(kycVerification, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [kycVerification.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const payoutManagementRelations = relations(payoutManagement, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [payoutManagement.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const disputesRelations = relations(disputes, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [disputes.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))

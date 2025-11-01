@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { auth } from "@/lib/auth";
 import { db } from "@/drizzle/db";
-import { users, userProfiles, userContacts, userAddresses, userMemberships } from "@/drizzle/schema";
+import { user, userProfiles, userContacts, userAddresses, userMemberships } from "@/drizzle/schema";
 import { eq } from "drizzle-orm";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -45,46 +45,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Start transaction-like operations
     try {
-      // 1. Upsert user record
-      const userResult = await db.insert(users)
-        .values({
-          authUserId: user.id,
-          email,
-          emailVerified: true, // Assume verified if they can call this API
-        })
-        .onConflictDoUpdate({
-          target: users.authUserId,
-          set: {
-            email,
-            emailVerified: true,
-            updatedAt: new Date()
-          }
-        })
-        .returning();
-
-      const userId = userResult[0].id;
+      // Use Better Auth user ID directly (no need to sync to custom table)
+      const userId = user.id;
 
       // 2. Upsert user profile
       if (first_name || last_name || middle_name || date_of_birth || full_name) {
-        await db.insert(userProfiles)
-          .values({
-            id: userId, // Using userId as profile ID based on schema
-            userId: userId,
-            firstName: first_name ?? (full_name ? full_name.split(' ')[0] : null),
-            lastName: last_name ?? (full_name && full_name.includes(' ') ? full_name.split(' ').slice(1).join(' ') : null),
-            middleName: middle_name ?? null,
-            dateOfBirth: date_of_birth ?? null,
-          })
-          .onConflictDoUpdate({
-            target: userProfiles.userId,
-            set: {
+        // Check if profile exists first
+        const existingProfile = await db
+          .select()
+          .from(userProfiles)
+          .where(eq(userProfiles.userId, userId))
+          .limit(1)
+          .then(rows => rows[0]);
+
+        if (existingProfile) {
+          // Update existing profile
+          await db
+            .update(userProfiles)
+            .set({
               firstName: first_name ?? (full_name ? full_name.split(' ')[0] : null),
               lastName: last_name ?? (full_name && full_name.includes(' ') ? full_name.split(' ').slice(1).join(' ') : null),
               middleName: middle_name ?? null,
               dateOfBirth: date_of_birth ?? null,
               updatedAt: new Date()
-            }
-          });
+            })
+            .where(eq(userProfiles.userId, userId));
+        } else {
+          // Create new profile - generate unique ID
+          await db.insert(userProfiles)
+            .values({
+              id: `profile_${userId}`, // Generate unique profile ID
+              userId: userId,
+              firstName: first_name ?? (full_name ? full_name.split(' ')[0] : null),
+              lastName: last_name ?? (full_name && full_name.includes(' ') ? full_name.split(' ').slice(1).join(' ') : null),
+              middleName: middle_name ?? null,
+              dateOfBirth: date_of_birth ?? null,
+            });
+        }
       }
 
       // 3. Upsert phone contact
@@ -108,21 +105,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // 4. Upsert address
       if (street_address || city || state || zip_code) {
-        await db.insert(userAddresses)
-          .values({
-            userId: userId,
-            addressType: 'primary',
-            streetAddress: street_address ?? null,
-            addressLine2: address_line_2 ?? null,
-            city: city ?? null,
-            state: state ?? null,
-            postalCode: zip_code ?? null,
-            countryCode: country_code ?? 'US',
-            isPrimary: true,
-          })
-                    .onConflictDoUpdate({
-            target: userAddresses.userId,
-            set: {
+        // Check if address exists first
+        const existingAddress = await db
+          .select()
+          .from(userAddresses)
+          .where(eq(userAddresses.userId, userId))
+          .limit(1)
+          .then(rows => rows[0]);
+
+        if (existingAddress) {
+          // Update existing address
+          await db
+            .update(userAddresses)
+            .set({
               addressType: 'primary',
               streetAddress: street_address ?? null,
               addressLine2: address_line_2 ?? null,
@@ -132,24 +127,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               countryCode: country_code ?? 'US',
               isPrimary: true,
               updatedAt: new Date()
-            }
-          });
+            })
+            .where(eq(userAddresses.userId, userId));
+        } else {
+          // Create new address
+          await db.insert(userAddresses)
+            .values({
+              userId: userId,
+              addressType: 'primary',
+              streetAddress: street_address ?? null,
+              addressLine2: address_line_2 ?? null,
+              city: city ?? null,
+              state: state ?? null,
+              postalCode: zip_code ?? null,
+              countryCode: country_code ?? 'US',
+              isPrimary: true,
+            });
+        }
       }
 
       // 5. Upsert membership record
-      await db.insert(userMemberships)
-        .values({
-          userId: userId,
-          joinDate: new Date().toISOString().split('T')[0],
-          tenure: '0',
-          verificationStatus: 'PENDING',
-        })
-        .onConflictDoUpdate({
-          target: userMemberships.userId,
-          set: {
+      const existingMembership = await db
+        .select()
+        .from(userMemberships)
+        .where(eq(userMemberships.userId, userId))
+        .limit(1)
+        .then(rows => rows[0]);
+
+      if (existingMembership) {
+        // Update existing membership
+        await db
+          .update(userMemberships)
+          .set({
             updatedAt: new Date()
-          }
-        });
+          })
+          .where(eq(userMemberships.userId, userId));
+      } else {
+        // Create new membership
+        await db.insert(userMemberships)
+          .values({
+            userId: userId,
+            joinDate: new Date().toISOString().split('T')[0],
+            tenure: '0',
+            verificationStatus: 'PENDING',
+          });
+      }
 
     } catch (error: any) {
       console.error('Profile upsert error:', error);

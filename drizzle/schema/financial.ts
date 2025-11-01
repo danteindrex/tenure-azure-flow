@@ -14,14 +14,14 @@
 
 import { pgTable, uuid, text, varchar, boolean, timestamp, decimal, integer, jsonb, index, unique, char } from 'drizzle-orm/pg-core'
 import { relations, sql } from 'drizzle-orm'
-import { users } from './users'
+import { user } from './users'
 
 // ============================================================================
 // 1. USER PAYMENT METHODS (EXISTING TABLE - EXACT MAPPING)
 // ============================================================================
 export const userPaymentMethods = pgTable('user_payment_methods', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => user.id, { onDelete: 'cascade' }),
   provider: varchar('provider', { length: 20 }).notNull().default('stripe'),
   methodType: varchar('method_type', { length: 20 }).notNull(), // 'card', 'bank_account', 'paypal'
   methodSubtype: varchar('method_subtype', { length: 20 }), // 'visa', 'mastercard', etc.
@@ -50,7 +50,7 @@ export const userPaymentMethods = pgTable('user_payment_methods', {
 // ============================================================================
 export const userSubscriptions = pgTable('user_subscriptions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => user.id, { onDelete: 'cascade' }),
   provider: varchar('provider', { length: 20 }).notNull().default('stripe'),
   providerSubscriptionId: varchar('provider_subscription_id', { length: 255 }).notNull(),
   providerCustomerId: varchar('provider_customer_id', { length: 255 }).notNull(),
@@ -73,7 +73,7 @@ export const userSubscriptions = pgTable('user_subscriptions', {
 // ============================================================================
 export const userPayments = pgTable('user_payments', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => user.id, { onDelete: 'cascade' }),
   subscriptionId: uuid('subscription_id'),
   paymentMethodId: uuid('payment_method_id'),
   provider: varchar('provider', { length: 20 }).notNull().default('stripe'),
@@ -103,7 +103,7 @@ export const userPayments = pgTable('user_payments', {
 // ============================================================================
 export const userBillingSchedules = pgTable('user_billing_schedules', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => user.id, { onDelete: 'cascade' }),
   subscriptionId: uuid('subscription_id').references(() => userSubscriptions.id, { onDelete: 'cascade' }),
   billingCycle: varchar('billing_cycle', { length: 20 }).default('MONTHLY'), // 'MONTHLY', 'QUARTERLY', 'YEARLY'
   nextBillingDate: timestamp('next_billing_date', { mode: 'date' }),
@@ -122,7 +122,7 @@ export const userBillingSchedules = pgTable('user_billing_schedules', {
 // ============================================================================
 export const userAgreements = pgTable('user_agreements', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => user.id, { onDelete: 'cascade' }),
   agreementType: varchar('agreement_type', { length: 50 }).notNull(), // 'terms_of_service', 'privacy_policy', etc.
   versionNumber: varchar('version_number', { length: 20 }).notNull(),
   agreedAt: timestamp('agreed_at', { withTimezone: true }).defaultNow(),
@@ -146,26 +146,26 @@ export const userAgreements = pgTable('user_agreements', {
 // ============================================================================
 
 export const userPaymentMethodsRelations = relations(userPaymentMethods, ({ one, many }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userPaymentMethods.userId],
-    references: [users.id]
+    references: [user.id]
   }),
   payments: many(userPayments)
 }))
 
 export const userSubscriptionsRelations = relations(userSubscriptions, ({ one, many }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userSubscriptions.userId],
-    references: [users.id]
+    references: [user.id]
   }),
   payments: many(userPayments),
   billingSchedules: many(userBillingSchedules)
 }))
 
 export const userPaymentsRelations = relations(userPayments, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userPayments.userId],
-    references: [users.id]
+    references: [user.id]
   }),
   subscription: one(userSubscriptions, {
     fields: [userPayments.subscriptionId],
@@ -178,9 +178,9 @@ export const userPaymentsRelations = relations(userPayments, ({ one }) => ({
 }))
 
 export const userBillingSchedulesRelations = relations(userBillingSchedules, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userBillingSchedules.userId],
-    references: [users.id]
+    references: [user.id]
   }),
   subscription: one(userSubscriptions, {
     fields: [userBillingSchedules.subscriptionId],
@@ -189,8 +189,8 @@ export const userBillingSchedulesRelations = relations(userBillingSchedules, ({ 
 }))
 
 export const userAgreementsRelations = relations(userAgreements, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userAgreements.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))

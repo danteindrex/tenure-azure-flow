@@ -5,7 +5,6 @@ import rateLimit from 'express-rate-limit';
 import { config } from './config/env';
 import { logger } from './config/logger';
 import { testConnection, closePool } from './config/database';
-import { rawBodyMiddleware } from './middleware/rawBody.middleware';
 import subscriptionRoutes from './routes/subscription.routes';
 import webhookRoutes from './routes/webhook.routes';
 
@@ -17,16 +16,22 @@ const limiter = rateLimit({
   max: 100, // limit each IP to 100 requests per windowMs
 });
 
-// Middleware - Raw body for webhooks
-app.use(rawBodyMiddleware);
-
-// Middleware - Security & parsing
+// Middleware - Security
 app.use(helmet());
 app.use(cors({
   origin: config.cors.allowedOrigins,
   credentials: true,
 }));
-app.use(express.json());
+
+// Middleware - Body parsing
+// Use raw body for Stripe webhooks, JSON for everything else
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/webhooks/stripe') {
+    express.raw({ type: 'application/json' })(req, res, next);
+  } else {
+    express.json()(req, res, next);
+  }
+});
 app.use(express.urlencoded({ extended: true }));
 app.use('/api/', limiter);
 

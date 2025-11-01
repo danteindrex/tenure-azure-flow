@@ -67,10 +67,13 @@ export const auth = betterAuth({
       allowedAttempts: 3,
       // Send OTP via our email service
       async sendVerificationOTP({ email, otp, type }) {
-        console.log('📧 Better Auth: Sending OTP email...')
-        console.log('   Email:', email)
-        console.log('   OTP (6-digit):', otp)
-        console.log('   Type:', type)
+        // Only log in development mode - never log OTP codes in production
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('📧 Better Auth: Sending OTP email...')
+          console.log('   Email:', email)
+          console.log('   OTP (6-digit):', otp)
+          console.log('   Type:', type)
+        }
 
         try {
           if (type === 'email-verification') {

@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/drizzle/db";
-import { users, userProfiles, userContacts, userAddresses } from "@/drizzle/schema";
+import { user, userProfiles, userContacts, userAddresses } from "@/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -11,29 +11,31 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Get database user
-    const dbUser = await db.select().from(users)
-      .where(eq(users.authUserId, session.user.id))
+    const userId = session.user.id;
+
+    // Get Better Auth user
+    const dbUser = await db.select().from(user)
+      .where(eq(user.id, userId))
       .limit(1)
       .then(rows => rows[0]);
 
     if (!dbUser) {
       return NextResponse.json({
         error: "User not found in database",
-        details: "User exists in auth but not in users table"
+        details: "User not found in Better Auth table"
       }, { status: 404 });
     }
 
     // Get profile
     const profile = await db.select().from(userProfiles)
-      .where(eq(userProfiles.userId, dbUser.id))
+      .where(eq(userProfiles.userId, userId))
       .limit(1)
       .then(rows => rows[0]);
 
     // Get phone contact
     const phoneContact = await db.select().from(userContacts)
       .where(and(
-        eq(userContacts.userId, dbUser.id),
+        eq(userContacts.userId, userId),
         eq(userContacts.contactType, 'phone')
       ))
       .limit(1)
@@ -42,7 +44,7 @@ export async function GET(request: Request) {
     // Get primary address
     const address = await db.select().from(userAddresses)
       .where(and(
-        eq(userAddresses.userId, dbUser.id),
+        eq(userAddresses.userId, userId),
         eq(userAddresses.isPrimary, true)
       ))
       .limit(1)

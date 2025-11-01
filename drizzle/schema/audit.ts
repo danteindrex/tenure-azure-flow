@@ -11,14 +11,14 @@
 
 import { pgTable, uuid, text, varchar, boolean, timestamp, jsonb, integer, inet, index } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
-import { users } from './users'
+import { user } from './users'
 
 // ============================================================================
 // 1. SYSTEM AUDIT LOGS (EXISTING TABLE - EXACT MAPPING)
 // ============================================================================
 export const systemAuditLogs = pgTable('system_audit_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  userId: uuid('user_id').references(() => user.id, { onDelete: 'set null' }),
   adminId: integer('admin_id'), // References admin(id)
 
   // Entity Information
@@ -80,15 +80,15 @@ export const userAuditLogs = pgTable('user_audit_logs', {
 // ============================================================================
 
 export const systemAuditLogsRelations = relations(systemAuditLogs, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [systemAuditLogs.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const userAuditLogsRelations = relations(userAuditLogs, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userAuditLogs.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))

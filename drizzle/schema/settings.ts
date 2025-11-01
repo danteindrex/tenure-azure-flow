@@ -16,14 +16,14 @@
 
 import { pgTable, uuid, text, boolean, timestamp, integer, jsonb, numeric, index } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
-import { users } from './users'
+import { user } from './users'
 
 // ============================================================================
 // 1. USER SETTINGS: Main Settings Table (TO BE CREATED)
 // ============================================================================
 export const userSettings = pgTable('user_settings', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().unique().references(() => user.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 
@@ -65,7 +65,7 @@ export const userSettings = pgTable('user_settings', {
 // ============================================================================
 export const userNotificationPreferences = pgTable('user_notification_preferences', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().unique().references(() => user.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 
@@ -100,7 +100,7 @@ export const userNotificationPreferences = pgTable('user_notification_preference
 // ============================================================================
 export const userSecuritySettings = pgTable('user_security_settings', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().unique().references(() => user.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 
@@ -135,7 +135,7 @@ export const userSecuritySettings = pgTable('user_security_settings', {
 // ============================================================================
 export const userPaymentSettings = pgTable('user_payment_settings', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().unique().references(() => user.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 
@@ -169,7 +169,7 @@ export const userPaymentSettings = pgTable('user_payment_settings', {
 // ============================================================================
 export const userPrivacySettings = pgTable('user_privacy_settings', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().unique().references(() => user.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 
@@ -213,7 +213,7 @@ export const userPrivacySettings = pgTable('user_privacy_settings', {
 // ============================================================================
 export const userAppearanceSettings = pgTable('user_appearance_settings', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().unique().references(() => user.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 
@@ -250,43 +250,43 @@ export const userAppearanceSettings = pgTable('user_appearance_settings', {
 // ============================================================================
 
 export const userSettingsRelations = relations(userSettings, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userSettings.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const userNotificationPreferencesRelations = relations(userNotificationPreferences, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userNotificationPreferences.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const userSecuritySettingsRelations = relations(userSecuritySettings, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userSecuritySettings.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const userPaymentSettingsRelations = relations(userPaymentSettings, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userPaymentSettings.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const userPrivacySettingsRelations = relations(userPrivacySettings, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userPrivacySettings.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const userAppearanceSettingsRelations = relations(userAppearanceSettings, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [userAppearanceSettings.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))

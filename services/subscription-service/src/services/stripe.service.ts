@@ -131,7 +131,7 @@ export class StripeService {
    */
   static async handleCheckoutComplete(session: Stripe.Checkout.Session): Promise<void> {
     try {
-      const userId = parseInt(session.metadata!.userId);
+      const userId = session.metadata!.userId; // UUID string, not integer
       const subscriptionId = session.subscription as string;
 
       // Get subscription details from Stripe
@@ -139,8 +139,8 @@ export class StripeService {
 
       // Update user status to Active
       const updateUserQuery = `
-        UPDATE users 
-        SET status = 'Active', updated_at = NOW() 
+        UPDATE users
+        SET status = 'Active', updated_at = NOW()
         WHERE id = $1
       `;
       await pool.query(updateUserQuery, [userId]);

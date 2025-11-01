@@ -28,11 +28,13 @@ export {
   organization
 } from './auth'
 
+// Backward compatibility: export 'user' as 'users' for legacy code
+export { user as users } from './auth'
+
 // ============================================================================
 // CORE USER TABLES
 // ============================================================================
 export {
-  users,
   userProfiles,
   userContacts,
   userAddresses,

@@ -12,7 +12,7 @@
 
 import { pgTable, uuid, text, varchar, boolean, timestamp, decimal, integer, jsonb, index } from 'drizzle-orm/pg-core'
 import { relations, sql } from 'drizzle-orm'
-import { users } from './users'
+import { user } from './users'
 
 // ============================================================================
 // 1. TAX FORMS (EXISTING TABLE - EXACT MAPPING)
@@ -20,7 +20,7 @@ import { users } from './users'
 export const taxForms = pgTable('tax_forms', {
   id: uuid('id').primaryKey().defaultRandom(),
   formId: text('form_id').notNull().default(sql`(gen_random_uuid())::text`),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   formType: text('form_type').notNull(),
   taxYear: integer('tax_year').notNull(),
   status: text('status').notNull().default('pending'),
@@ -49,7 +49,7 @@ export const taxForms = pgTable('tax_forms', {
 export const transactionMonitoring = pgTable('transaction_monitoring', {
   id: uuid('id').primaryKey().defaultRandom(),
   transactionId: uuid('transaction_id').notNull(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   transactionType: text('transaction_type').notNull(),
   amount: decimal('amount', { precision: 12, scale: 2 }).notNull(),
   currency: text('currency').default('USD'),
@@ -101,22 +101,22 @@ export const verificationCodes = pgTable('verification_codes', {
 // ============================================================================
 
 export const taxFormsRelations = relations(taxForms, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [taxForms.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const transactionMonitoringRelations = relations(transactionMonitoring, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [transactionMonitoring.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
 
 export const verificationCodesRelations = relations(verificationCodes, ({ one }) => ({
-  user: one(users, {
+  user: one(user, {
     fields: [verificationCodes.userId],
-    references: [users.id]
+    references: [user.id]
   })
 }))
