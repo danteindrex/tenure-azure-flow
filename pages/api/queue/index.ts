@@ -58,23 +58,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 // Fallback function for direct database access
 async function fallbackToDirectAccess(res: NextApiResponse) {
   try {
-    // Fetch queue data from database
-    const queueData = await db.select().from(membershipQueue);
+    // Import required schemas
+    const { users, userProfiles, userPayments } = await import('@/drizzle/schema');
+    const { sql, eq, asc } = await import('drizzle-orm');
 
-    // For now, return basic queue data
-    // TODO: Enrich with user profile data when user tables are available
-    const enrichedQueueData = queueData.map((item: any) => ({
-      ...item,
-      user_name: `User ${item.userId}`,
-      user_email: '',
-      user_status: item.isActive ? 'Active' : 'Inactive',
-      member_join_date: item.createdAt || ''
-    }));
+    // Fetch queue data with user info using JOIN
+    const enrichedQueueData = await db
+      .select({
+        id: membershipQueue.id,
+        userId: membershipQueue.userId,
+        queuePosition: membershipQueue.queuePosition,
+        joinedQueueAt: membershipQueue.joinedQueueAt,
+        isEligible: membershipQueue.isEligible,
+        subscriptionActive: membershipQueue.subscriptionActive,
+        totalMonthsSubscribed: membershipQueue.totalMonthsSubscribed,
+        lifetimePaymentTotal: membershipQueue.lifetimePaymentTotal,
+        lastPaymentDate: membershipQueue.lastPaymentDate,
+        hasReceivedPayout: membershipQueue.hasReceivedPayout,
+        createdAt: membershipQueue.createdAt,
+        updatedAt: membershipQueue.updatedAt,
+        // Get real user name from profile
+        user_name: sql<string>`COALESCE(${userProfiles.firstName} || ' ' || ${userProfiles.lastName}, 'Member ' || ${membershipQueue.queuePosition})`,
+        user_email: users.email,
+        user_status: sql<string>`CASE WHEN ${membershipQueue.subscriptionActive} THEN 'Active' ELSE 'Inactive' END`,
+        member_join_date: membershipQueue.joinedQueueAt
+      })
+      .from(membershipQueue)
+      .innerJoin(users, eq(membershipQueue.userId, users.id))
+      .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
+      .orderBy(asc(membershipQueue.queuePosition));
 
     // Calculate statistics
-    const activeMembers = queueData.filter((user: any) => user.isActive).length;
-    const eligibleMembers = queueData.filter((user: any) => user.isEligible).length;
-    const totalMembers = queueData.length;
+    const activeMembers = enrichedQueueData.filter((user: any) => user.subscriptionActive).length;
+    const eligibleMembers = enrichedQueueData.filter((user: any) => user.isEligible).length;
+    const totalMembers = enrichedQueueData.length;
+
+    // Calculate total revenue from payments table
+    const totalRevenueResult = await db.select({
+      total: sql<string>`COALESCE(SUM(${userPayments.amount}), 0)`
+    })
+    .from(userPayments)
+    .where(eq(userPayments.status, 'completed'));
+
+    const totalRevenue = Number(totalRevenueResult[0]?.total || 0);
+
+    // Calculate potential winners based on revenue
+    const rewardPerWinner = 100000; // $100K per winner (BR-4)
+    const potentialWinners = Math.min(
+      Math.floor(totalRevenue / rewardPerWinner),
+      eligibleMembers
+    );
 
     return res.status(200).json({
       success: true,
@@ -84,10 +117,10 @@ async function fallbackToDirectAccess(res: NextApiResponse) {
           totalMembers,
           activeMembers,
           eligibleMembers,
-          totalRevenue: 0, // TODO: Calculate from payments table
-          potentialWinners: Math.min(2, eligibleMembers),
-          payoutThreshold: 500000,
-          receivedPayouts: queueData.filter((m: any) => m.hasReceivedPayout).length
+          totalRevenue,
+          potentialWinners,
+          payoutThreshold: 100000, // BR-3: $100K minimum
+          receivedPayouts: enrichedQueueData.filter((m: any) => m.hasReceivedPayout).length
         },
       },
     });

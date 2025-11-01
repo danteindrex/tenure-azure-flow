@@ -50,42 +50,63 @@ const Profile = () => {
   useEffect(() => {
     const loadProfile = async () => {
       if (!user || isPending) return;
-      
+
       try {
         setLoading(true);
-        
-        // Get user data from Better Auth session
-        const fullName = user.name || '';
-        const email = user.email || '';
-        
-        // Default phone values - TODO: Get from user profile data
-        const phoneCountryCode = '+1';
-        const phoneNumber = '';
-        // Note: Phone data should be fetched from user_contacts table
+
+        // Fetch full profile from API (includes phone + address)
+        const response = await fetch('/api/profiles/me', {
+          method: 'GET',
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load profile');
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to load profile data');
+        }
+
+        const { email, profile, phone, address } = result.data;
+
+        // Build full name from profile
+        const fullName = profile?.firstName && profile?.lastName
+          ? `${profile.firstName} ${profile.lastName}`
+          : user.name || '';
 
         const userIdDisplay = `USR-${String(user.id).slice(-6)}`;
-        const joinDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+        const joinDate = user.createdAt
+          ? new Date(user.createdAt).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            })
+          : '';
 
         const userData = {
           fullName,
-          email,
-          phoneCountryCode,
-          phoneNumber,
-          streetAddress: '',
-          city: '',
-          state: '',
-          zipCode: '',
+          email: email || user.email || '',
+          phoneCountryCode: phone?.countryCode || '+1',
+          phoneNumber: phone?.number || '',
+          streetAddress: address?.streetAddress || '',
+          city: address?.city || '',
+          state: address?.state || '',
+          zipCode: address?.postalCode || '',
           userId: userIdDisplay,
           joinDate,
           status: 'Active',
-          bio: '',
+          bio: '', // TODO: Add bio field to user_profiles table if needed
         };
 
         setProfileData(userData);
         setOriginalData(userData);
       } catch (error) {
         console.error('Error loading profile:', error);
-        await logError(`Error loading profile: ${error.message}`, user.id);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        await logError(`Error loading profile: ${errorMessage}`, user.id);
         toast.error("Failed to load profile data");
       } finally {
         setLoading(false);

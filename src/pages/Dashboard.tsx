@@ -102,19 +102,29 @@ const Dashboard = () => {
           throw new Error('Failed to fetch dashboard data');
         }
 
-        const dashboardData = await response.json();
-        const { dbUser, queueData, latestPayment } = dashboardData;
+        const result = await response.json();
 
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to load dashboard data');
+        }
 
+        const { user: dbUser, profile, queue, subscription, payments } = result.data;
 
-        // Use business logic service singleton
-        const businessLogic = BusinessLogicService;
+        // Get payout status from business rules API
+        const payoutResponse = await fetch('/api/business-rules/payout-conditions', {
+          method: 'GET',
+          credentials: 'include'
+        });
+        const payoutResult = await payoutResponse.json();
+        const payoutStatus = payoutResult.payoutStatus;
 
-        // Get payout status using correct business rules
-        const payoutStatus = await businessLogic.checkPayoutConditions();
-
-        // Get member payment status
-        const memberPaymentStatus = await businessLogic.getMemberPaymentStatus(dbUser?.id);
+        // Get member payment status from business rules API
+        const paymentStatusResponse = await fetch('/api/business-rules/payment-status', {
+          method: 'GET',
+          credentials: 'include'
+        });
+        const paymentStatusResult = await paymentStatusResponse.json();
+        const memberPaymentStatus = paymentStatusResult.paymentStatus;
 
         // Calculate next payment due using business logic
         let nextPaymentDue = '';
@@ -137,25 +147,30 @@ const Dashboard = () => {
           daysUntilPayment = 0;
         }
 
-        // Get tenure start from business logic (BR-9)
-        const tenureStart = await businessLogic.getMemberTenureStart(dbUser?.id);
+        // Get tenure start from business rules API (BR-9)
+        const tenureStartResponse = await fetch('/api/business-rules/tenure-start', {
+          method: 'GET',
+          credentials: 'include'
+        });
+        const tenureStartResult = await tenureStartResponse.json();
+        const tenureStart = tenureStartResult.tenureStart ? new Date(tenureStartResult.tenureStart) : null;
 
         // Set user data with correct business logic
         const userInfo = {
-          memberId: dbUser?.id ? `TRP-${dbUser.id.toString().padStart(3, '0')}` : `TRP-${new Date().getFullYear()}-${String(user.id).slice(-3).toUpperCase()}`,
-          tenureStart: tenureStart ? tenureStart.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+          memberId: dbUser?.id ? `TRP-${dbUser.id.toString().slice(-6).padStart(3, '0')}` : `TRP-${new Date().getFullYear()}-${String(user.id).slice(-3).toUpperCase()}`,
+          tenureStart: tenureStart ? tenureStart.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
           }) : (memberPaymentStatus.hasJoiningFee ? 'Joining fee paid' : 'Joining fee required'),
           nextPaymentDue,
-          lastPaymentDate: memberPaymentStatus.lastMonthlyPayment ? memberPaymentStatus.lastMonthlyPayment.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+          lastPaymentDate: memberPaymentStatus.lastMonthlyPayment ? new Date(memberPaymentStatus.lastMonthlyPayment).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
           }) : (memberPaymentStatus.hasJoiningFee ? 'Joining fee only' : 'No payments yet'),
           paymentStatus: memberPaymentStatus.isInDefault ? 'Default Risk' : (memberPaymentStatus.hasJoiningFee ? 'Active' : 'Pending'),
-          queuePosition: queueData?.queue_position || 0,
+          queuePosition: queue?.position || 0,
           totalPaid: memberPaymentStatus.totalPaid,
           subscriptionActive: !memberPaymentStatus.isInDefault && memberPaymentStatus.hasJoiningFee,
         };
@@ -179,13 +194,17 @@ const Dashboard = () => {
         };
 
         // Get winner order for queue display (BR-5, BR-6, BR-10)
-        const winnerOrder = await businessLogic.getMembersWithContinuousTenure();
-        const queueDisplay = winnerOrder.slice(0, 10).map((member, index) => ({
+        const continuousTenureResponse = await fetch('/api/business-rules/continuous-tenure', {
+          method: 'GET',
+          credentials: 'include'
+        });
+        const continuousTenureResult = await continuousTenureResponse.json();
+        const winnerOrder = continuousTenureResult.members || [];
+
+        const queueDisplay = winnerOrder.slice(0, 10).map((member: any, index: number) => ({
           rank: member.position,
           name: member.memberName,
-          tenureMonths: Math.floor(
-            (Date.now() - member.tenureStart.getTime()) / (1000 * 60 * 60 * 24 * 30)
-          ),
+          tenureMonths: member.continuousTenure,
           status: member.isActive ? 'Active' : 'Inactive',
           isCurrentUser: member.memberId === dbUser?.id,
           memberId: member.memberId

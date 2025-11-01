@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { 
-  History as HistoryIcon, 
-  Search, 
-  Filter, 
+import { useToast } from "@/components/ui/use-toast";
+import {
+  History as HistoryIcon,
+  Search,
+  Filter,
   Calendar,
   Clock,
   DollarSign,
@@ -21,88 +22,48 @@ const History = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  console.log("History component rendering");
+  // Load activity history from API
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        setLoading(true);
 
-  const historyData = [
-    {
-      id: "HIST-001",
-      type: "payment",
-      action: "Monthly Payment Processed",
-      description: "Successfully processed monthly membership fee",
-      amount: 25.00,
-      status: "completed",
-      date: "2025-01-15",
-      time: "14:30",
-      details: "Payment method: Credit Card ending in 1234"
-    },
-    {
-      id: "HIST-002",
-      type: "queue",
-      action: "Queue Position Changed",
-      description: "Moved up 2 positions in tenure queue",
-      amount: null,
-      status: "completed",
-      date: "2025-01-14",
-      time: "09:15",
-      details: "Previous rank: #5, New rank: #3"
-    },
-    {
-      id: "HIST-003",
-      type: "milestone",
-      action: "Fund Milestone Reached",
-      description: "Fund reached $250,000 milestone",
-      amount: 250000.00,
-      status: "completed",
-      date: "2025-01-12",
-      time: "16:45",
-      details: "2 winners will be selected soon"
-    },
-    {
-      id: "HIST-004",
-      type: "profile",
-      action: "Profile Updated",
-      description: "Updated contact information",
-      amount: null,
-      status: "completed",
-      date: "2025-01-10",
-      time: "11:20",
-      details: "Changed phone number and address"
-    },
-    {
-      id: "HIST-005",
-      type: "payment",
-      action: "Payment Failed",
-      description: "Monthly payment failed due to insufficient funds",
-      amount: 25.00,
-      status: "failed",
-      date: "2025-01-05",
-      time: "08:00",
-      details: "Card declined - insufficient funds"
-    },
-    {
-      id: "HIST-006",
-      type: "bonus",
-      action: "Referral Bonus Earned",
-      description: "Earned bonus for referring new member",
-      amount: 5.00,
-      status: "completed",
-      date: "2025-01-03",
-      time: "13:30",
-      details: "Referred: jane.doe@example.com"
-    },
-    {
-      id: "HIST-007",
-      type: "system",
-      action: "Account Created",
-      description: "Successfully created new account",
-      amount: 300.00,
-      status: "completed",
-      date: "2025-01-01",
-      time: "10:00",
-      details: "Initial membership fee paid"
-    }
-  ];
+        const response = await fetch('/api/history/activity?limit=50', {
+          method: 'GET',
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch history');
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+          setHistoryData(result.activities || []);
+        } else {
+          throw new Error(result.error || 'Failed to load activity history');
+        }
+      } catch (error) {
+        console.error('Error fetching history:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load activity history. Please try again.",
+          variant: "destructive",
+        });
+        // Set empty array on error
+        setHistoryData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHistory();
+  }, []);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -256,7 +217,19 @@ const History = () => {
       {/* History List */}
       <Card className="p-6">
         <div className="space-y-4">
-          {filteredHistory.length === 0 ? (
+          {loading ? (
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-start gap-4 p-4 border border-border rounded-lg animate-pulse">
+                  <div className="w-10 h-10 rounded-full bg-accent/10"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-48 bg-accent/10 rounded"></div>
+                    <div className="h-3 w-32 bg-accent/10 rounded"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredHistory.length === 0 ? (
             <div className="text-center py-8">
               <HistoryIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No history found</p>
