@@ -35,7 +35,7 @@ async function deleteAllUsers() {
     // Delete all user-related data
     const tables = [
       'system_audit_logs',
-      'user_audit_logs', 
+      'user_audit_logs',
       'auditlog',
       'user_settings',
       'user_notification_preferences',
@@ -68,7 +68,7 @@ async function deleteAllUsers() {
       'organization_member',
       'organization_invitation',
       'Payout',
-      'Payment', 
+      'Payment',
       'Tenure',
       'Member',
       'users',
@@ -96,7 +96,7 @@ async function deleteAllUsers() {
     await client.query('SET session_replication_role = DEFAULT')
 
     await client.query('COMMIT')
-    
+
     console.log(`✅ Deleted ${totalDeleted} total records`)
     console.log('🎉 All users deleted successfully!')
 

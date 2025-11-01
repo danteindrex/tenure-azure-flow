@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/drizzle/db'
-import { users, userProfiles, userContacts, userAddresses, userMemberships } from '@/drizzle/schema/users'
+import { user, userProfiles, userContacts, userAddresses, userMemberships } from '@/drizzle/schema/users'
 import { eq } from 'drizzle-orm'
 
 export async function GET(req: NextRequest) {
@@ -13,8 +13,8 @@ export async function GET(req: NextRequest) {
     }
 
     // Get user profile data
-    const userProfile = await db.query.users.findFirst({
-      where: eq(users.id, session.user.id),
+    const userProfile = await db.query.user.findFirst({
+      where: eq(user.id, session.user.id),
       with: {
         profiles: true,
         contacts: true,
@@ -40,16 +40,8 @@ export async function POST(req: NextRequest) {
 
     const profileData = await req.json()
 
-    // Get the user's database ID (not the auth user ID)
-    const userRecord = await db.query.users.findFirst({
-      where: eq(users.authUserId, session.user.id)
-    })
-
-    if (!userRecord) {
-      return NextResponse.json({ error: 'User record not found' }, { status: 404 })
-    }
-
-    const userId = userRecord.id
+    // Use the Better Auth user ID directly
+    const userId = session.user.id
 
     // Update user profile
     if (profileData.firstName !== undefined || profileData.lastName !== undefined ||

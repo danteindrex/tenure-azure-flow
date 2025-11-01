@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { db } from '@/drizzle/db';
-import { membershipQueue, users, userProfiles, userPayments } from '@/drizzle/schema';
+import { membershipQueue, user, userProfiles, userPayments } from '@/drizzle/schema';
 import { eq, asc, and, sql } from 'drizzle-orm';
 
 /**
@@ -21,7 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get all queue members with user info joined
     const queueMembers = await db
       .select({
-        memberId: users.id,
+        memberId: user.id,
         queuePosition: membershipQueue.queuePosition,
         joinedQueueAt: membershipQueue.joinedQueueAt,
         isEligible: membershipQueue.isEligible,
@@ -32,12 +32,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         hasReceivedPayout: membershipQueue.hasReceivedPayout,
         firstName: userProfiles.firstName,
         lastName: userProfiles.lastName,
-        email: users.email,
-        userStatus: users.status
+        email: user.email,
+        userStatus: user.emailVerified
       })
       .from(membershipQueue)
-      .innerJoin(users, eq(membershipQueue.userId, users.id))
-      .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
+      .innerJoin(user, eq(membershipQueue.userId, user.id))
+      .leftJoin(userProfiles, eq(user.id, userProfiles.userId))
       .where(eq(membershipQueue.isEligible, true))
       .orderBy(asc(membershipQueue.queuePosition));
 

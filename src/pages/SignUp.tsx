@@ -623,7 +623,7 @@ const SignUp = () => {
         setTimeout(async () => {
           try {
             const otpResult = await authClient.emailOtp.sendVerificationOtp({
-              email: currentProviededEmail,
+              email: email,
               type: "email-verification"
             });
 
@@ -1881,7 +1881,7 @@ const SignUp = () => {
 
                   // Small delay to ensure session is cleared
                   setTimeout(() => {
-                    router.push('/login');
+                    navigate.push('/login');
                   }, 500);
                 } catch (error) {
                   console.error('❌ Logout error:', error);

@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { auth } from '@/lib/auth';
 import { db } from '@/drizzle/db';
 import { membershipQueue } from '@/drizzle/schema/membership';
+import { user, userProfiles } from '@/drizzle/schema';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -79,13 +80,13 @@ async function fallbackToDirectAccess(res: NextApiResponse) {
         updatedAt: membershipQueue.updatedAt,
         // Get real user name from profile
         user_name: sql<string>`COALESCE(${userProfiles.firstName} || ' ' || ${userProfiles.lastName}, 'Member ' || ${membershipQueue.queuePosition})`,
-        user_email: users.email,
+        user_email: user.email,
         user_status: sql<string>`CASE WHEN ${membershipQueue.subscriptionActive} THEN 'Active' ELSE 'Inactive' END`,
         member_join_date: membershipQueue.joinedQueueAt
       })
       .from(membershipQueue)
-      .innerJoin(users, eq(membershipQueue.userId, users.id))
-      .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
+      .innerJoin(user, eq(membershipQueue.userId, user.id))
+      .leftJoin(userProfiles, eq(user.id, userProfiles.userId))
       .orderBy(asc(membershipQueue.queuePosition));
 
     // Calculate statistics
