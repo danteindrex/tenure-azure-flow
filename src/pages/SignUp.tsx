@@ -64,8 +64,6 @@ const SignUp = () => {
   // Log page visit and check for existing session
   useEffect(() => {
     logPageVisit('/signup');
-    
-
 
     // Check URL parameters for step, OAuth info, and email
     const urlParams = new URLSearchParams(window.location.search);
@@ -73,7 +71,8 @@ const SignUp = () => {
     const oauthParam = urlParams.get('oauth');
     const emailParam = urlParams.get('email');
     const needsVerificationParam = urlParams.get('needsVerification');
-    
+    const sessionIdParam = urlParams.get('session_id'); // Stripe success redirect
+
     // Pre-fill email from URL parameter (from login redirect)
     if (emailParam) {
       setFormData(prev => ({
@@ -81,7 +80,7 @@ const SignUp = () => {
         email: decodeURIComponent(emailParam),
       }));
     }
-    
+
     // If OAuth user, pre-fill data from session
     if (oauthParam && session?.user) {
       const fullName = session.user.name || "";
@@ -98,54 +97,59 @@ const SignUp = () => {
         middleName,
       }));
     }
-    
+
     // If user is authenticated, check their database state to determine correct step
-    if (session?.user && !isPending && !bypassed) {
-      fetch('/api/onboarding/status', {
-        method: 'GET',
-        credentials: 'include'
-      })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success && data.status) {
-            if (data.status.canAccessDashboard) {
-              // User completed everything, go to dashboard
-              // User completed everything, go to dashboard
-              navigate.push('/dashboard');
-            } else {
-              // Set step based on database state, not URL parameter
-              const correctStep = data.status.nextStep;
-              console.log(`User should be on step ${correctStep} based on database state`);
-              
-              // Handle legacy step 5 users by redirecting to step 3 (merged step)
-              if (correctStep === 7) {
-                setStep(5); // Payment step
-              } else if (correctStep >= 1 && correctStep <= 6) {
-                setStep(correctStep);
-              }
-              
-              // Pre-fill email if available
-              if (session.user.email) {
-                setFormData(prev => ({
-                  ...prev,
-                  email: session.user.email || "",
-                }));
-              }
-            }
-          }
+    // Skip the check if coming from Stripe (session_id in URL) or if bypassed
+    if (session?.user && !isPending && !bypassed && !sessionIdParam) {
+      // Add small delay to ensure webhook has processed (if just completed payment)
+      const checkDelay = stepParam === '5' ? 2000 : 0;
+
+      setTimeout(() => {
+        fetch('/api/onboarding/status', {
+          method: 'GET',
+          credentials: 'include'
         })
-        .catch(error => {
-          console.error('Error checking onboarding status:', error);
-          // Fallback to URL parameter if API fails
-          if (stepParam) {
-            const stepNumber = parseInt(stepParam, 10);
-            if (stepNumber === 5) {
-              setStep(3);
-            } else if (stepNumber >= 1 && stepNumber <= 5) {
-              setStep(stepNumber);
+          .then(response => response.json())
+          .then(data => {
+            if (data.success && data.status) {
+              if (data.status.canAccessDashboard) {
+                // User completed everything, go to dashboard
+                navigate.push('/dashboard');
+              } else {
+                // Set step based on database state, not URL parameter
+                const correctStep = data.status.nextStep;
+                console.log(`User should be on step ${correctStep} based on database state`);
+
+                // Handle legacy step 5 users by redirecting to step 3 (merged step)
+                if (correctStep === 7) {
+                  setStep(5); // Payment step
+                } else if (correctStep >= 1 && correctStep <= 6) {
+                  setStep(correctStep);
+                }
+
+                // Pre-fill email if available
+                if (session.user.email) {
+                  setFormData(prev => ({
+                    ...prev,
+                    email: session.user.email || "",
+                  }));
+                }
+              }
             }
-          }
-        });
+          })
+          .catch(error => {
+            console.error('Error checking onboarding status:', error);
+            // Fallback to URL parameter if API fails
+            if (stepParam) {
+              const stepNumber = parseInt(stepParam, 10);
+              if (stepNumber === 5) {
+                setStep(3);
+              } else if (stepNumber >= 1 && stepNumber <= 5) {
+                setStep(stepNumber);
+              }
+            }
+          });
+      }, checkDelay);
     } else if (!session?.user && stepParam) {
       // Not authenticated, use URL parameter
       const stepNumber = parseInt(stepParam, 10);
@@ -880,20 +884,21 @@ const SignUp = () => {
   const handlePhoneBypass = async (): Promise<void> => {
     try {
       setLoading(true);
-      // Skip the updateUser call since it requires authentication
-      // Just save the profile data directly via API
 
-      // Also save to normalized tables via API
-      await fetch("/api/profiles/upsert", {
+      const formattedPhone = formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode);
+
+      // Step 1: Save profile data via API
+      const profileResp = await fetch("/api/profiles/upsert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include',
         body: JSON.stringify({
           email: formData.email,
           first_name: formData.firstName,
           last_name: formData.lastName,
           middle_name: formData.middleName,
           date_of_birth: formData.dateOfBirth,
-          phone: formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode),
+          phone: formattedPhone,
           street_address: formData.streetAddress,
           address_line_2: formData.addressLine2,
           city: formData.city,
@@ -903,8 +908,13 @@ const SignUp = () => {
         }),
       });
 
-      // Update progress in database
-      await fetch('/api/onboarding/update-progress', {
+      if (!profileResp.ok) {
+        const errorData = await profileResp.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save profile');
+      }
+
+      // Step 2: Update progress - profile completed
+      const profileProgressResp = await fetch('/api/onboarding/update-progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -912,11 +922,13 @@ const SignUp = () => {
           step: 'profile-completed'
         })
       });
-      
-      const formattedPhone = formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode);
 
-      // Update progress in database
-      await fetch('/api/onboarding/update-progress', {
+      if (!profileProgressResp.ok) {
+        console.warn('Failed to update profile progress:', await profileProgressResp.text());
+      }
+
+      // Step 3: Mark phone as verified (CRITICAL for bypass to work)
+      const phoneProgressResp = await fetch('/api/onboarding/update-progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -926,6 +938,12 @@ const SignUp = () => {
         })
       });
 
+      if (!phoneProgressResp.ok) {
+        const errorData = await phoneProgressResp.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to verify phone');
+      }
+
+      console.log('Bypass successful: Profile saved and phone marked as verified');
       setBypassed(true);
       setStep(5);
       toast.success("Phone bypassed for development! Please proceed to payment.");
@@ -1494,7 +1512,7 @@ const SignUp = () => {
               </div>
             </div>
 
-            <div className="flex justify-between mt-6">
+            <div className="flex flex-col sm:flex-row justify-between gap-4 mt-6">
               <Button
                 variant="outline"
                 onClick={() => setStep(2)}
@@ -1504,33 +1522,37 @@ const SignUp = () => {
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              <Button
-                onClick={handleStep3Submit}
-                disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
-                className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
-                size="lg"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending Code...
-                  </>
-                ) : (
-                  <>
-                    Send Verification Code
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
-              <Button
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  onClick={handleStep3Submit}
+                  disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
+                  size="lg"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending Code...
+                    </>
+                  ) : (
+                    <>
+                      Send Verification Code
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+
+                <Button
                   type="button"
                   variant="outline"
                   onClick={handlePhoneBypass}
-                  className="px-8 py-2"
-                  disabled={loading}
+                  className="px-8 py-2 border-yellow-600 text-yellow-500 hover:bg-yellow-600/10"
+                  disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.zipCode}
                 >
                   Bypass for Dev
                 </Button>
+              </div>
             </div>
           </>
         )}
