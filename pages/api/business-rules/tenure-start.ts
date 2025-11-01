@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { auth } from '@/lib/auth';
 import { db } from '@/drizzle/db';
-import { users, userPayments } from '@/drizzle/schema';
+import { user, userPayments } from '@/drizzle/schema';
 import { eq, and, asc } from 'drizzle-orm';
 
 /**
@@ -25,8 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Get database user
-    const dbUser = await db.select().from(users)
-      .where(eq(users.authUserId, session.user.id))
+    const dbUser = await db.select().from(user)
+      .where(eq(user.id, session.user.id))
       .limit(1)
       .then(rows => rows[0]);
 

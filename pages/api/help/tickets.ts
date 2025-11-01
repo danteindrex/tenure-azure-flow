@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { auth } from "@/lib/auth";
 import { db } from "@/drizzle/db";
-import { users } from "@/drizzle/schema";
+import { user } from "@/drizzle/schema";
 import { eq } from "drizzle-orm";
 import { pgTable, uuid, text, varchar, timestamp } from "drizzle-orm/pg-core";
 

@@ -1,14 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { auth } from "@/lib/auth";
 import { db } from "@/drizzle/db";
-import { users } from "@/drizzle/schema";
+import { user } from "@/drizzle/schema";
 import { eq } from "drizzle-orm";
 import { pgTable, uuid, timestamp, jsonb } from "drizzle-orm/pg-core";
 
 // Define user_preferences table inline since it might not be in the schema yet
 const userPreferences = pgTable('user_preferences', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   preferences: jsonb('preferences'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
@@ -26,8 +26,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Get user ID from our users table
-    const userData = await db.query.users.findFirst({
-      where: eq(users.authUserId, session.user.id),
+    const userData = await db.query.user.findFirst({
+      where: eq(user.id, session.user.id),
       columns: { id: true }
     });
 
