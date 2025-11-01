@@ -1,24 +1,37 @@
 import { auth } from '../../../lib/auth'
-import { toNextJsHandler } from 'better-auth/next-js'
 import type { NextApiRequest, NextApiResponse } from 'next'
 
-const handlers = toNextJsHandler(auth)
-
-// Wrap the handlers to satisfy Next.js API route type
-export default async function authHandler(req: NextApiRequest, res: NextApiResponse) {
-  const method = req.method?.toUpperCase()
-
-  if (method === 'GET' && handlers.GET) {
-    return handlers.GET(req as any)
-  } else if (method === 'POST' && handlers.POST) {
-    return handlers.POST(req as any)
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    // Create a proper Request object with full URL
+    const protocol = req.headers['x-forwarded-proto'] || 'http'
+    const host = req.headers.host || 'localhost:3000'
+    const url = `${protocol}://${host}${req.url}`
+    
+    const request = new Request(url, {
+      method: req.method,
+      headers: new Headers(req.headers as Record<string, string>),
+      body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
+    })
+    
+    const response = await auth.handler(request)
+    
+    // Convert Web API Response to Next.js response
+    if (response instanceof Response) {
+      const body = await response.text()
+      
+      // Copy headers
+      response.headers.forEach((value, key) => {
+        res.setHeader(key, value)
+      })
+      
+      // Set status and send body
+      res.status(response.status).send(body)
+    } else {
+      res.status(500).json({ error: 'Invalid response from auth handler' })
+    }
+  } catch (error) {
+    console.error('Auth handler error:', error)
+    res.status(500).json({ error: 'Internal server error' })
   }
-
-  return res.status(405).json({ error: 'Method not allowed' })
-}
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
 }

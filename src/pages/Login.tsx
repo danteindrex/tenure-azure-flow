@@ -79,7 +79,7 @@ const Login = () => {
         });
 
         // Handle email verification - send OTP for existing user
-        const errorMsg = error.message.toLowerCase();
+        const errorMsg = (error.message || '').toLowerCase();
         if (errorMsg.includes("email not verified") || 
             errorMsg.includes("not verified") || 
             errorMsg.includes("verify") ||
