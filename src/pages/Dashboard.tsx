@@ -56,7 +56,7 @@ const Dashboard = () => {
           potentialWinners: 0,
           daysUntilDraw: 45,
           daysUntilPayment: 0,
-          paymentAmount: 300, // Joining fee for new users
+          paymentAmount: BUSINESS_RULES.JOINING_FEE, // Joining fee for new users
           fundReady: false,
           timeReady: true, // Since we're past 12 months from 2024-01-01
           payoutReady: false,
@@ -79,7 +79,7 @@ const Dashboard = () => {
           },
           {
             title: "🚀 Join the Fund",
-            message: "Complete your $300 joining fee to start contributing to the payout fund and secure your queue position.",
+            message: `Complete your $${BUSINESS_RULES.JOINING_FEE} joining fee to start contributing to the payout fund and secure your queue position.`,
             timestamp: "Available",
             type: "warning"
           }
@@ -291,7 +291,7 @@ const Dashboard = () => {
           potentialWinners: 0,
           daysUntilDraw: 45,
           daysUntilPayment: 0,
-          paymentAmount: 25,
+          paymentAmount: BUSINESS_RULES.JOINING_FEE,
           fundReady: false,
           timeReady: true, // Since we're past 12 months from 2024-01-01
           payoutReady: false,
@@ -326,10 +326,6 @@ const Dashboard = () => {
 
   // Activity feed state
   const [activityFeed, setActivityFeed] = useState([]);
-
-  const fundData = {
-    nextDrawDate: "March 15, 2025",
-  };
 
   if (loading) {
     return (
