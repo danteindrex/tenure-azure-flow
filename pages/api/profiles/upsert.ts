@@ -12,11 +12,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Get current user session using Better Auth
+    console.log('🔍 Profile upsert - checking session...');
+    console.log('Headers:', Object.keys(req.headers));
+
     const session = await auth.api.getSession({
       headers: new Headers(req.headers as any)
     });
 
+    console.log('Session result:', session ? 'Found' : 'Not found');
+    if (session?.user) {
+      console.log('User ID:', session.user.id);
+      console.log('User email:', session.user.email);
+    }
+
     if (!session?.user) {
+      console.error('❌ No session found in profile upsert');
       return res.status(401).json({ error: "Not authenticated" });
     }
 

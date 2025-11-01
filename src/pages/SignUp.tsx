@@ -928,6 +928,7 @@ const SignUp = () => {
       await fetch("/api/profiles/upsert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include', // Include session cookies
         body: JSON.stringify({
           email: formData.email,
           first_name: formData.firstName,
@@ -967,6 +968,12 @@ const SignUp = () => {
       const formattedPhone = formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode);
 
       console.log('🔧 Development Mode: Auto-bypassing phone verification');
+      console.log('📋 Current session:', session ? {
+        userId: session.user?.id,
+        email: session.user?.email,
+        emailVerified: session.user?.emailVerified
+      } : 'NO SESSION');
+      console.log('⏳ Is session pending?', isPending);
 
       // Step 1: Save complete profile data via API
       const profileResp = await fetch("/api/profiles/upsert", {
@@ -1108,22 +1115,11 @@ const SignUp = () => {
       await logSignup("google_oauth", false);
 
       // Use Better Auth for Google OAuth
-      const result = await signIn.social({
+      // Better Auth will set session cookies first, then redirect to callback
+      await signIn.social({
         provider: 'google',
-        callbackURL: `${window.location.origin}/signup?step=3&oauth=google`
+        callbackURL: `${window.location.origin}/auth/callback`,
       });
-
-      if (result.error) {
-        await logSignup("google_oauth", false);
-        await logError(`Google signup failed: ${result.error.message}`, undefined, {
-          provider: 'google',
-          error_code: result.error.message
-        });
-        toast.error("Google signup failed");
-        return;
-      }
-
-      await logSignup("google_oauth", true);
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Google signup failed";
@@ -1131,7 +1127,6 @@ const SignUp = () => {
         provider: 'google'
       });
       toast.error("Google signup failed");
-    } finally {
       setLoading(false);
     }
   };

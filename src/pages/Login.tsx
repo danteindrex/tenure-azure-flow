@@ -112,34 +112,21 @@ const Login = () => {
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
-      
+
       // Log Google login attempt
       await logLogin("google_oauth", false);
 
-      const { data, error } = await authClient.signIn.social({
+      // Use callbackURL - Better Auth will set session cookies first, then redirect
+      await authClient.signIn.social({
         provider: 'google',
         callbackURL: `${window.location.origin}/auth/callback`,
       });
 
-      if (error) {
-        await logLogin("google_oauth", false);
-        await logError(`Google login failed: ${error.message}`, undefined, {
-          provider: 'google',
-          error_code: error.message
-        });
-        toast.error("Google login failed");
-        return;
-      }
-
-      // Log successful Google login attempt (will be completed after redirect)
-      await logLogin("google_oauth", true);
-      
     } catch (err: any) {
-      await logError(`Google login error: ${err?.message}`, undefined, { 
-        provider: 'google' 
+      await logError(`Google login error: ${err?.message}`, undefined, {
+        provider: 'google'
       });
       toast.error("Google login failed");
-    } finally {
       setLoading(false);
     }
   };
