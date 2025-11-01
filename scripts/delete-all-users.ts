@@ -110,3 +110,4 @@ async function deleteAllUsers() {
 }
 
 deleteAllUsers()
+deleteAllUsers()
