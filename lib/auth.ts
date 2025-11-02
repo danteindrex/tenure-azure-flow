@@ -61,7 +61,7 @@ export const auth = betterAuth({
       otpLength: 6,
       // OTP expires in 10 minutes
       expiresIn: 600,
-      // Send verification OTP when user signs up
+      // Let Better Auth handle OTP sending automatically on signup
       sendVerificationOnSignUp: true,
       // Allow 3 attempts before invalidating OTP
       allowedAttempts: 3,
@@ -69,10 +69,14 @@ export const auth = betterAuth({
       async sendVerificationOTP({ email, otp, type }) {
         // Only log in development mode - never log OTP codes in production
         if (process.env.NODE_ENV !== 'production') {
-          console.log('📧 Better Auth: Sending OTP email...')
+          console.log('\n🔔 ========== EMAIL SEND ATTEMPT ==========')
+          console.log('   Timestamp:', new Date().toISOString())
           console.log('   Email:', email)
           console.log('   OTP (6-digit):', otp)
           console.log('   Type:', type)
+          console.log('   Stack trace:')
+          console.trace()
+          console.log('==========================================\n')
         }
 
         try {

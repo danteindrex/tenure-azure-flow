@@ -5,7 +5,7 @@
  * DO NOT modify these tables manually - they are managed by Better Auth.
  */
 
-import { pgTable, text, timestamp, boolean, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid, integer } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // Map to your existing 'users' table structure exactly
@@ -80,6 +80,22 @@ export const twoFactor = pgTable("two_factor", {
   userId: uuid("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+});
+
+export const passkey = pgTable("passkey", {
+  id: text("id").primaryKey(),
+  name: text("name"),
+  publicKey: text("public_key").notNull(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  webauthnUserId: text("webauthn_user_id").notNull(),
+  counter: integer("counter").notNull().default(0),
+  deviceType: text("device_type").notNull(),
+  backedUp: boolean("backed_up").notNull().default(false),
+  transports: text("transports"),
+  createdAt: timestamp("created_at").defaultNow(),
+  credentialID: text("credentialID"),
 });
 
 export const organization = pgTable("organization", {

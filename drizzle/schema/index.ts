@@ -25,6 +25,7 @@ export {
   account,
   verification,
   twoFactor,
+  passkey,
   organization
 } from './auth'
 

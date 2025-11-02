@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
@@ -63,7 +63,9 @@ const SignUp = () => {
   const [autoSubmitting, setAutoSubmitting] = useState(false);
   const [bypassed, setBypassed] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
-  
+  const otpSentRef = useRef(false); // Additional protection against re-renders
+  const [otpReady, setOtpReady] = useState(true); // Track if OTP is ready for verification
+
   // Field validation states
   const [fieldValidation, setFieldValidation] = useState({
     email: { isValid: false, touched: false },
@@ -605,6 +607,76 @@ const SignUp = () => {
 
       if (result.error) {
         console.error("Account creation error:", result.error);
+
+        // If account already exists, try to log them in and direct to correct step
+        if (result.error.message.includes("already exists")) {
+          toast.info("Account exists. Logging you in...");
+
+          try {
+            // Attempt to sign in with provided credentials
+            const loginResult = await signIn.email({
+              email: formData.email.trim(),
+              password: formData.password,
+            });
+
+            if (loginResult.error) {
+              // Wrong password or other login error
+              await logSignup(email, false);
+              toast.error("Email already registered. Please use the correct password or use 'Forgot Password'.");
+              return;
+            }
+
+            // Successfully logged in - now check their completion status
+            toast.success("Logged in successfully!");
+
+            // Fetch user profile to determine which step they're on
+            const response = await fetch('/api/profiles/get', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: formData.email.trim() })
+            });
+
+            if (response.ok) {
+              const profileData = await response.json();
+
+              // Check email verification status
+              if (!loginResult.data?.user?.emailVerified) {
+                // Need to verify email
+                setUserId(loginResult.data?.user?.id || null);
+                setStep(2);
+                toast.info("Please verify your email to continue.");
+                return;
+              }
+
+              // Check if profile is complete
+              if (!profileData.profile || !profileData.profile.first_name) {
+                // Need to complete profile
+                setUserId(loginResult.data?.user?.id || null);
+                setStep(3);
+                toast.info("Please complete your profile.");
+                return;
+              }
+
+              // Profile complete - redirect to dashboard
+              navigate.push('/dashboard');
+              return;
+            } else {
+              // Profile doesn't exist yet - go to step 3
+              setUserId(loginResult.data?.user?.id || null);
+              setStep(3);
+              toast.info("Please complete your profile.");
+              return;
+            }
+
+          } catch (loginError) {
+            console.error("Auto-login error:", loginError);
+            await logSignup(email, false);
+            toast.error("Email already registered. Please login instead.");
+            return;
+          }
+        }
+
+        // Other errors
         await logSignup(email, false);
         await logError(`Account creation failed: ${result.error.message}`, undefined, {
           step: 'account_creation',
@@ -612,12 +684,7 @@ const SignUp = () => {
           error_code: result.error.message,
         });
 
-        let userMessage = "Failed to create account. Please try again.";
-        if (result.error.message.includes("already exists")) {
-          userMessage = "An account with this email already exists. Please login instead.";
-        }
-
-        toast.error(userMessage);
+        toast.error("Failed to create account. Please try again.");
         return;
       }
 
@@ -625,34 +692,19 @@ const SignUp = () => {
       setUserId(result.data?.user?.id || null);
       await logSignup(email, true, result.data?.user?.id);
 
-      // Move to email verification step first
+      // Move to email verification step
+      // Better Auth automatically sends the OTP email (sendVerificationOnSignUp: true)
       setStep(2);
-      toast.success("Account created! We'll send you a verification code shortly.");
+      setOtpSent(true); // Mark as sent since Better Auth handles it
+      otpSentRef.current = true;
+      setOtpReady(false); // OTP not ready yet
+      toast.success("Account created! Check your email for a verification code.");
 
-      // Send email verification OTP with delay to ensure user is fully created
-      if (!otpSent) {
-        setOtpSent(true);
-        setTimeout(async () => {
-          try {
-            const otpResult = await authClient.emailOtp.sendVerificationOtp({
-              email: email,
-              type: "email-verification"
-            });
-
-            if (otpResult.error) {
-              console.error('Failed to send verification OTP:', otpResult.error);
-              toast.error("Failed to send verification email. Please use the 'Resend Code' button.");
-              setOtpSent(false); // Reset flag on error
-            } else {
-              toast.success("Verification code sent! Please check your email for the 6-digit code.");
-            }
-          } catch (otpError) {
-            console.error('Error sending verification OTP:', otpError);
-            toast.error("Failed to send verification email. Please use the 'Resend Code' button.");
-            setOtpSent(false); // Reset flag on error
-          }
-        }, 2000); // 2 second delay to ensure user is fully created
-      }
+      // Add delay to ensure OTP is saved to database before allowing verification
+      setTimeout(() => {
+        setOtpReady(true);
+        console.log('✅ OTP ready for verification');
+      }, 2000); // 2 second delay for Better Auth to save OTP
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Unexpected error during signup";
@@ -668,6 +720,18 @@ const SignUp = () => {
 
   // Step 2: Handle email verification
   const handleEmailVerification = async (): Promise<void> => {
+    // Check if OTP is ready first (prevent race condition)
+    if (!otpReady) {
+      toast.info("Preparing verification code... Please try again in a moment.");
+      // Auto-retry after delay if code is entered
+      setTimeout(() => {
+        if (formData.emailOtpCode && formData.emailOtpCode.length === 6) {
+          handleEmailVerification();
+        }
+      }, 1000);
+      return;
+    }
+
     if (!formData.emailOtpCode || formData.emailOtpCode.length !== 6) {
       toast.error("Please enter the 6-digit verification code");
       return;
@@ -747,6 +811,8 @@ const SignUp = () => {
     try {
       setLoading(true);
       setOtpSent(false); // Reset the flag to allow new sends
+      otpSentRef.current = false; // Reset ref to allow resend
+      setOtpReady(false); // Mark as not ready while sending
 
       const result = await authClient.emailOtp.sendVerificationOtp({
         email: formData.email.trim(),
@@ -755,13 +821,21 @@ const SignUp = () => {
 
       if (result.error) {
         toast.error("Failed to resend verification code");
+        setOtpReady(true); // Reset on error
         return;
       }
 
       setOtpSent(true); // Mark as sent
+      otpSentRef.current = true; // Mark ref as sent
       toast.success("New 6-digit verification code sent! Please check your inbox.");
+
+      // Delay before allowing verification
+      setTimeout(() => {
+        setOtpReady(true);
+      }, 2000);
     } catch (err) {
       toast.error("Failed to resend verification code");
+      setOtpReady(true); // Reset on error
     } finally {
       setLoading(false);
     }
@@ -1140,7 +1214,7 @@ const SignUp = () => {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-cyan-500/5 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      <Card className="w-full max-w-lg p-8 relative z-10 backdrop-blur-xl border border-gray-800 shadow-2xl" style={{ backgroundColor: '#171717' }}>
+      <Card className="w-full max-w-lg p-8 relative z-10 backdrop-blur-xl border-0 shadow-2xl" style={{ backgroundColor: '#171717' }}>
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <div className="flex items-center gap-2 text-blue-400">
@@ -1403,7 +1477,7 @@ const SignUp = () => {
                   : "Tell us about yourself and your address"
                 }
               </p>
-              {new URLSearchParams(window.location.search).get('oauth') && (
+              {new URLSearchParams(window.location.search).get('oauth') && session?.user && (
                 <div className="mt-3 space-y-2">
                   <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-900/20 text-green-400 rounded-full text-sm border border-green-700">
                     <Check className="w-4 h-4" />
@@ -1753,27 +1827,27 @@ const SignUp = () => {
         {step === 5 && (
           <>
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold mb-2">Complete Your Membership</h1>
+              <h1 className="text-2xl font-bold mb-2 text-white">Complete Your Membership</h1>
               <p className="text-gray-400">Choose your payment plan to join the queue</p>
             </div>
 
             <div className="space-y-6">
-              <Card className="p-6 border-2 border-accent glow-blue">
+              <Card className="p-6 bg-gray-900 border-0 shadow-[0_20px_50px_rgba(75,_85,_99,_0.7)] hover:shadow-[0_25px_60px_rgba(75,_85,_99,_0.9)] transition-shadow duration-300">
                 <div className="text-center space-y-4">
                   <div>
-                    <p className="text-gray-400">Initial Payment</p>
+                    <p className="text-gray-300">Initial Payment</p>
                     <p className="text-4xl font-bold text-accent">$300</p>
-                    <p className="text-sm text-gray-400">Includes first month</p>
+                    <p className="text-sm text-gray-300">Includes first month</p>
                   </div>
-                  <div className="border-t pt-4">
-                    <p className="text-gray-400">Then Monthly</p>
+                  <div className="border-t border-gray-700 pt-4">
+                    <p className="text-gray-300">Then Monthly</p>
                     <p className="text-2xl font-semibold text-white">$25</p>
-                    <p className="text-sm text-gray-400">Starting month 2</p>
+                    <p className="text-sm text-gray-300">Starting month 2</p>
                   </div>
                 </div>
               </Card>
 
-              <div className="space-y-4 p-4 bg-gray-800/50 rounded-lg border">
+              <div className="space-y-4 p-4 bg-gray-900/50 rounded-lg border-0">
                 <h3 className="font-semibold text-white">What happens next:</h3>
                 <ul className="space-y-2 text-sm text-gray-400">
                   <li className="flex items-center gap-2">
@@ -1864,7 +1938,7 @@ const SignUp = () => {
             </Link>
           </p>
         ) : (
-          <div className="text-center mt-1.5">
+          <div className="text-center mt-6">
             <p className="text-xs text-gray-500 mb-2">
               Logged in as {session?.user?.email || formData.email}
             </p>

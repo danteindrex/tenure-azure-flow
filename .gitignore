@@ -31,3 +31,9 @@ out/
 *.sln
 *.sw?
 .vercel
+*/playwright-report/
+.cache/
+coverage/
+/playwright-report/
+/test-results/
+tests-results/

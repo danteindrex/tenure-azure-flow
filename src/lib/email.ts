@@ -26,12 +26,12 @@ class EmailService {
 
   constructor() {
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST!,
-      port: parseInt(process.env.SMTP_PORT!),
+      host: process.env.SMTP_HOST!.trim(), // Trim whitespace/newlines
+      port: parseInt(process.env.SMTP_PORT!.trim()),
       secure: process.env.SMTP_SECURE === 'true', // false for 587, true for 465
       auth: {
-        user: process.env.SMTP_USER!,
-        pass: process.env.SMTP_PASS!
+        user: process.env.SMTP_USER!.trim(),
+        pass: process.env.SMTP_PASS!.trim()
       },
       tls: {
         rejectUnauthorized: false
