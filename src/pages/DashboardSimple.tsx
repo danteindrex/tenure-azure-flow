@@ -39,174 +39,109 @@ const DashboardSimple = () => {
   useEffect(() => {
     const fetchQueueAndUsers = async () => {
       try {
-        // Total revenue from completed payments using normalized schema
-        // Temporarily disabled - TODO: Replace with Better Auth API calls
-        const payments = []
-        const paymentsError = null
-        if (!paymentsError && payments) {
-          const sum = payments.reduce((s, p: any) => s + (p.amount || 0), 0);
-          setTotalRevenue(sum);
+        // Fetch queue data and statistics from API
+        const [queueResponse, statsResponse] = await Promise.all([
+          fetch('/api/queue', { credentials: 'include' }),
+          fetch('/api/queue/statistics', { credentials: 'include' })
+        ]);
+
+        if (!queueResponse.ok || !statsResponse.ok) {
+          console.error('Failed to fetch queue data');
+          return;
         }
 
-        // Queue position: try to map current user -> membership_queue
-        let currentUserId: string | null = null;
-        if (user?.id) {
-          // Find user by auth_user_id in normalized users table
-          // Temporarily disabled - TODO: Replace with Better Auth API calls
-          const userData = null
-          const userError = null
-          if (!userError && userData?.id) {
-            currentUserId = userData.id;
-          }
+        const queueData = await queueResponse.json();
+        const statsData = await statsResponse.json();
+
+        if (!queueData.success || !statsData.success) {
+          console.error('API returned error');
+          return;
         }
 
-        // Fetch queue ordered by position using normalized schema
-        // Temporarily disabled - TODO: Replace with Better Auth API calls
-        const queue = []
-        const queueError = null
-      } catch (e) {
-        // console.error('Error in fetchQueueAndUsers:', e);
-      }
-    };
-    /*
-        const { data: queue, error: queueError } = await supabase
-          .from('membership_queue')
-          .select('user_id, queue_position, total_months_subscribed, subscription_active')
-          .order('queue_position', { ascending: true });
-        if (!queueError && queue) {
-          // Determine current user's position or fallback to first
-          let pos: number | null = null;
-          if (currentUserId) {
-            setCurrentUserIdState(currentUserId);
-            const mine = queue.find((q: any) => q.user_id === currentUserId);
-            if (mine) pos = mine.queue_position;
-            if (mine) {
-              // fetch current user's display name (email local-part) if available
-              let displayName = 'You';
-              try {
-                const { data: meData } = await supabase
-                  .from('users')
-                  .select('email')
-                  .eq('id', currentUserId)
-                  .maybeSingle();
-                if (meData?.email) displayName = meData.email.split('@')[0];
-              } catch (e) {
-                // ignore and fallback to 'You'
-              }
+        // Set total revenue from statistics
+        setTotalRevenue(statsData.data.totalRevenue || 0);
 
-              // populate current user entry (may not be in top preview)
-              setCurrentUserEntry({
-                rank: mine.queue_position,
-                name: displayName,
-                tenureMonths: mine.total_months_subscribed ?? 0,
-                status: mine.subscription_active ? 'Active' : 'Inactive',
-                isCurrentUser: true
-              });
-            } else {
-              setCurrentUserEntry(null);
+        // Find current user in queue
+        let currentUserId: string | null = user?.id || null;
+        const queue = queueData.data.queue || [];
+
+        if (currentUserId && queue.length > 0) {
+          setCurrentUserIdState(currentUserId);
+          const mine = queue.find((q: any) => q.user_id === currentUserId);
+
+          if (mine) {
+            setQueuePosition(mine.queue_position);
+
+            // Set current user entry
+            setCurrentUserEntry({
+              rank: mine.queue_position,
+              name: mine.user_name || 'You',
+              tenureMonths: mine.total_months_subscribed ?? 0,
+              status: mine.subscription_active ? 'Active' : 'Inactive',
+              isCurrentUser: true
+            });
+
+            // Set payment info from queue data
+            if (mine.last_payment_date) {
+              setPaymentAmount(mine.lifetime_payment_total || 0);
+              // Calculate days until next payment (30 days after last payment)
+              const lastPayment = new Date(mine.last_payment_date);
+              const nextPayment = new Date(lastPayment);
+              nextPayment.setDate(lastPayment.getDate() + 30);
+              const diff = Math.ceil((nextPayment.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+              setDaysUntilPayment(Math.max(diff, 0));
             }
-          }
-          setQueuePosition(pos ?? (queue[0]?.queue_position ?? null));
-
-          // Build top queue preview with user names
-          const userIds = queue.slice(0, 5).map((q: any) => q.user_id);
-          const { data: users } = await supabase
-            .from('users')
-            .select('id, email')
-            .in('id', userIds);
-
-          const preview = queue.slice(0, 5).map((q: any) => {
-            // display raw user_id to match membership_queue entries
-            return {
-              rank: q.queue_position,
-              userId: q.user_id,
-              name: q.user_id, // kept for backward compat with existing JSX (member.name), but set to user_id
-              tenureMonths: q.total_months_subscribed ?? 0,
-              status: q.subscription_active ? 'Active' : 'Inactive',
-              isCurrentUser: currentUserId ? q.user_id === currentUserId : false,
-            };
-          }).sort((a, b) => a.rank - b.rank);
-          setTopQueue(preview);
-        }
-
-        // Payment amount and days until payment for current user (BR-2 monthly cycle best-effort)
-        if (user?.id && currentUserId) {
-          const { data: myPayments } = await supabase
-            .from('user_payments')
-            .select('amount, payment_date, status')
-            .eq('user_id', currentUserId)
-            .eq('status', 'succeeded')
-            .order('payment_date', { ascending: false })
-            .limit(1);
-          if (myPayments && myPayments.length > 0) {
-            setPaymentAmount(myPayments[0].amount || 0);
-            // Assume monthly cycle; compute days until 30 days after last payment
-            const last = new Date(myPayments[0].payment_date || new Date());
-            const next = new Date(last);
-            next.setDate(last.getDate() + 30);
-            const diff = Math.ceil((next.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-            setDaysUntilPayment(Math.max(diff, 0));
           } else {
-            setPaymentAmount(0);
-            setDaysUntilPayment(0);
+            setCurrentUserEntry(null);
+            setQueuePosition(null);
           }
-        } else {
-          setPaymentAmount(0);
-          setDaysUntilPayment(0);
         }
 
-        // BR-3: Payout trigger 12 months after launch AND fund >= 100k
+        // Build top 5 queue preview
+        const preview = queue.slice(0, 5).map((q: any) => ({
+          rank: q.queue_position,
+          name: q.user_name || `Member ${q.queue_position}`,
+          tenureMonths: q.total_months_subscribed ?? 0,
+          status: q.subscription_active ? 'Active' : 'Inactive',
+          isCurrentUser: currentUserId ? q.user_id === currentUserId : false,
+        }));
+        setTopQueue(preview);
+
+        // Calculate days until draw
         const launch = BUSINESS_LAUNCH_DATE ? new Date(BUSINESS_LAUNCH_DATE) : null;
         if (launch) {
           const twelveMonths = new Date(launch);
           twelveMonths.setMonth(twelveMonths.getMonth() + 12);
-          // If at 12 months fund < 100k, continue until threshold is reached
-          const threshold = PRIZE_PER_WINNER; // 100k
+          const threshold = PRIZE_PER_WINNER;
+
           if (Date.now() < twelveMonths.getTime()) {
             const d = Math.ceil((twelveMonths.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
             setDaysUntilDraw(Math.max(d, 0));
-          } else if (totalRevenue < threshold) {
-            // Time-based condition satisfied, but threshold not met; indicate 0 days but show progress in UI
+          } else if (statsData.data.totalRevenue < threshold) {
             setDaysUntilDraw(0);
           } else {
-            // Trigger can occur immediately
             setDaysUntilDraw(0);
           }
         } else {
-          // Fallback to mid-month draw cadence if launch date missing
           setDaysUntilDraw(computeDaysUntilNextDraw());
         }
-      } catch {
-        // Leave defaults on error
+
+      } catch (e) {
+        console.error('Error in fetchQueueAndUsers:', e);
       }
     };
 
     // Initial fetch
-    fetchQueueAndUsers();
-
-    // Subscribe to realtime changes in membership_queue to update the UI live
-    try {
-      if ((supabase as any)?.channel) {
-        channel = (supabase as any)
-          .channel('public:membership_queue')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'membership_queue' }, payload => {
-            // Re-fetch the preview and current user entry when changes happen
-            fetchQueueAndUsers();
-          })
-          .subscribe();
-      } else if ((supabase as any)?.from) {
-        // older client real-time API
-        (supabase as any)
-          .from('membership_queue')
-          .on('*', () => fetchQueueAndUsers())
-          .subscribe();
-      }
-    } catch (e) {
-      // If realtime isn't available or subscription failed, fallback to polling
-      console.warn('Realtime subscription failed, falling back to polling:', e);
-      pollRef.current = window.setInterval(() => fetchQueueAndUsers(), 5000);
+    if (user?.id) {
+      fetchQueueAndUsers();
     }
-    */
+
+    // Poll for updates every 30 seconds
+    pollRef.current = window.setInterval(() => {
+      if (user?.id) {
+        fetchQueueAndUsers();
+      }
+    }, 30000);
 
     return () => {
       // cleanup polling
