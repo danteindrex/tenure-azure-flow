@@ -62,7 +62,7 @@ const DashboardSimple = () => {
         setTotalRevenue(statsData.data.totalRevenue || 0);
 
         // Find current user in queue
-        let currentUserId: string | null = user?.id || null;
+        const currentUserId: string | null = user?.id || null;
         const queue = queueData.data.queue || [];
 
         if (currentUserId && queue.length > 0) {

@@ -1883,7 +1883,7 @@ const SignUp = () => {
                 <Button
                   onClick={handlePayment}
                   disabled={loading}
-                  className="w-full bg-accent text-background hover:glow-blue-lg"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200"
                   size="lg"
                 >
                   {loading ? (
