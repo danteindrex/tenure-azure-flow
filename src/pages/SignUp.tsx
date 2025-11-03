@@ -1705,7 +1705,6 @@ const SignUp = () => {
                 onClick={handleStep3Submit}
                 disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
                 className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
-                size="lg"
               >
                 {loading ? (
                   <>
