@@ -774,10 +774,10 @@ const SignUp = () => {
 
         // Other errors
         await logSignup(email, false);
-        await logError(`Account creation failed: ${result.error.message}`, undefined, {
+        await logError(`Account creation failed: ${result.error.message || result.error.code || 'Unknown error'}`, undefined, {
           step: 'account_creation',
           email: email,
-          error_code: result.error.message,
+          error_code: result.error.message || result.error.code || 'unknown',
         });
 
         toast.error("Failed to create account. Please try again.");
@@ -863,7 +863,7 @@ const SignUp = () => {
         } else if (result.error.code === 'TOO_MANY_ATTEMPTS') {
           toast.error("Too many failed attempts. Please request a new verification code.");
         } else {
-          toast.error(`Verification failed: ${result.error.message}`);
+          toast.error(`Verification failed: ${result.error.message || result.error.code || 'Please try again'}`);
         }
         return;
       }

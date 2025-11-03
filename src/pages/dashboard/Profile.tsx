@@ -129,7 +129,7 @@ const Profile = () => {
       });
 
       if (result.error) {
-        throw new Error(result.error.message);
+        throw new Error(result.error.message || result.error.code || 'Failed to update profile');
       }
 
       // Log profile update
@@ -152,7 +152,8 @@ const Profile = () => {
       setIsEditing(false);
     } catch (error) {
       console.error('Error saving profile:', error);
-      await logError(`Error saving profile: ${error.message}`, user.id);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      await logError(`Error saving profile: ${errorMessage}`, user.id);
       toast.error("Failed to update profile");
     } finally {
       setSaving(false);
