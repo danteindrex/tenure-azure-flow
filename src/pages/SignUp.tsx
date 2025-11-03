@@ -1977,29 +1977,29 @@ const SignUp = () => {
         {step === 5 && (
           <>
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold mb-2 text-white">Complete Your Membership</h1>
-              <p className="text-gray-400">Choose your payment plan to join the queue</p>
+              <h1 className="text-2xl font-bold mb-2 text-foreground">Complete Your Membership</h1>
+              <p className="text-muted-foreground">Choose your payment plan to join the queue</p>
             </div>
 
             <div className="space-y-6">
-              <Card className="p-6 bg-gray-900 border-0 shadow-[0_20px_50px_rgba(75,_85,_99,_0.7)] hover:shadow-[0_25px_60px_rgba(75,_85,_99,_0.9)] transition-shadow duration-300">
+              <Card className="p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg dark:shadow-[0_20px_50px_rgba(75,_85,_99,_0.7)] hover:shadow-xl dark:hover:shadow-[0_25px_60px_rgba(75,_85,_99,_0.9)] transition-shadow duration-300">
                 <div className="text-center space-y-4">
                   <div>
-                    <p className="text-gray-300">Initial Payment</p>
+                    <p className="text-muted-foreground">Initial Payment</p>
                     <p className="text-4xl font-bold text-accent">$300</p>
-                    <p className="text-sm text-gray-300">Includes first month</p>
+                    <p className="text-sm text-muted-foreground">Includes first month</p>
                   </div>
-                  <div className="border-t border-gray-700 pt-4">
-                    <p className="text-gray-300">Then Monthly</p>
-                    <p className="text-2xl font-semibold text-white">$25</p>
-                    <p className="text-sm text-gray-300">Starting month 2</p>
+                  <div className="border-t border-border pt-4">
+                    <p className="text-muted-foreground">Then Monthly</p>
+                    <p className="text-2xl font-semibold text-foreground">$25</p>
+                    <p className="text-sm text-muted-foreground">Starting month 2</p>
                   </div>
                 </div>
               </Card>
 
-              <div className="space-y-4 p-4 bg-gray-900/50 rounded-lg border-0">
-                <h3 className="font-semibold text-white">What happens next:</h3>
-                <ul className="space-y-2 text-sm text-gray-400">
+              <div className="space-y-4 p-4 bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                <h3 className="font-semibold text-foreground">What happens next:</h3>
+                <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-accent" />
                     You'll be redirected to our secure payment processor
@@ -2024,7 +2024,7 @@ const SignUp = () => {
                   type="button"
                   variant="outline"
                   onClick={() => setStep(4)}
-                  className="w-full border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
+                  className="w-full"
                   disabled={loading}
                 >
                   <ChevronLeft className="mr-2 h-4 w-4" />
@@ -2034,7 +2034,6 @@ const SignUp = () => {
                   onClick={handlePayment}
                   disabled={loading}
                   className="w-full bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transition-all duration-200"
-                  size="lg"
                 >
                   {loading ? (
                     <>
