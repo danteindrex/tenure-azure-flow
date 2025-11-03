@@ -705,7 +705,7 @@ const SignUp = () => {
         console.error("Account creation error:", result.error);
 
         // If account already exists, try to log them in and direct to correct step
-        if (result.error.message.includes("already exists")) {
+        if (result.error.message && result.error.message.includes("already exists")) {
           toast.info("Account exists. Logging you in...");
 
           try {
