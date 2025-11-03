@@ -52,9 +52,27 @@ const Login = () => {
     return <span className={colorClass}>*</span>;
   };
 
-  // Log page visit
+  // Log page visit and handle URL parameters
   useEffect(() => {
     logPageVisit('/login');
+
+    // Check for URL parameters (from signup redirect)
+    const urlParams = new URLSearchParams(window.location.search);
+    const emailParam = urlParams.get('email');
+    const messageParam = urlParams.get('message');
+    const verifiedParam = urlParams.get('verified');
+
+    // Pre-fill email if provided
+    if (emailParam) {
+      setEmail(decodeURIComponent(emailParam));
+    }
+
+    // Show message if provided
+    if (messageParam) {
+      toast.success(decodeURIComponent(messageParam), { duration: 5000 });
+    } else if (verifiedParam === 'true') {
+      toast.success('Email verified! Please login to continue.', { duration: 5000 });
+    }
   }, []);
 
   // Toggle between light and dark theme
@@ -106,9 +124,19 @@ const Login = () => {
 
       // Log successful login
       await logLogin(email.trim(), true, data?.user?.id);
-      
-      toast.success("Logged in successfully");
-      router.replace("/auth/callback");
+
+      // Check if user was redirected from signup flow
+      const urlParams = new URLSearchParams(window.location.search);
+      const stepParam = urlParams.get('step');
+
+      if (stepParam === '3') {
+        // User was in the middle of signup - redirect back to signup at step 3
+        toast.success("Logged in! Continuing your signup...");
+        router.replace("/signup?step=3");
+      } else {
+        toast.success("Logged in successfully");
+        router.replace("/auth/callback");
+      }
     } catch (err: any) {
       toast.error(err?.message ?? "Invalid email or password");
     } finally {

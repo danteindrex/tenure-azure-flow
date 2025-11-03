@@ -605,6 +605,13 @@ const SignUp = () => {
 
     // Auto-submit when 6 digits are entered
     if (cleanValue.length === 6 && !loading && !autoSubmitting) {
+      // For email OTP, check if OTP is ready before auto-submitting
+      if (field === 'emailOtpCode' && step === 2 && !otpReady) {
+        console.log('⏳ OTP not ready yet, waiting...');
+        toast.info("Preparing verification code... Please wait a moment.");
+        return;
+      }
+
       setAutoSubmitting(true);
       setTimeout(() => {
         if (field === 'emailOtpCode' && step === 2) {
@@ -879,6 +886,26 @@ const SignUp = () => {
       await refetchSession();
       console.log('✅ Session refetched twice for reliability');
 
+      // Verify session is actually available - if not, redirect to login
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const verifySessionResponse = await fetch('/api/auth/session', {
+        method: 'GET',
+        credentials: 'include'
+      });
+      const sessionCheck = await verifySessionResponse.json();
+
+      if (!sessionCheck || !sessionCheck.user) {
+        console.error('❌ Session still not available after email verification');
+        toast.warning("Email verified! Redirecting you to login...", { duration: 5000 });
+
+        // Wait 2 seconds then redirect to login with email pre-filled
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        window.location.href = `/login?email=${encodeURIComponent(formData.email.trim())}&verified=true&message=${encodeURIComponent('Email verified! Please login to continue.')}`;
+        return;
+      }
+
+      console.log('✅ Session confirmed available:', sessionCheck.user.id);
+
       // Update progress in database
       const progressResponse = await fetch('/api/onboarding/update-progress', {
         method: 'POST',
@@ -893,6 +920,16 @@ const SignUp = () => {
         console.error('Failed to update progress:', progressResponse.status, progressResponse.statusText);
         const errorData = await progressResponse.json().catch(() => ({}));
         console.error('Progress update error:', errorData);
+
+        // If still getting 401, redirect to login
+        if (progressResponse.status === 401) {
+          console.error('❌ Still not authenticated - redirecting to login');
+          toast.warning("Please login to continue your signup.", { duration: 5000 });
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          window.location.href = `/login?email=${encodeURIComponent(formData.email.trim())}&verified=true&step=3`;
+          return;
+        }
+
         // Don't fail the verification, just log the error
         toast.warning("Email verified, but failed to update progress. Please continue.");
       } else {

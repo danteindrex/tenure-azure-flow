@@ -36,7 +36,9 @@ export const auth = betterAuth({
   // Email & Password authentication
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
+    // NOTE: Don't use requireEmailVerification here - it conflicts with emailOTP plugin
+    // The emailOTP plugin with overrideDefaultEmailVerification handles all verification
+    autoSignInAfterVerification: true, // CRITICAL: Auto sign-in after email OTP verification
   },
 
   // Social authentication providers
