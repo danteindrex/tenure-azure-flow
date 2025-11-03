@@ -139,7 +139,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ backgroundColor: '#000000' }}>
       {/* Theme Toggle Button */}
       <Button
         variant="ghost"
