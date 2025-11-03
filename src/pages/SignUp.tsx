@@ -1639,12 +1639,12 @@ const SignUp = () => {
 
             <div className="space-y-4">
               {/* Personal Information Section */}
-              <div className="space-y-4 p-4 bg-gray-800/30 rounded-lg border border-gray-700">
-                <h3 className="font-semibold text-white">Personal Information</h3>
+              <div className="space-y-4 p-4 bg-white dark:bg-gray-800/30 rounded-lg border border-gray-200 dark:border-gray-700">
+                <h3 className="font-semibold text-foreground">Personal Information</h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName" className="text-gray-200">
+                    <Label htmlFor="firstName" className="text-foreground">
                       First Name <ValidationAsterisk isValid={fieldValidation.firstName.isValid} touched={fieldValidation.firstName.touched} />
                     </Label>
                     <Input
@@ -1652,24 +1652,24 @@ const SignUp = () => {
                       placeholder="John"
                       value={formData.firstName}
                       onChange={(e) => handleInputChange("firstName", e.target.value)}
-                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                      className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
                       required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="middleName" className="text-gray-200">Middle Name</Label>
+                    <Label htmlFor="middleName" className="text-foreground">Middle Name</Label>
                     <Input
                       id="middleName"
                       placeholder="Michael"
                       value={formData.middleName}
                       onChange={(e) => handleInputChange("middleName", e.target.value)}
-                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                      className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="lastName" className="text-gray-200">
+                    <Label htmlFor="lastName" className="text-foreground">
                       Last Name <ValidationAsterisk isValid={fieldValidation.lastName.isValid} touched={fieldValidation.lastName.touched} />
                     </Label>
                     <Input
@@ -1677,14 +1677,14 @@ const SignUp = () => {
                       placeholder="Doe"
                       value={formData.lastName}
                       onChange={(e) => handleInputChange("lastName", e.target.value)}
-                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                      className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
                       required
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="dateOfBirth" className="text-gray-200">
+                  <Label htmlFor="dateOfBirth" className="text-foreground">
                     Date of Birth <ValidationAsterisk isValid={fieldValidation.dateOfBirth.isValid} touched={fieldValidation.dateOfBirth.touched} />
                   </Label>
                   <Input
@@ -1692,7 +1692,7 @@ const SignUp = () => {
                     type="date"
                     value={formData.dateOfBirth}
                     onChange={(e) => handleDateOfBirthChange(e.target.value)}
-                    className={`bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${dateValidation && !dateValidation.isValid
+                    className={`bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors ${dateValidation && !dateValidation.isValid
                       ? 'border-red-500 focus:border-red-500'
                       : dateValidation && dateValidation.isValid
                         ? 'border-green-500 focus:border-green-500'
@@ -1709,7 +1709,7 @@ const SignUp = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phoneNumber" className="text-gray-200">
+                  <Label htmlFor="phoneNumber" className="text-foreground">
                     Phone Number <ValidationAsterisk isValid={fieldValidation.phoneNumber.isValid} touched={fieldValidation.phoneNumber.touched} />
                   </Label>
                   <div className="flex gap-2">
@@ -1727,7 +1727,7 @@ const SignUp = () => {
                         }
                       }}
                     >
-                      <SelectTrigger className="w-24 bg-gray-800/50 border-gray-700 focus:border-blue-500">
+                      <SelectTrigger className="w-24 bg-input border-border focus:border-accent">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1744,23 +1744,23 @@ const SignUp = () => {
                       placeholder={formData.phoneCountryCode === '+256' ? '745315809' : 'Enter phone number'}
                       value={formData.phoneNumber}
                       onChange={(e) => handlePhoneInputChange(e.target.value)}
-                      className="flex-1 bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                      className="flex-1 bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
                       maxLength={20}
                       required
                     />
                   </div>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-muted-foreground">
                     We'll send you a verification code to confirm your number
                   </p>
                 </div>
               </div>
 
               {/* Address Information Section */}
-              <div className="space-y-4 p-4 bg-gray-800/30 rounded-lg border border-gray-700">
-                <h3 className="font-semibold text-white">Address Information</h3>
+              <div className="space-y-4 p-4 bg-white dark:bg-gray-800/30 rounded-lg border border-gray-200 dark:border-gray-700">
+                <h3 className="font-semibold text-foreground">Address Information</h3>
 
                 <div className="space-y-2">
-                  <Label htmlFor="streetAddress" className="text-gray-200">
+                  <Label htmlFor="streetAddress" className="text-foreground">
                     Street Address <ValidationAsterisk isValid={fieldValidation.streetAddress.isValid} touched={fieldValidation.streetAddress.touched} />
                   </Label>
                   <Input
@@ -1768,25 +1768,25 @@ const SignUp = () => {
                     placeholder="123 Main St"
                     value={formData.streetAddress}
                     onChange={(e) => handleInputChange("streetAddress", e.target.value)}
-                    className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                    className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="addressLine2" className="text-gray-200">Address Line 2 (Optional)</Label>
+                  <Label htmlFor="addressLine2" className="text-foreground">Address Line 2 (Optional)</Label>
                   <Input
                     id="addressLine2"
                     placeholder="Apt, Suite, Unit, etc."
                     value={formData.addressLine2}
                     onChange={(e) => handleInputChange("addressLine2", e.target.value)}
-                    className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                    className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="city" className="text-gray-200">
+                    <Label htmlFor="city" className="text-foreground">
                       City <ValidationAsterisk isValid={fieldValidation.city.isValid} touched={fieldValidation.city.touched} />
                     </Label>
                     <Input
@@ -1794,18 +1794,18 @@ const SignUp = () => {
                       placeholder="New York"
                       value={formData.city}
                       onChange={(e) => handleInputChange("city", e.target.value)}
-                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                      className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
                       required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="state" className="text-gray-200">State <span className="text-gray-500">*</span></Label>
+                    <Label htmlFor="state" className="text-foreground">State <span className="text-muted-foreground">*</span></Label>
                     <Select
                       value={formData.state}
                       onValueChange={(value) => handleInputChange("state", value)}
                     >
-                      <SelectTrigger className="bg-gray-800/50 border-gray-700 focus:border-blue-500">
+                      <SelectTrigger className="bg-input border-border focus:border-accent">
                         <SelectValue placeholder="Select state" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1819,7 +1819,7 @@ const SignUp = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="zipCode" className="text-gray-200">
+                    <Label htmlFor="zipCode" className="text-foreground">
                       ZIP Code <ValidationAsterisk isValid={fieldValidation.zipCode.isValid} touched={fieldValidation.zipCode.touched} />
                     </Label>
                     <Input
@@ -1827,7 +1827,7 @@ const SignUp = () => {
                       placeholder="10001"
                       value={formData.zipCode}
                       onChange={(e) => handleInputChange("zipCode", e.target.value)}
-                      className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                      className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
                       required
                     />
                   </div>
@@ -1839,7 +1839,7 @@ const SignUp = () => {
               <Button
                 variant="outline"
                 onClick={() => setStep(2)}
-                className="px-8 py-2 border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
+                className="px-8 py-2"
                 disabled={loading}
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
