@@ -67,6 +67,8 @@ const SignUp = () => {
   const [otpSent, setOtpSent] = useState(false);
   const otpSentRef = useRef(false); // Additional protection against re-renders
   const [otpReady, setOtpReady] = useState(true); // Track if OTP is ready for verification
+  const [waitingForPayment, setWaitingForPayment] = useState(false); // Track if waiting for Stripe webhook
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Field validation states
   const [fieldValidation, setFieldValidation] = useState({
@@ -157,9 +159,101 @@ const SignUp = () => {
       });
     }
 
+    // If returning from Stripe payment (session_id in URL), start polling for webhook completion
+    if (sessionIdParam && session?.user && !isPending) {
+      console.log('🔄 Detected return from Stripe, waiting for webhook to process payment...');
+      setWaitingForPayment(true);
+      setIsLoadingStep(true);
+
+      let pollAttempts = 0;
+      const maxPollAttempts = 30; // Poll for up to 60 seconds (30 attempts * 2 seconds)
+
+      const pollPaymentStatus = async () => {
+        pollAttempts++;
+        console.log(`📊 Polling payment status (attempt ${pollAttempts}/${maxPollAttempts})...`);
+
+        try {
+          const response = await fetch('/api/onboarding/status', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
+
+          const data = await response.json();
+
+          if (data.success && data.status) {
+            if (data.status.canAccessDashboard) {
+              // Payment processed! Webhook completed successfully
+              console.log('✅ Payment confirmed by webhook! Redirecting to dashboard...');
+
+              // Clean up polling
+              if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current);
+                pollingIntervalRef.current = null;
+              }
+
+              setWaitingForPayment(false);
+              setIsLoadingStep(false);
+
+              // Remove session_id from URL and redirect to dashboard
+              window.history.replaceState(null, '', '/dashboard');
+              navigate.push('/dashboard');
+              return;
+            }
+          }
+
+          // Check if we've exceeded max attempts
+          if (pollAttempts >= maxPollAttempts) {
+            console.warn('⚠️ Payment verification timeout - webhook may be delayed');
+
+            // Clean up polling
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
+
+            setWaitingForPayment(false);
+            setIsLoadingStep(false);
+
+            toast.error('Payment verification is taking longer than expected. Please refresh the page or contact support if this persists.');
+          }
+        } catch (error) {
+          console.error('❌ Error polling payment status:', error);
+
+          if (pollAttempts >= maxPollAttempts) {
+            // Clean up polling on error after max attempts
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
+
+            setWaitingForPayment(false);
+            setIsLoadingStep(false);
+            toast.error('Unable to verify payment status. Please refresh the page.');
+          }
+        }
+      };
+
+      // Start polling immediately
+      pollPaymentStatus();
+
+      // Then poll every 2 seconds
+      pollingIntervalRef.current = setInterval(pollPaymentStatus, 2000);
+
+      // Cleanup on unmount
+      return () => {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      };
+    }
     // If user is authenticated, check their database state to determine correct step
     // Skip the check if coming from Stripe (session_id in URL) or if bypassed
-    if (session?.user && !isPending && !bypassed && !sessionIdParam) {
+    else if (session?.user && !isPending && !bypassed && !sessionIdParam) {
       setIsLoadingStep(true);
 
       // Add small delay to ensure webhook has processed (if just completed payment)
@@ -1270,8 +1364,31 @@ const SignUp = () => {
           ))}
         </div>
 
+        {/* Payment Verification Loading State */}
+        {waitingForPayment && (
+          <div className="text-center space-y-6">
+            <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto">
+              <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-bold text-foreground">Verifying Your Payment</h1>
+              <p className="text-muted-foreground">
+                Please wait while we confirm your payment with Stripe...
+              </p>
+              <p className="text-sm text-muted-foreground">
+                This usually takes just a few seconds
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '200ms' }} />
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '400ms' }} />
+            </div>
+          </div>
+        )}
+
         {/* Step 1: Email + Password */}
-        {step === 1 && (
+        {!waitingForPayment && step === 1 && (
           <>
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold mb-2 text-foreground">Create Your Account</h1>
@@ -1392,7 +1509,7 @@ const SignUp = () => {
         )}
 
         {/* Step 2: Email OTP Verification */}
-        {step === 2 && (
+        {!waitingForPayment && step === 2 && (
           <>
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">

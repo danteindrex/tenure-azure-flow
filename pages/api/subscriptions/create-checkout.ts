@@ -49,8 +49,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
       body: JSON.stringify({
         userId: userData.id, // Using normalized user ID
-        successUrl: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/signup?canceled=true`,
+        successUrl: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/signup?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/signup?step=5&canceled=true`,
       }),
     });
 
