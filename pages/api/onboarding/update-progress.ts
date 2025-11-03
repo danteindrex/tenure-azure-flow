@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Update or create phone contact record as verified
         const { phone } = data;
         if (phone) {
-          // First, check if phone contact exists
+          // First, check if phone contact exists for this user
           const existingContact = await db
             .select()
             .from(userContacts)
@@ -66,6 +66,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               })
               .where(eq(userContacts.id, existingContact.id));
           } else {
+            // Check if this phone number already exists for a different user
+            const phoneConflict = await db
+              .select()
+              .from(userContacts)
+              .where(
+                and(
+                  eq(userContacts.contactType, 'phone'),
+                  eq(userContacts.contactValue, phone)
+                )
+              )
+              .limit(1)
+              .then(rows => rows[0]);
+
+            if (phoneConflict) {
+              return res.status(409).json({
+                error: 'Phone number already registered',
+                message: 'This phone number is already associated with another account'
+              });
+            }
+
             // Create new verified phone contact
             await db
               .insert(userContacts)

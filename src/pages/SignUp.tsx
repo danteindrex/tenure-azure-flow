@@ -17,7 +17,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 
 const SignUp = () => {
   const navigate = useRouter();
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending, refetch: refetchSession } = useSession();
   const { theme, setTheme, actualTheme } = useTheme();
 
   // Initialize step from URL parameter to prevent flashing
@@ -854,7 +854,7 @@ const SignUp = () => {
       console.log('🔍 Error details:', JSON.stringify(result.error, null, 2));
 
       if (result.error) {
-        
+
         // Handle specific error cases
         if (result.error.code === 'INVALID_OTP') {
           toast.error("Invalid or expired verification code. Please check your email or request a new code.");
@@ -868,7 +868,10 @@ const SignUp = () => {
         return;
       }
 
-
+      // CRITICAL: Refetch session after email verification to get authenticated session
+      console.log('🔄 Refetching session after email verification...');
+      await refetchSession();
+      console.log('✅ Session refetched');
 
       // Update progress in database
       const progressResponse = await fetch('/api/onboarding/update-progress', {
