@@ -251,14 +251,14 @@ const Dashboard = () => {
         } else if (memberPaymentStatus.hasJoiningFee) {
           activities.push({
             title: "✅ Active Membership",
-            message: `Your tenure is being tracked. Total paid: $${memberPaymentStatus.totalPaid}. Monthly payments: ${memberPaymentStatus.monthlyPaymentCount}.`,
+            message: `Your Home Solutions membership is being tracked. Total paid: $${memberPaymentStatus.totalPaid}. Monthly payments: ${memberPaymentStatus.monthlyPaymentCount}.`,
             timestamp: "Active",
             type: "success"
           });
         } else {
           activities.push({
             title: "🚀 Complete Your Registration",
-            message: `Pay your $${BUSINESS_RULES.JOINING_FEE} joining fee to activate your membership and start tenure tracking.`,
+            message: `Pay your $${BUSINESS_RULES.JOINING_FEE} joining fee to activate your membership and start Home Solutions tracking.`,
             timestamp: "Pending",
             type: "warning"
           });
@@ -271,7 +271,7 @@ const Dashboard = () => {
                                 userInfo.queuePosition === 3 ? 'rd' : 'th';
           activities.push({
             title: `🏆 Queue Position: ${userInfo.queuePosition}${positionSuffix}`,
-            message: `You are currently ${userInfo.queuePosition}${positionSuffix} in line for payout based on your continuous tenure.`,
+            message: `You are currently ${userInfo.queuePosition}${positionSuffix} in line for payout based on your continuous Home Solutions membership.`,
             timestamp: "Current",
             type: "info"
           });
@@ -396,11 +396,11 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Left Column - 2/3 */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-            {/* Tenure Queue - Moved to top */}
+            {/* Home Solutions Queue - Moved to top */}
             <Card className="glass-card p-3 sm:p-6">
               <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2">
                 <Users className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
-                Tenure Queue
+                Home Solutions Queue
               </h2>
               <div className="overflow-x-auto" ref={queueCounter.ref}>
                 <table className="w-full min-w-[400px]">
@@ -408,7 +408,7 @@ const Dashboard = () => {
                     <tr className="text-left text-xs sm:text-sm text-muted-foreground">
                       <th className="pb-2 sm:pb-3 pr-2">Rank</th>
                       <th className="pb-2 sm:pb-3 pr-2">Member</th>
-                      <th className="pb-2 sm:pb-3 pr-2">Tenure</th>
+                      <th className="pb-2 sm:pb-3 pr-2">Home Solutions</th>
                       <th className="pb-2 sm:pb-3 text-right">Status</th>
                     </tr>
                   </thead>
@@ -445,10 +445,10 @@ const Dashboard = () => {
                 <div className="space-y-1 sm:space-y-2">
                   <p className="text-xs sm:text-sm text-green-300 font-medium flex items-center gap-1 sm:gap-2">
                     <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                    Tenure Start Date
+                    Home Solutions Start Date
                   </p>
                   <p className="text-base sm:text-lg font-bold text-white">{userData.tenureStart}</p>
-                  <p className="text-xs text-green-400 hidden sm:block">Tenure is calculated to the millisecond.</p>
+                  <p className="text-xs text-green-400 hidden sm:block">Home Solutions membership is calculated to the millisecond.</p>
                 </div>
               </Card>
 
@@ -467,7 +467,7 @@ const Dashboard = () => {
                   <p className={`text-xs ${userData.subscriptionActive ? 'text-red-400' : 'text-orange-400'}`}>
                     {userData.subscriptionActive 
                       ? `Defaulting means instant loss of rank! ($${BUSINESS_RULES.MONTHLY_FEE}.00)`
-                      : `Required to start tenure tracking ($${BUSINESS_RULES.JOINING_FEE}.00)`
+                      : `Required to start Home Solutions tracking ($${BUSINESS_RULES.JOINING_FEE}.00)`
                     }
                   </p>
                 </div>
