@@ -18,16 +18,16 @@ All colors MUST be HSL.
     --popover: 0 0% 98%;
     --popover-foreground: 210 100% 6%;
 
-    --primary: 199 100% 36%;  /* #0077b6 Ocean Blue */
+    --primary: 191 100% 42%;  /* #00b3d6 Ocean Blue */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 190 100% 42%;  /* #00b4d8 Light Cyan */
+    --secondary: 191 100% 42%;  /* #00b3d6 Light Cyan */
     --secondary-foreground: 0 0% 100%;
 
     --muted: 215 20% 50%;  /* #94a3b8 Slate */
     --muted-foreground: 215 20% 58%;
 
-    --accent: 190 100% 42%;  /* #00b4d8 Light Cyan */
+    --accent: 191 100% 42%;  /* #00b3d6 Light Cyan */
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;  /* #ef4444 Error Red */
@@ -86,7 +86,7 @@ All colors MUST be HSL.
     --popover: 0 0% 12%;         /* #1f1f1f */
     --popover-foreground: 0 0% 100%; /* #ffffff White Text */
 
-    --primary: 190 100% 42%;     /* #00bcd4 Cyan - Keep accent color */
+    --primary: 191 100% 42%;     /* #00b3d6 Cyan - Updated accent color */
     --primary-foreground: 0 0% 100%; /* #ffffff White Text */
 
     --secondary: 0 0% 15%;       /* #262626 Dark Gray */
@@ -95,7 +95,7 @@ All colors MUST be HSL.
     --muted: 0 0% 20%;           /* #333333 Muted Background */
     --muted-foreground: 0 0% 70%; /* #b3b3b3 Muted Text */
 
-    --accent: 190 100% 42%;      /* #00bcd4 Cyan - Keep accent color */
+    --accent: 191 100% 42%;      /* #00b3d6 Cyan - Updated accent color */
     --accent-foreground: 0 0% 100%; /* #ffffff White Text */
 
     --destructive: 0 84% 60%;    /* #ef4444 Red - Keep destructive color */

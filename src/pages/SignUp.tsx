@@ -1307,7 +1307,7 @@ const SignUp = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ backgroundColor: '#000000' }}>
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
       {/* Theme Toggle Button */}
       <Button
         variant="ghost"
@@ -1588,7 +1588,7 @@ const SignUp = () => {
                 <Button
                   type="submit"
                   disabled={loading || autoSubmitting || !formData.emailOtpCode || formData.emailOtpCode.length !== 6}
-                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transition-all duration-200 px-8 py-2"
                   size="lg"
                 >
                   {loading || autoSubmitting ? (
@@ -1626,7 +1626,7 @@ const SignUp = () => {
                     Email verified via Google
                   </div>
                   {(formData.firstName || formData.lastName) && (
-                    <p className="text-xs text-blue-400">
+                    <p className="text-xs text-accent">
                       ✓ Name pre-filled from Google (you can edit if needed)
                     </p>
                   )}
@@ -1846,7 +1846,7 @@ const SignUp = () => {
               <Button
                 onClick={handleStep3Submit}
                 disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
-                className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
+                className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transition-all duration-200 px-8 py-2"
               >
                 {loading ? (
                   <>
@@ -1944,7 +1944,7 @@ const SignUp = () => {
                 <Button
                   type="submit"
                   disabled={loading || autoSubmitting || !formData.phoneOtpCode || formData.phoneOtpCode.length !== 6}
-                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200 px-8 py-2"
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transition-all duration-200 px-8 py-2"
                   size="lg"
                 >
                   {loading || autoSubmitting ? (
@@ -2024,7 +2024,7 @@ const SignUp = () => {
                 <Button
                   onClick={handlePayment}
                   disabled={loading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200"
+                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transition-all duration-200"
                   size="lg"
                 >
                   {loading ? (
@@ -2074,7 +2074,7 @@ const SignUp = () => {
         {step === 1 ? (
           <p className="text-center text-sm text-gray-400">
             Already have an account?{" "}
-            <Link href="/login" className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors">
+            <Link href="/login" className="text-accent hover:text-accent/80 hover:underline font-medium transition-colors">
               Back to Login
             </Link>
           </p>
