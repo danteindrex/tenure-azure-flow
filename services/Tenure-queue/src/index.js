@@ -11,13 +11,23 @@ const database = require('./config/database');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Detect serverless environment
+const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV;
+
+// Trust proxy for serverless environments (Vercel, AWS Lambda)
+// This is required for rate limiting and getting correct client IPs
+if (isServerless) {
+  app.set('trust proxy', true);
+  console.log('🔧 Running in serverless mode - trust proxy enabled');
+}
+
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
 // CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
+const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : ['http://localhost:3000'];
 
@@ -96,11 +106,16 @@ const startServer = async () => {
     const dbTest = await database.testConnection();
     if (!dbTest.success) {
       console.error('Database connection failed:', dbTest.message);
-      process.exit(1);
+      // Don't exit in serverless - let the platform handle it
+      if (!isServerless) {
+        process.exit(1);
+      } else {
+        console.warn('⚠️ Starting server despite database connection failure (serverless mode)');
+      }
+    } else {
+      console.log('✅ Database connection successful');
     }
-    
-    console.log('✅ Database connection successful');
-    
+
     app.listen(PORT, () => {
       console.log(`🚀 Tenure Queue Service running on port ${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV}`);
@@ -109,7 +124,10 @@ const startServer = async () => {
     });
   } catch (error) {
     console.error('Failed to start server:', error);
-    process.exit(1);
+    // Don't exit in serverless - let the platform handle it
+    if (!isServerless) {
+      process.exit(1);
+    }
   }
 };
 

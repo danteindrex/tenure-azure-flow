@@ -43,16 +43,27 @@ if (!process.env.DATABASE_URL) {
   )
 }
 
-// Create PostgreSQL connection pool optimized for Supabase Transaction Mode
+// For serverless (Vercel), prefer Transaction Mode (port 6543) over Session Mode (port 5432)
+// Transaction Mode is faster and handles more concurrent connections
+const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+const connectionString = process.env.DATABASE_URL
+
+// Log which mode we're using
+if (isServerless && connectionString?.includes(':5432')) {
+  console.warn('⚠️ Using Session Mode (port 5432) in serverless. Consider switching to Transaction Mode (port 6543) for better performance.')
+  console.warn('   Update DATABASE_URL to use port 6543 instead of 5432')
+}
+
+// Create PostgreSQL connection pool optimized for Vercel serverless + Supabase
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
   ssl: { rejectUnauthorized: false }, // Always use SSL for Supabase
-  // Optimized settings for unstable connections
-  max: 10, // Max number of clients in the pool
-  min: 2, // Minimum number of clients to keep idle
-  idleTimeoutMillis: 60000, // Close idle clients after 60 seconds
-  connectionTimeoutMillis: 10000, // Wait 10 seconds to connect
-  //acquireTimeoutMillis: 10000, // Wait 10 seconds to acquire a client
+  // Optimized settings for serverless environments (Vercel)
+  max: 1, // Only 1 connection per serverless function instance
+  min: 0, // No idle connections in serverless
+  idleTimeoutMillis: 10000, // Close idle clients after 10 seconds
+  connectionTimeoutMillis: 5000, // Wait 5 seconds to connect
+  allowExitOnIdle: true, // Allow pool to close when idle (important for serverless)
 })
 
 // Log pool errors but don't exit process
@@ -61,20 +72,17 @@ pool.on('error', (err) => {
   // Don't exit process, let the pool handle reconnection
 })
 
+// Test connection on startup (only log in development to avoid noise)
+if (process.env.NODE_ENV === 'development') {
+  pool.on('connect', () => {
+    console.log('✅ Database connected successfully')
+  })
+}
+
 // Create Drizzle instance with schema
 export const db = drizzle(pool, {
   schema,
   logger: process.env.NODE_ENV === 'development' // Enable query logging in development
-})
-
-// Test connection on startup
-pool.on('connect', (client) => {
-  console.log('✅ Database connected successfully')
-})
-
-pool.on('error', (err, client) => {
-  console.error('❌ Database connection error:', err.message)
-  // Don't exit process, let the pool handle reconnection
 })
 
 // Export pool for advanced usage

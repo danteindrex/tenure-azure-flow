@@ -10,10 +10,19 @@ import webhookRoutes from './routes/webhook.routes';
 
 const app: Application = express();
 
+// Trust proxy for serverless environments (Vercel, AWS Lambda)
+// This is required for rate limiting and getting correct client IPs
+if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV) {
+  app.set('trust proxy', true);
+  logger.info('Running in serverless mode - trust proxy enabled');
+}
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
+  // Skip failed requests in serverless to avoid false positives
+  skipFailedRequests: true,
 });
 
 // Middleware - Security

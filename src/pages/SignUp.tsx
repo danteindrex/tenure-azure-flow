@@ -871,7 +871,13 @@ const SignUp = () => {
       // CRITICAL: Refetch session after email verification to get authenticated session
       console.log('🔄 Refetching session after email verification...');
       await refetchSession();
-      console.log('✅ Session refetched');
+
+      // Wait a moment for session cookies to be set
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Force another refetch to ensure we have the session
+      await refetchSession();
+      console.log('✅ Session refetched twice for reliability');
 
       // Update progress in database
       const progressResponse = await fetch('/api/onboarding/update-progress', {

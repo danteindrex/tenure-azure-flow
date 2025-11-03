@@ -147,6 +147,8 @@ export const auth = betterAuth({
       generateId: () => crypto.randomUUID(), // Generate UUIDs for Better Auth
     },
     useSecureCookies: process.env.NODE_ENV === 'production',
+    // SameSite policy for cookies - set to 'lax' for better compatibility
+    cookieSameSite: 'lax',
     // Cross-origin settings for API
     crossSubDomainCookies: {
       enabled: false
