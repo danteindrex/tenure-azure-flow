@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { LogOut, User, Sun } from "lucide-react";
+import { LogOut, User, Sun, Moon } from "lucide-react";
 import { authClient, useSession } from "@/lib/auth-client";
 import { logLogout } from "@/lib/audit";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -40,9 +40,9 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
     }
   };
 
-  // Force light theme - no theme toggle
-  const forceLight = () => {
-    setTheme('light');
+  // Toggle between light and dark theme
+  const toggleTheme = () => {
+    setTheme(actualTheme === 'light' ? 'dark' : 'light');
   };
 
   return (
@@ -71,11 +71,23 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
                 <p className="text-muted-foreground">Welcome back, {displayUserData.name}</p>
               </div>
 
-              {/* Light Theme Indicator */}
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Sun className="w-4 h-4" />
-                <span className="hidden sm:inline">Light Mode</span>
-              </div>
+              {/* Theme Toggle Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleTheme}
+                className="flex items-center gap-2 hover:bg-accent/10 p-2"
+                title={`Switch to ${actualTheme === 'light' ? 'dark' : 'light'} mode`}
+              >
+                {actualTheme === 'light' ? (
+                  <Moon className="w-4 h-4" />
+                ) : (
+                  <Sun className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline text-sm">
+                  {actualTheme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                </span>
+              </Button>
 
               {/* User Menu */}
               <div className="relative">

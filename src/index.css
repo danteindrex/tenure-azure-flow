@@ -76,44 +76,69 @@ All colors MUST be HSL.
   }
 
   .dark {
-    /* Dark Theme - Tenure Reward Program */
-    --background: 210 100% 6%;   /* #0a192f Deep Navy */
-    --foreground: 0 0% 98%;      /* #fafafa Light Gray */
+    /* Dark Theme - Custom #171717 Background with White Text */
+    --background: 0 0% 9%;       /* #171717 Dark Gray Background */
+    --foreground: 0 0% 100%;     /* #ffffff White Text */
 
-    --card: 210 100% 8%;         /* #0f1f3a Darker Navy Card */
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 12%;            /* #1f1f1f Slightly Lighter Card Background */
+    --card-foreground: 0 0% 100%; /* #ffffff White Text */
 
-    --popover: 210 100% 8%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 12%;         /* #1f1f1f */
+    --popover-foreground: 0 0% 100%; /* #ffffff White Text */
 
-    --primary: 190 100% 42%;     /* #00bcd4 Cyan - Same accent color */
-    --primary-foreground: 0 0% 98%;
+    --primary: 190 100% 42%;     /* #00bcd4 Cyan - Keep accent color */
+    --primary-foreground: 0 0% 100%; /* #ffffff White Text */
 
-    --secondary: 215 20% 15%;    /* #1e293b Dark Gray */
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 0 0% 15%;       /* #262626 Dark Gray */
+    --secondary-foreground: 0 0% 100%; /* #ffffff White Text */
 
-    --muted: 215 20% 12%;        /* #0f172a Very Dark Gray */
-    --muted-foreground: 215 20% 65%;
+    --muted: 0 0% 20%;           /* #333333 Muted Background */
+    --muted-foreground: 0 0% 70%; /* #b3b3b3 Muted Text */
 
-    --accent: 190 100% 42%;      /* #00bcd4 Cyan - Same accent color */
-    --accent-foreground: 0 0% 98%;
+    --accent: 190 100% 42%;      /* #00bcd4 Cyan - Keep accent color */
+    --accent-foreground: 0 0% 100%; /* #ffffff White Text */
 
-    --destructive: 0 84% 60%;    /* #ef4444 Red - Same destructive color */
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 84% 60%;    /* #ef4444 Red - Keep destructive color */
+    --destructive-foreground: 0 0% 100%; /* #ffffff White Text */
 
-    --border: 215 20% 20%;       /* Darker border */
-    --input: 215 20% 15%;        /* Darker input background */
-    --ring: 190 100% 42%;        /* Same ring color */
+    --success: 158 100% 48%;     /* #00f5a0 Success Green */
+    --warning: 43 96% 56%;       /* #fbbf24 Warning Yellow */
+
+    /* Dashboard Indicator Colors for Dark Mode */
+    --indigo-300: 217 91% 70%;   /* Lighter indigo for dark mode */
+    --indigo-400: 217 91% 65%;
+    --indigo-600: 217 91% 60%;
+    --indigo-700: 217 91% 55%;
+    --indigo-900: 217 91% 45%;
+    --purple-300: 262 83% 70%;   /* Lighter purple for dark mode */
+    --purple-400: 262 83% 65%;
+    --purple-600: 262 83% 60%;
+    --purple-900: 262 83% 45%;
+    --yellow-300: 45 93% 60%;    /* Lighter yellow for dark mode */
+    --yellow-400: 45 93% 55%;
+    --yellow-500: 45 93% 50%;
+    --red-300: 0 84% 70%;        /* Lighter red for dark mode */
+    --red-400: 0 84% 65%;
+    --red-600: 0 84% 60%;
+    --red-900: 0 84% 45%;
+    --green-300: 142 76% 50%;    /* Lighter green for dark mode */
+    --green-400: 142 76% 45%;
+    --green-600: 142 76% 40%;
+    --green-900: 142 76% 30%;
+
+    --border: 0 0% 25%;          /* #404040 Darker border */
+    --input: 0 0% 15%;           /* #262626 Darker input background */
+    --ring: 190 100% 42%;        /* Keep ring color */
 
     /* Gradients for dark theme */
-    --gradient-primary: linear-gradient(135deg, hsl(210 100% 6%) 0%, hsl(210 100% 8%) 100%);
-    --gradient-card: linear-gradient(135deg, hsl(210 100% 8% / 0.9) 0%, hsl(210 100% 10% / 0.9) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(0 0% 9%) 0%, hsl(0 0% 12%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 12% / 0.9) 0%, hsl(0 0% 15% / 0.9) 100%);
     --gradient-glow: radial-gradient(circle at center, hsl(190 100% 42% / 0.15) 0%, transparent 70%);
     
     /* Shadows with glow for dark theme */
     --shadow-glow: 0 0 20px hsl(190 100% 42% / 0.3);
     --shadow-glow-lg: 0 0 40px hsl(190 100% 42% / 0.4);
-    --shadow-card: 0 8px 32px hsl(0 0% 0% / 0.3);
+    --shadow-card: 0 8px 32px hsl(0 0% 0% / 0.5);
   }
 }
 
@@ -124,31 +149,16 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    background: #ffffff !important;
     min-height: 100vh;
   }
   
-  /* Force light theme */
+  /* Proper theme handling */
   html {
-    color-scheme: light !important;
+    color-scheme: light;
   }
   
   html.dark {
-    color-scheme: light !important;
-  }
-  
-  /* Override any dark theme classes */
-  .dark {
-    --background: 0 0% 100% !important;
-    --foreground: 210 100% 6% !important;
-    --card: 0 0% 98% !important;
-    --card-foreground: 210 100% 6% !important;
-  }
-  
-  /* Ensure body is always light */
-  body.dark {
-    background: #ffffff !important;
-    color: #0a192f !important;
+    color-scheme: dark;
   }
 }
 

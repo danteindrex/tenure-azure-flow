@@ -32,20 +32,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return currentTheme;
   };
 
-  // Apply theme to document - force light theme only
+  // Apply theme to document
   const applyTheme = (newTheme: 'light' | 'dark') => {
     if (typeof window !== 'undefined') {
       const root = window.document.documentElement;
       root.classList.remove('light', 'dark');
-      root.classList.add('light'); // Always apply light theme
+      root.classList.add(newTheme);
       
-      // Always set light theme attributes
-      root.setAttribute('data-theme', 'light');
+      // Set theme attributes
+      root.setAttribute('data-theme', newTheme);
       
-      // Update meta theme-color for mobile browsers - always light
+      // Update meta theme-color for mobile browsers
       const metaThemeColor = document.querySelector('meta[name="theme-color"]');
       if (metaThemeColor) {
-        metaThemeColor.setAttribute('content', '#ffffff');
+        metaThemeColor.setAttribute('content', newTheme === 'dark' ? '#000000' : '#ffffff');
       }
     }
   };
@@ -53,18 +53,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Load theme from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Force light theme as default
-      setThemeState('light');
-      setActualTheme('light');
-      applyTheme('light');
+      const savedTheme = localStorage.getItem('theme') as Theme;
+      const initialTheme = savedTheme || 'light';
+      const resolvedTheme = resolveTheme(initialTheme);
       
-      // Save light theme to localStorage
-      localStorage.setItem('theme', 'light');
-      
-      // Remove any existing dark class
-      const root = window.document.documentElement;
-      root.classList.remove('dark');
-      root.classList.add('light');
+      setThemeState(initialTheme);
+      setActualTheme(resolvedTheme);
+      applyTheme(resolvedTheme);
     }
   }, []);
 
@@ -84,14 +79,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [theme]);
 
   const setTheme = (newTheme: Theme) => {
-    // Force light theme only
-    setThemeState('light');
-    setActualTheme('light');
-    applyTheme('light');
+    const resolvedTheme = resolveTheme(newTheme);
     
-    // Save light theme to localStorage
+    setThemeState(newTheme);
+    setActualTheme(resolvedTheme);
+    applyTheme(resolvedTheme);
+    
+    // Save theme to localStorage
     if (typeof window !== 'undefined') {
-      localStorage.setItem('theme', 'light');
+      localStorage.setItem('theme', newTheme);
     }
   };
 

@@ -195,7 +195,7 @@ const TwoFactorManager = () => {
                   Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
                 </p>
                 {qrCode && (
-                  <div className="bg-white p-4 rounded-lg inline-block">
+                  <div className="bg-background border border-border p-4 rounded-lg inline-block">
                     <img src={qrCode} alt="2FA QR Code" className="w-48 h-48" />
                   </div>
                 )}
@@ -257,18 +257,18 @@ const TwoFactorManager = () => {
           </div>
 
           {backupCodes.length > 0 && (
-            <div className="border border-amber-200 bg-amber-50 rounded-lg p-4">
+            <div className="border border-warning/30 bg-warning/10 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                <AlertTriangle className="w-5 h-5 text-warning mt-0.5" />
                 <div className="flex-1">
-                  <h4 className="font-semibold text-amber-800 mb-2">Backup Codes</h4>
-                  <p className="text-sm text-amber-700 mb-4">
+                  <h4 className="font-semibold text-foreground mb-2">Backup Codes</h4>
+                  <p className="text-sm text-muted-foreground mb-4">
                     Save these backup codes in a safe place. You can use them to access your account if you lose your authenticator device.
                   </p>
                   <div className="grid grid-cols-2 gap-2 mb-4">
                     {backupCodes.map((code, index) => (
                       <div key={index} className="flex items-center gap-2">
-                        <code className="bg-white px-2 py-1 rounded text-sm font-mono border">
+                        <code className="bg-background px-2 py-1 rounded text-sm font-mono border border-border">
                           {code}
                         </code>
                         <Button
