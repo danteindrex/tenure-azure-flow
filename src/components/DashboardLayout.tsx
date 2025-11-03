@@ -71,26 +71,25 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
                 <p className="text-muted-foreground">Welcome back, {displayUserData.name}</p>
               </div>
 
-              {/* Theme Toggle Button */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleTheme}
-                className="flex items-center gap-2 hover:bg-accent/10 p-2"
-                title={`Switch to ${actualTheme === 'light' ? 'dark' : 'light'} mode`}
-              >
-                {actualTheme === 'light' ? (
-                  <Moon className="w-4 h-4" />
-                ) : (
-                  <Sun className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline text-sm">
-                  {actualTheme === 'light' ? 'Dark Mode' : 'Light Mode'}
-                </span>
-              </Button>
+              {/* Right Side Actions */}
+              <div className="flex items-center gap-2">
+                {/* Theme Toggle Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleTheme}
+                  className="w-8 h-8 p-0 hover:bg-accent/10 rounded-full"
+                  title={`Switch to ${actualTheme === 'light' ? 'dark' : 'light'} mode`}
+                >
+                  {actualTheme === 'light' ? (
+                    <Moon className="w-4 h-4" />
+                  ) : (
+                    <Sun className="w-4 h-4" />
+                  )}
+                </Button>
 
-              {/* User Menu */}
-              <div className="relative">
+                {/* User Menu */}
+                <div className="relative">
                 <Button
                   variant="ghost"
                   className="flex items-center gap-1 sm:gap-2 hover:bg-accent/10 p-2 sm:px-3"
@@ -103,17 +102,18 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
                   <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-success pulse-glow" />
                 </Button>
 
-                {showProfileMenu && (
-                  <Card className="absolute right-0 mt-2 w-40 sm:w-48 glass-card p-2 animate-fade-in">
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent/10 rounded-md text-destructive"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Logout
-                    </button>
-                  </Card>
-                )}
+                  {showProfileMenu && (
+                    <Card className="absolute right-0 mt-2 w-40 sm:w-48 glass-card p-2 animate-fade-in">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent/10 rounded-md text-destructive"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Logout
+                      </button>
+                    </Card>
+                  )}
+                </div>
               </div>
             </div>
           </div>
