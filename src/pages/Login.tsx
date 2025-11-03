@@ -4,17 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Crown } from "lucide-react";
+import { Crown, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/router";
 import { authClient } from "@/lib/auth-client";
 import { logPageVisit, logLogin, logError } from "@/lib/audit";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { theme, setTheme, actualTheme } = useTheme();
   
   // Field validation states
   const [fieldValidation, setFieldValidation] = useState({
@@ -54,6 +56,11 @@ const Login = () => {
   useEffect(() => {
     logPageVisit('/login');
   }, []);
+
+  // Toggle between light and dark theme
+  const toggleTheme = () => {
+    setTheme(actualTheme === 'light' ? 'dark' : 'light');
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,31 +139,49 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-black">
-      {/* Next.js Dark Theme Background Glow Effect */}
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
+      {/* Theme Toggle Button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={toggleTheme}
+        className="absolute top-4 right-4 z-20 flex items-center gap-2 hover:bg-accent/10 p-2"
+        title={`Switch to ${actualTheme === 'light' ? 'dark' : 'light'} mode`}
+      >
+        {actualTheme === 'light' ? (
+          <Moon className="w-4 h-4" />
+        ) : (
+          <Sun className="w-4 h-4" />
+        )}
+        <span className="hidden sm:inline text-sm">
+          {actualTheme === 'light' ? 'Dark Mode' : 'Light Mode'}
+        </span>
+      </Button>
+
+      {/* Background Glow Effect */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute top-1/4 right-1/4 w-[400px] h-[400px] bg-purple-500/8 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-1/4 left-1/4 w-[350px] h-[350px] bg-cyan-500/6 rounded-full blur-[90px] pointer-events-none" />
       
-      <Card className="w-full max-w-md p-8 relative z-10 backdrop-blur-xl border border-gray-800 shadow-2xl" style={{ backgroundColor: '#171717' }}>
+      <Card className="w-full max-w-md p-8 relative z-10 backdrop-blur-xl border border-border shadow-2xl bg-card">
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-2">
-            <Crown className="w-8 h-8 text-blue-400" />
-            <span className="text-2xl font-bold text-white">Home Solutions</span>
+            <Crown className="w-8 h-8 text-accent" />
+            <span className="text-2xl font-bold text-foreground">Home Solutions</span>
           </div>
         </div>
 
         {/* Title */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2 text-white">Welcome Back</h1>
-          <p className="text-gray-400">Sign in to your account</p>
+          <h1 className="text-3xl font-bold mb-2 text-foreground">Welcome Back</h1>
+          <p className="text-muted-foreground">Sign in to your account</p>
         </div>
 
         {/* Form */}
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-gray-200">Email</Label>
+            <Label htmlFor="email" className="text-foreground">Email</Label>
             <Input
               id="email"
               type="email"
@@ -167,19 +192,19 @@ const Login = () => {
                 const isValid = validateEmail(e.target.value);
                 updateFieldValidation('email', e.target.value, isValid);
               }}
-              className={`bg-gray-800/50 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${
+              className={`bg-input text-foreground placeholder-muted-foreground transition-colors ${
                 fieldValidation.email.touched 
                   ? fieldValidation.email.isValid 
                     ? 'border-green-500 focus:border-green-500' 
                     : 'border-red-500 focus:border-red-500'
-                  : 'border-gray-700 focus:border-blue-500'
+                  : 'border-border focus:border-accent'
               }`}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-gray-200">Password</Label>
+            <Label htmlFor="password" className="text-foreground">Password</Label>
             <Input
               id="password"
               type="password"
@@ -190,12 +215,12 @@ const Login = () => {
                 const isValid = validatePassword(e.target.value);
                 updateFieldValidation('password', e.target.value, isValid);
               }}
-              className={`bg-gray-800/50 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${
+              className={`bg-input text-foreground placeholder-muted-foreground transition-colors ${
                 fieldValidation.password.touched 
                   ? fieldValidation.password.isValid 
                     ? 'border-green-500 focus:border-green-500' 
                     : 'border-red-500 focus:border-red-500'
-                  : 'border-gray-700 focus:border-blue-500'
+                  : 'border-border focus:border-accent'
               }`}
               required
             />
@@ -203,15 +228,15 @@ const Login = () => {
 
           <div className="flex items-center justify-between text-sm">
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500/20" />
-              <span className="text-gray-400">Remember me</span>
+              <input type="checkbox" className="w-4 h-4 rounded border-border bg-input text-accent focus:ring-accent/20" />
+              <span className="text-muted-foreground">Remember me</span>
             </label>
-            <Link href="/reset-password" className="text-blue-400 hover:text-blue-300 hover:underline transition-colors">
+            <Link href="/reset-password" className="text-accent hover:text-accent/80 hover:underline transition-colors">
               Forgot password?
             </Link>
           </div>
 
-          <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 transition-all duration-200" size="lg" disabled={loading}>
+          <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transition-all duration-200" size="lg" disabled={loading}>
             {loading ? "Signing in..." : "Login"}
           </Button>
         </form>
@@ -219,17 +244,17 @@ const Login = () => {
         {/* Divider */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-700"></div>
+            <div className="w-full border-t border-border"></div>
           </div>
           <div className="relative flex justify-center text-xs">
-            <span className="bg-gray-900 px-2 text-gray-400">Or continue with</span>
+            <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
           </div>
         </div>
 
         {/* Social Login */}
         <div className="w-full">
           <Button 
-            className="w-full bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white transition-colors" 
+            className="w-full bg-secondary hover:bg-secondary/80 border border-border text-secondary-foreground transition-colors" 
             onClick={handleGoogleLogin}
             disabled={loading}
           >
@@ -244,9 +269,9 @@ const Login = () => {
         </div>
 
         {/* Sign Up Link */}
-        <p className="text-center text-sm text-gray-400 mt-6">
+        <p className="text-center text-sm text-muted-foreground mt-6">
           {"Don't"} have an account?{" "}
-          <Link href="/signup" className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors">
+          <Link href="/signup" className="text-accent hover:text-accent/80 hover:underline font-medium transition-colors">
             Sign up
           </Link>
         </p>

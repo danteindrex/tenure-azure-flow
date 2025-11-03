@@ -7,16 +7,18 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Crown, Check, ChevronRight, ChevronLeft, Loader2, Mail, Phone, Fingerprint, Shield } from "lucide-react";
+import { Crown, Check, ChevronRight, ChevronLeft, Loader2, Mail, Phone, Fingerprint, Shield, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 import { authClient, useSession, signUp, updateUser, signIn, signOut } from "@/lib/auth-client";
 import { logPageVisit, logSignup, logError } from "@/lib/audit";
 import { COUNTRY_DIAL_CODES } from "@/lib/countryDialCodes";
 import baseLogger from "@/lib/baseLogger";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const SignUp = () => {
   const navigate = useRouter();
   const { data: session, isPending } = useSession();
+  const { theme, setTheme, actualTheme } = useTheme();
 
   // Initialize step from URL parameter to prevent flashing
   const getInitialStep = (): number => {
@@ -364,7 +366,7 @@ const SignUp = () => {
 
   // Validation asterisk component
   const ValidationAsterisk = ({ isValid, touched }: { isValid: boolean; touched: boolean }) => {
-    let colorClass = 'text-gray-500'; // Default gray for untouched
+    let colorClass = 'text-muted-foreground'; // Default for untouched
     
     if (touched) {
       colorClass = isValid ? 'text-green-500' : 'text-red-500';
@@ -1182,6 +1184,11 @@ const SignUp = () => {
     }
   };
 
+  // Toggle between light and dark theme
+  const toggleTheme = () => {
+    setTheme(actualTheme === 'light' ? 'dark' : 'light');
+  };
+
   const handleGoogleSignup = async (): Promise<void> => {
     try {
       setLoading(true);
@@ -1206,20 +1213,38 @@ const SignUp = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-black">
-      {/* Next.js Dark Theme Animated Background */}
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
+      {/* Theme Toggle Button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={toggleTheme}
+        className="absolute top-4 right-4 z-20 flex items-center gap-2 hover:bg-accent/10 p-2"
+        title={`Switch to ${actualTheme === 'light' ? 'dark' : 'light'} mode`}
+      >
+        {actualTheme === 'light' ? (
+          <Moon className="w-4 h-4" />
+        ) : (
+          <Sun className="w-4 h-4" />
+        )}
+        <span className="hidden sm:inline text-sm">
+          {actualTheme === 'light' ? 'Dark Mode' : 'Light Mode'}
+        </span>
+      </Button>
+
+      {/* Animated Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-cyan-500/5 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      <Card className="w-full max-w-lg p-8 relative z-10 backdrop-blur-xl border-0 shadow-2xl" style={{ backgroundColor: '#171717' }}>
+      <Card className="w-full max-w-lg p-8 relative z-10 backdrop-blur-xl border border-border shadow-2xl bg-card">
         {/* Logo */}
         <div className="flex justify-center mb-6">
-          <div className="flex items-center gap-2 text-blue-400">
-            <Crown className="w-8 h-8 text-blue-400" />
-            <span className="text-2xl font-bold text-white">Home Solutions</span>
+          <div className="flex items-center gap-2">
+            <Crown className="w-8 h-8 text-accent" />
+            <span className="text-2xl font-bold text-foreground">Home Solutions</span>
           </div>
         </div>
 
@@ -1229,15 +1254,15 @@ const SignUp = () => {
             <div key={i} className="flex items-center">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${step >= i
-                  ? "bg-blue-500 text-white shadow-lg shadow-blue-500/25"
-                  : "bg-gray-800 border border-gray-700 text-gray-400"
+                  ? "bg-accent text-accent-foreground shadow-lg"
+                  : "bg-muted border border-border text-muted-foreground"
                   }`}
               >
                 {step > i ? <Check className="w-4 h-4" /> : i}
               </div>
               {i < 5 && (
                 <div
-                  className={`w-6 h-1 mx-1 transition-all duration-300 ${step > i ? "bg-blue-500" : "bg-gray-700"
+                  className={`w-6 h-1 mx-1 transition-all duration-300 ${step > i ? "bg-accent" : "bg-border"
                     }`}
                 />
               )}
@@ -1249,13 +1274,13 @@ const SignUp = () => {
         {step === 1 && (
           <>
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold mb-2 text-white">Create Your Account</h1>
-              <p className="text-gray-400">Enter your email and create a password</p>
+              <h1 className="text-2xl font-bold mb-2 text-foreground">Create Your Account</h1>
+              <p className="text-muted-foreground">Enter your email and create a password</p>
             </div>
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-gray-200">
+                <Label htmlFor="email" className="text-foreground">
                   Email Address <ValidationAsterisk isValid={fieldValidation.email.isValid} touched={fieldValidation.email.touched} />
                 </Label>
                 <Input
@@ -1264,7 +1289,7 @@ const SignUp = () => {
                   placeholder="you@example.com"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
-                  className={`bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${
+                  className={`bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors ${
                     fieldValidation.email.touched 
                       ? fieldValidation.email.isValid 
                         ? 'border-green-500 focus:border-green-500' 
@@ -1286,7 +1311,7 @@ const SignUp = () => {
                   </p>
                 )}
                 {!fieldValidation.email.touched && (
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-muted-foreground">
                     We'll send you a verification code to confirm your email
                   </p>
                 )}
@@ -1294,7 +1319,7 @@ const SignUp = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-gray-200">
+                  <Label htmlFor="password" className="text-foreground">
                     Password <ValidationAsterisk isValid={fieldValidation.password.isValid} touched={fieldValidation.password.touched} />
                   </Label>
                   <Input
@@ -1303,13 +1328,13 @@ const SignUp = () => {
                     placeholder="At least 8 characters"
                     value={formData.password}
                     onChange={(e) => handleInputChange("password", e.target.value)}
-                    className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                    className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-gray-200">
+                  <Label htmlFor="confirmPassword" className="text-foreground">
                     Confirm Password <ValidationAsterisk isValid={fieldValidation.confirmPassword.isValid} touched={fieldValidation.confirmPassword.touched} />
                   </Label>
                   <Input
@@ -1318,7 +1343,7 @@ const SignUp = () => {
                     placeholder="Confirm your password"
                     value={formData.confirmPassword}
                     onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                    className="bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors"
+                    className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
                     required
                   />
                 </div>
@@ -1330,13 +1355,13 @@ const SignUp = () => {
                   checked={formData.agreeToTerms}
                   onCheckedChange={(checked: boolean) => handleInputChange("agreeToTerms", checked)}
                 />
-                <Label htmlFor="agreeToTerms" className="text-sm text-gray-200">
+                <Label htmlFor="agreeToTerms" className="text-sm text-foreground">
                   I agree to the{" "}
-                  <a href="#" className="text-blue-400 hover:text-blue-300 hover:underline transition-colors">
+                  <a href="#" className="text-accent hover:text-accent/80 hover:underline transition-colors">
                     Terms & Conditions
                   </a>{" "}
                   and{" "}
-                  <a href="#" className="text-blue-400 hover:text-blue-300 hover:underline transition-colors">
+                  <a href="#" className="text-accent hover:text-accent/80 hover:underline transition-colors">
                     Privacy Policy
                   </a>
                 </Label>
@@ -1347,7 +1372,7 @@ const SignUp = () => {
               <Button
                 onClick={handleStep1Submit}
                 disabled={loading || !formData.email || !validateEmail(formData.email) || !formData.password || !formData.confirmPassword || !formData.agreeToTerms || !fieldValidation.email.isValid || !fieldValidation.password.isValid || !fieldValidation.confirmPassword.isValid}
-                className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 px-8 py-2 transition-all duration-200"
+                className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg px-8 py-2 transition-all duration-200"
                 size="lg"
               >
                 {loading ? (
@@ -1370,13 +1395,13 @@ const SignUp = () => {
         {step === 2 && (
           <>
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Mail className="w-8 h-8 text-blue-400" />
+              <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mail className="w-8 h-8 text-accent" />
               </div>
-              <h1 className="text-2xl font-bold mb-2 text-white">Verify Your Email</h1>
-              <p className="text-gray-400">
+              <h1 className="text-2xl font-bold mb-2 text-foreground">Verify Your Email</h1>
+              <p className="text-muted-foreground">
                 Enter the verification code sent to<br />
-                <span className="font-medium text-white">{formData.email}</span>
+                <span className="font-medium text-foreground">{formData.email}</span>
               </p>
             </div>
 
@@ -1388,7 +1413,7 @@ const SignUp = () => {
             }}>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="emailOtpCode" className="text-gray-200">Verification Code *</Label>
+                  <Label htmlFor="emailOtpCode" className="text-foreground">Verification Code *</Label>
                   <Input
                     id="emailOtpCode"
                     type="text"
@@ -1400,7 +1425,7 @@ const SignUp = () => {
                       const otpCode = pastedText.replace(/\D/g, '').slice(0, 6);
                       handleOtpInputChange('emailOtpCode', otpCode);
                     }}
-                    className={`text-center text-2xl tracking-widest bg-gray-800/50 border-gray-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder-gray-400 transition-colors ${autoSubmitting ? 'border-green-500 bg-green-900/20' : ''
+                    className={`text-center text-2xl tracking-widest bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors ${autoSubmitting ? 'border-green-500 bg-green-900/20' : ''
                       }`}
                     placeholder="000000"
                     maxLength={6}
@@ -1410,11 +1435,11 @@ const SignUp = () => {
                     autoFocus
                     disabled={autoSubmitting}
                   />
-                  <div className="text-xs text-gray-400 space-y-1">
+                  <div className="text-xs text-muted-foreground space-y-1">
                     {autoSubmitting ? (
                       <p className="text-green-400">Verifying code...</p>
                     ) : (
-                      <p className="text-gray-400">Enter the 6-digit code from your email</p>
+                      <p className="text-muted-foreground">Enter the 6-digit code from your email</p>
                     )}
                   </div>
                 </div>
@@ -1470,8 +1495,8 @@ const SignUp = () => {
         {step === 3 && (
           <>
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold mb-2 text-white">Complete Your Profile</h1>
-              <p className="text-gray-400">
+              <h1 className="text-2xl font-bold mb-2 text-foreground">Complete Your Profile</h1>
+              <p className="text-muted-foreground">
                 {new URLSearchParams(window.location.search).get('oauth')
                   ? "Review and complete your profile information"
                   : "Tell us about yourself and your address"
