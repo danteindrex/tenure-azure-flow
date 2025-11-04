@@ -58,6 +58,8 @@ const SignUp = () => {
     state: "",
     zipCode: "",
     country: "UG", // Default to Uganda
+    // Step 5: Payment Consent
+    agreeToPayment: false,
   });
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -1284,6 +1286,12 @@ const SignUp = () => {
 
   // Step 5: Payment
   const handlePayment = async (): Promise<void> => {
+    // Check payment consent first
+    if (!formData.agreeToPayment) {
+      toast.error("Please agree to the payment terms to continue");
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -1520,7 +1528,12 @@ const SignUp = () => {
                 />
                 <Label htmlFor="agreeToTerms" className="text-sm text-foreground">
                   I agree to the{" "}
-                  <a href="#" className="text-accent hover:text-accent/80 hover:underline transition-colors">
+                  <a
+                    href="/TermsAndConditions"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent hover:text-accent/80 hover:underline transition-colors"
+                  >
                     Terms & Conditions
                   </a>{" "}
                   and{" "}
@@ -2015,21 +2028,21 @@ const SignUp = () => {
           <>
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold mb-2 text-foreground">Complete Your Membership</h1>
-              <p className="text-muted-foreground">Choose your payment plan to join the queue</p>
+              <p className="text-muted-foreground">Review payment details to join the queue</p>
             </div>
 
             <div className="space-y-6">
               <Card className="p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg dark:shadow-[0_20px_50px_rgba(75,_85,_99,_0.7)] hover:shadow-xl dark:hover:shadow-[0_25px_60px_rgba(75,_85,_99,_0.9)] transition-shadow duration-300">
                 <div className="text-center space-y-4">
                   <div>
-                    <p className="text-muted-foreground">Initial Payment</p>
+                    <p className="text-sm text-muted-foreground mb-1">Non-refundable Signup Fee</p>
                     <p className="text-4xl font-bold text-accent">$300</p>
-                    <p className="text-sm text-muted-foreground">Includes first month</p>
+                    <p className="text-xs text-muted-foreground mt-1">One-time payment</p>
                   </div>
                   <div className="border-t border-border pt-4">
-                    <p className="text-muted-foreground">Then Monthly</p>
+                    <p className="text-sm text-muted-foreground mb-1">Recurring Monthly Membership Fee</p>
                     <p className="text-2xl font-semibold text-foreground">$25</p>
-                    <p className="text-sm text-muted-foreground">Starting month 2</p>
+                    <p className="text-xs text-muted-foreground mt-1">Billed monthly starting month 2</p>
                   </div>
                 </div>
               </Card>
@@ -2056,6 +2069,30 @@ const SignUp = () => {
                 </ul>
               </div>
 
+              {/* Payment Consent Checkbox - REQUIRED */}
+              <div className="p-4 bg-accent/5 border-2 border-accent/20 rounded-lg">
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="agreeToPayment"
+                    checked={formData.agreeToPayment}
+                    onCheckedChange={(checked: boolean) => handleInputChange("agreeToPayment", checked)}
+                    className="mt-1"
+                  />
+                  <Label htmlFor="agreeToPayment" className="text-sm text-foreground leading-relaxed cursor-pointer">
+                    I explicitly consent to the payment of the <strong>non-refundable $300 signup fee</strong> and the <strong>recurring $25 monthly membership fee</strong> as outlined in the{" "}
+                    <a
+                      href="/TermsAndConditions"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent hover:text-accent/80 hover:underline font-semibold"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Terms & Conditions
+                    </a>.
+                  </Label>
+                </div>
+              </div>
+
               <div className="flex gap-3">
                 <Button
                   type="button"
@@ -2069,8 +2106,8 @@ const SignUp = () => {
                 </Button>
                 <Button
                   onClick={handlePayment}
-                  disabled={loading}
-                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transition-all duration-200"
+                  disabled={loading || !formData.agreeToPayment}
+                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <>
