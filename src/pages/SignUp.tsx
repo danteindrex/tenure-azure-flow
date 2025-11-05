@@ -14,6 +14,8 @@ import { logPageVisit, logSignup, logError } from "@/lib/audit";
 import { COUNTRY_DIAL_CODES } from "@/lib/countryDialCodes";
 import baseLogger from "@/lib/baseLogger";
 import { useTheme } from "@/contexts/ThemeContext";
+import { TermsModal } from "@/components/TermsModal";
+import { PrivacyModal } from "@/components/PrivacyModal";
 
 const SignUp = () => {
   const navigate = useRouter();
@@ -71,6 +73,10 @@ const SignUp = () => {
   const [otpReady, setOtpReady] = useState(true); // Track if OTP is ready for verification
   const [waitingForPayment, setWaitingForPayment] = useState(false); // Track if waiting for Stripe webhook
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Modal states
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   // Field validation states
   const [fieldValidation, setFieldValidation] = useState({
@@ -1528,18 +1534,27 @@ const SignUp = () => {
                 />
                 <Label htmlFor="agreeToTerms" className="text-sm text-foreground">
                   I agree to the{" "}
-                  <a
-                    href="/TermsAndConditions"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowTermsModal(true);
+                    }}
                     className="text-accent hover:text-accent/80 hover:underline transition-colors"
                   >
                     Terms & Conditions
-                  </a>{" "}
+                  </button>{" "}
                   and{" "}
-                  <a href="#" className="text-accent hover:text-accent/80 hover:underline transition-colors">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowPrivacyModal(true);
+                    }}
+                    className="text-accent hover:text-accent/80 hover:underline transition-colors"
+                  >
                     Privacy Policy
-                  </a>
+                  </button>
                 </Label>
               </div>
             </div>
@@ -2080,15 +2095,17 @@ const SignUp = () => {
                   />
                   <Label htmlFor="agreeToPayment" className="text-sm text-foreground leading-relaxed cursor-pointer">
                     I explicitly consent to the payment of the <strong>non-refundable $300 signup fee</strong> and the <strong>recurring $25 monthly membership fee</strong> as outlined in the{" "}
-                    <a
-                      href="/TermsAndConditions"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowTermsModal(true);
+                      }}
                       className="text-accent hover:text-accent/80 hover:underline font-semibold"
-                      onClick={(e) => e.stopPropagation()}
                     >
                       Terms & Conditions
-                    </a>.
+                    </button>.
                   </Label>
                 </div>
               </div>
@@ -2202,6 +2219,10 @@ const SignUp = () => {
           </div>
         )}
       </Card>
+
+      {/* Terms and Privacy Modals */}
+      <TermsModal open={showTermsModal} onOpenChange={setShowTermsModal} />
+      <PrivacyModal open={showPrivacyModal} onOpenChange={setShowPrivacyModal} />
     </div>
   );
 };

@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import ResetPassword from "./pages/ResetPassword";
+import TermsAndConditions from "./pages/TermsAndConditions";
 import Dashboard from "./pages/Dashboard";
 import DashboardSimple from "./pages/DashboardSimple";
 import Profile from "./pages/dashboard/Profile";
@@ -35,6 +36,8 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+          <Route path="/TermsAndConditions" element={<TermsAndConditions />} />
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<DashboardSimple />} />
             <Route path="profile" element={<Profile />} />

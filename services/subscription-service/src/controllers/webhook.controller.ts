@@ -54,9 +54,9 @@ export class WebhookController {
           break;
 
         case 'invoice.payment_failed':
-          logger.warn('Invoice payment failed', {
-            invoice: event.data.object,
-          });
+          await StripeService.handleInvoicePaymentFailed(
+            event.data.object as Stripe.Invoice
+          );
           break;
 
         default:
