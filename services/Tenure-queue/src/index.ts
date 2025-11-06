@@ -1,14 +1,14 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
+import 'dotenv/config';
+import express, { Application, Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
+import queueRoutes from './routes/queueRoutes';
+import { apiLimiter } from './middleware/rateLimiter';
+import database from './config/database';
 
-const queueRoutes = require('./routes/queueRoutes');
-const { apiLimiter } = require('./middleware/rateLimiter');
-const database = require('./config/database');
-
-const app = express();
+const app: Application = express();
 const PORT = process.env.PORT || 3001;
 
 // Detect serverless environment
@@ -40,6 +40,9 @@ app.use(cors({
 
 // Compression middleware
 app.use(compression());
+
+// Cookie parser middleware
+app.use(cookieParser());
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -87,13 +90,13 @@ app.use('*', (req, res) => {
 });
 
 // Global error handler
-app.use((error, req, res, next) => {
+app.use((error: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Global error handler:', error);
-  
+
   res.status(error.status || 500).json({
     success: false,
-    error: process.env.NODE_ENV === 'production' 
-      ? 'Internal server error' 
+    error: process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
       : error.message,
     ...(process.env.NODE_ENV !== 'production' && { stack: error.stack })
   });
@@ -144,7 +147,7 @@ process.on('SIGINT', () => {
 
 startServer();
 
-module.exports = app;
+export default app;
 
 
 
