@@ -1,31 +1,35 @@
-const QueueModel = require('../models/QueueModel');
+import { Request, Response } from 'express';
+import QueueModel from '../models/QueueModel';
+import { pool } from '../../drizzle/db';
 
 class QueueController {
+  private queueModel: QueueModel;
+
   constructor() {
     this.queueModel = new QueueModel();
   }
 
-  async getQueue(req, res) {
+  async getQueue(req: Request, res: Response): Promise<void> {
     try {
       const { search, limit, offset } = req.query;
-      
+
       let queueData = await this.queueModel.getAllQueueMembers();
-      
+
       // Apply search filter if provided
-      if (search) {
+      if (search && typeof search === 'string') {
         const searchTerm = search.toLowerCase();
-        queueData = queueData.filter(member =>
+        queueData = queueData.filter((member: any) =>
           member.member_name?.toLowerCase().includes(searchTerm) ||
           member.member_email?.toLowerCase().includes(searchTerm) ||
-          member.memberid.toString().includes(searchTerm)
+          member.memberid?.toString().includes(searchTerm)
         );
       }
 
       // Apply pagination if provided
       const totalCount = queueData.length;
       if (limit) {
-        const limitNum = parseInt(limit);
-        const offsetNum = parseInt(offset) || 0;
+        const limitNum = parseInt(limit as string);
+        const offsetNum = parseInt(offset as string) || 0;
         queueData = queueData.slice(offsetNum, offsetNum + limitNum);
       }
 
@@ -38,12 +42,12 @@ class QueueController {
           statistics,
           pagination: {
             total: totalCount,
-            limit: limit ? parseInt(limit) : totalCount,
-            offset: offset ? parseInt(offset) : 0
+            limit: limit ? parseInt(limit as string) : totalCount,
+            offset: offset ? parseInt(offset as string) : 0
           }
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Queue fetch error:', error);
       res.status(500).json({
         success: false,
@@ -53,24 +57,25 @@ class QueueController {
     }
   }
 
-  async getQueueMember(req, res) {
+  async getQueueMember(req: Request, res: Response): Promise<void> {
     try {
       const { memberId } = req.params;
-      
+
       if (!memberId) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'Member ID is required'
         });
+        return;
       }
 
-      const member = await this.queueModel.getQueueMemberById(parseInt(memberId));
-      
+      const member = await this.queueModel.getQueueMemberById(memberId);
+
       res.json({
         success: true,
         data: member
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Queue member fetch error:', error);
       res.status(500).json({
         success: false,
@@ -80,15 +85,15 @@ class QueueController {
     }
   }
 
-  async getStatistics(req, res) {
+  async getStatistics(req: Request, res: Response): Promise<void> {
     try {
       const statistics = await this.queueModel.getQueueStatistics();
-      
+
       res.json({
         success: true,
         data: statistics
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Statistics fetch error:', error);
       res.status(500).json({
         success: false,
@@ -98,29 +103,30 @@ class QueueController {
     }
   }
 
-  async updateQueuePosition(req, res) {
+  async updateQueuePosition(req: Request, res: Response): Promise<void> {
     try {
       const { memberId } = req.params;
       const { newPosition } = req.body;
-      
+
       if (!memberId || !newPosition) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'Member ID and new position are required'
         });
+        return;
       }
 
       const updatedMember = await this.queueModel.updateQueuePosition(
-        parseInt(memberId), 
+        memberId,
         parseInt(newPosition)
       );
-      
+
       res.json({
         success: true,
         data: updatedMember,
         message: 'Queue position updated successfully'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Queue position update error:', error);
       res.status(500).json({
         success: false,
@@ -130,25 +136,26 @@ class QueueController {
     }
   }
 
-  async addMemberToQueue(req, res) {
+  async addMemberToQueue(req: Request, res: Response): Promise<void> {
     try {
       const memberData = req.body;
-      
+
       if (!memberData.memberid) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'Member ID is required'
         });
+        return;
       }
 
       const newMember = await this.queueModel.addMemberToQueue(memberData);
-      
+
       res.status(201).json({
         success: true,
         data: newMember,
         message: 'Member added to queue successfully'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Add member to queue error:', error);
       res.status(500).json({
         success: false,
@@ -158,25 +165,26 @@ class QueueController {
     }
   }
 
-  async removeMemberFromQueue(req, res) {
+  async removeMemberFromQueue(req: Request, res: Response): Promise<void> {
     try {
       const { memberId } = req.params;
-      
+
       if (!memberId) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'Member ID is required'
         });
+        return;
       }
 
-      const removedMember = await this.queueModel.removeMemberFromQueue(parseInt(memberId));
-      
+      const removedMember = await this.queueModel.removeMemberFromQueue(memberId);
+
       res.json({
         success: true,
         data: removedMember,
         message: 'Member removed from queue successfully'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Remove member from queue error:', error);
       res.status(500).json({
         success: false,
@@ -186,27 +194,27 @@ class QueueController {
     }
   }
 
-  async healthCheck(req, res) {
+  async healthCheck(req: Request, res: Response): Promise<void> {
     try {
-      const dbStatus = await this.queueModel.supabase
-        .from('queue')
-        .select('count', { count: 'exact', head: true });
+      // Simple health check using pool query
+      await pool.query('SELECT 1');
 
       res.json({
         success: true,
         status: 'healthy',
         timestamp: new Date().toISOString(),
-        database: dbStatus.error ? 'disconnected' : 'connected'
+        database: 'connected'
       });
-    } catch (error) {
+    } catch (error: any) {
       res.status(500).json({
         success: false,
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
+        database: 'disconnected',
         error: error.message
       });
     }
   }
 }
 
-module.exports = QueueController;
+export default QueueController;

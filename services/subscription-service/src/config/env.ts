@@ -6,7 +6,7 @@ dotenv.config();
 const envSchema = z.object({
   PORT: z.string().default('3001'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  DATABASE_URI: z.string(),
+  DATABASE_URL: z.string(),
   STRIPE_SECRET_KEY: z.string(),
   STRIPE_PUBLISHABLE_KEY: z.string(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
@@ -22,7 +22,7 @@ const env = envSchema.parse(process.env);
 export const config = {
   port: parseInt(env.PORT, 10),
   nodeEnv: env.NODE_ENV,
-  databaseUri: env.DATABASE_URI,
+  databaseUrl: env.DATABASE_URL,
   stripe: {
     secretKey: env.STRIPE_SECRET_KEY,
     publishableKey: env.STRIPE_PUBLISHABLE_KEY,

@@ -1,33 +1,23 @@
-const database = require('../config/database');
+import { pool } from '../../drizzle/db';
 
 /**
  * Queue Model - View-Based Queue System
- * 
+ *
  * This model queries the active_member_queue_view which dynamically calculates
  * queue positions from user subscriptions and payments. No manual reorganization needed.
  */
 class QueueModel {
-  constructor() {
-    this.supabase = database.getClient();
-  }
-
   /**
    * Get all active queue members from the view
    */
-  async getAllQueueMembers() {
+  async getAllQueueMembers(): Promise<any[]> {
     try {
-      const { data: queueData, error: queueError } = await this.supabase
-        .from('active_member_queue_view')
-        .select('*')
-        .order('queue_position', { ascending: true });
+      const result = await pool.query(
+        'SELECT * FROM active_member_queue_view ORDER BY queue_position ASC'
+      );
 
-      if (queueError) {
-        throw queueError;
-      }
-
-      // Data is already enriched by the view - no need for additional joins
-      return queueData || [];
-    } catch (error) {
+      return result.rows || [];
+    } catch (error: any) {
       throw new Error(`Failed to fetch queue members: ${error.message}`);
     }
   }
@@ -35,20 +25,19 @@ class QueueModel {
   /**
    * Get queue member by user ID from the view
    */
-  async getQueueMemberById(userId) {
+  async getQueueMemberById(userId: string): Promise<any> {
     try {
-      const { data, error } = await this.supabase
-        .from('active_member_queue_view')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
+      const result = await pool.query(
+        'SELECT * FROM active_member_queue_view WHERE user_id = $1',
+        [userId]
+      );
 
-      if (error) {
-        throw error;
+      if (result.rows.length === 0) {
+        throw new Error('Queue member not found');
       }
 
-      return data;
-    } catch (error) {
+      return result.rows[0];
+    } catch (error: any) {
       throw new Error(`Failed to fetch queue member: ${error.message}`);
     }
   }
@@ -56,14 +45,16 @@ class QueueModel {
   /**
    * Get queue statistics from the view
    */
-  async getQueueStatistics() {
+  async getQueueStatistics(): Promise<any> {
     try {
       const queueData = await this.getAllQueueMembers();
-      
+
       const totalMembers = queueData.length;
-      const eligibleMembers = queueData.filter(member => member.is_eligible).length;
-      const totalRevenue = queueData.reduce((sum, member) => sum + parseFloat(member.lifetime_payment_total || 0), 0);
-      const maxWinners = parseInt(process.env.MAX_WINNERS_PER_PAYOUT) || 2;
+      const eligibleMembers = queueData.filter((member: any) => member.is_eligible).length;
+      const totalRevenue = queueData.reduce((sum: number, member: any) =>
+        sum + parseFloat(member.lifetime_payment_total || 0), 0
+      );
+      const maxWinners = parseInt(process.env.MAX_WINNERS_PER_PAYOUT || '2');
       const potentialWinners = Math.min(maxWinners, eligibleMembers);
 
       return {
@@ -72,10 +63,10 @@ class QueueModel {
         eligibleMembers,
         totalRevenue,
         potentialWinners,
-        payoutThreshold: parseInt(process.env.DEFAULT_PAYOUT_THRESHOLD) || 500000,
-        receivedPayouts: queueData.filter(m => m.has_received_payout).length
+        payoutThreshold: parseInt(process.env.DEFAULT_PAYOUT_THRESHOLD || '500000'),
+        receivedPayouts: queueData.filter((m: any) => m.has_received_payout).length
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to calculate statistics: ${error.message}`);
     }
   }
@@ -83,21 +74,21 @@ class QueueModel {
   /**
    * Search queue members by email or name
    */
-  async searchQueueMembers(searchTerm, limit = 50) {
+  async searchQueueMembers(searchTerm: string, limit: number = 50): Promise<any[]> {
     try {
-      const { data, error } = await this.supabase
-        .from('active_member_queue_view')
-        .select('*')
-        .or(`email.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%,first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`)
-        .order('queue_position', { ascending: true })
-        .limit(limit);
+      const result = await pool.query(
+        `SELECT * FROM active_member_queue_view
+         WHERE email ILIKE $1
+            OR full_name ILIKE $1
+            OR first_name ILIKE $1
+            OR last_name ILIKE $1
+         ORDER BY queue_position ASC
+         LIMIT $2`,
+        [`%${searchTerm}%`, limit]
+      );
 
-      if (error) {
-        throw error;
-      }
-
-      return data || [];
-    } catch (error) {
+      return result.rows || [];
+    } catch (error: any) {
       throw new Error(`Failed to search queue members: ${error.message}`);
     }
   }
@@ -109,7 +100,7 @@ class QueueModel {
   /**
    * @deprecated No longer needed - positions are calculated dynamically in the view
    */
-  async updateQueuePosition(userId, newPosition) {
+  async updateQueuePosition(userId: string, newPosition: number): Promise<any> {
     console.warn('updateQueuePosition() is deprecated - queue positions are calculated dynamically');
     // Return current position from view
     return this.getQueueMemberById(userId);
@@ -118,7 +109,7 @@ class QueueModel {
   /**
    * @deprecated No longer needed - users are automatically added to queue when they have active subscriptions
    */
-  async addUserToQueue(userData) {
+  async addUserToQueue(userData: any): Promise<any> {
     console.warn('addUserToQueue() is deprecated - users automatically appear in queue with active subscriptions');
     // Return current position from view if exists
     return this.getQueueMemberById(userData.user_id);
@@ -127,7 +118,7 @@ class QueueModel {
   /**
    * @deprecated Legacy compatibility method
    */
-  async addMemberToQueue(memberData) {
+  async addMemberToQueue(memberData: any): Promise<any> {
     return this.addUserToQueue({
       user_id: memberData.memberid,
       ...memberData
@@ -137,7 +128,7 @@ class QueueModel {
   /**
    * @deprecated No longer needed - subscription cancellation automatically excludes from view
    */
-  async removeUserFromQueue(userId) {
+  async removeUserFromQueue(userId: string): Promise<null> {
     console.warn('removeUserFromQueue() is deprecated - users automatically excluded when subscription canceled');
     // No-op: View automatically excludes canceled subscriptions
     return null;
@@ -146,9 +137,9 @@ class QueueModel {
   /**
    * @deprecated Legacy compatibility method
    */
-  async removeMemberFromQueue(memberId) {
+  async removeMemberFromQueue(memberId: string): Promise<null> {
     return this.removeUserFromQueue(memberId);
   }
 }
 
-module.exports = QueueModel;
+export default QueueModel;

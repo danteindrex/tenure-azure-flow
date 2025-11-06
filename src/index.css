@@ -258,4 +258,35 @@ All colors MUST be HSL.
   .counter-animate {
     animation: counter-up 0.5s ease-out;
   }
+
+  /* Kursor.js Custom Styles */
+  .kursor {
+    z-index: 9999 !important;
+  }
+
+  .kursor-circle {
+    border: 2px solid #00b3d6 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+
+  .kursor-point {
+    background: #00b3d6 !important;
+    box-shadow: 0 0 20px rgba(0, 179, 214, 0.5) !important;
+  }
+
+  /* Dark mode adjustments */
+  .dark .kursor-circle {
+    border-color: #00b3d6 !important;
+    background: transparent !important;
+  }
+
+  /* Hover effect enhancement */
+  .kursor-hover .kursor-circle {
+    transform: scale(1.5) !important;
+    border-color: #00b3d6 !important;
+    background: transparent !important;
+    box-shadow: 0 0 30px rgba(0, 179, 214, 0.4) !important;
+  }
 }

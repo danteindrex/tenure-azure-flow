@@ -6,7 +6,7 @@ import { logger } from './logger';
 const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV;
 
 const poolConfig: PoolConfig = {
-  connectionString: config.databaseUri,
+  connectionString: config.databaseUrl,
   ssl: {
     rejectUnauthorized: false,
   },
