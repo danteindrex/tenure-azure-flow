@@ -1,22 +1,22 @@
 import { Router } from 'express';
 import { SubscriptionController } from '../controllers/subscription.controller';
-import { authenticateUser } from '../middleware/auth';
+import { validateSession } from '../middleware/auth.middleware';
 
 const router = Router();
 
 // Create checkout session (protected)
-router.post('/checkout', authenticateUser, SubscriptionController.createCheckoutSession);
+router.post('/checkout', validateSession, SubscriptionController.createCheckoutSession);
 
 // Get subscription details (protected)
-router.get('/:memberId', authenticateUser, SubscriptionController.getSubscription);
+router.get('/:memberId', validateSession, SubscriptionController.getSubscription);
 
 // Cancel subscription (protected)
-router.post('/:memberId/cancel', authenticateUser, SubscriptionController.cancelSubscription);
+router.post('/:memberId/cancel', validateSession, SubscriptionController.cancelSubscription);
 
 // Reactivate subscription (protected)
-router.post('/:memberId/reactivate', authenticateUser, SubscriptionController.reactivateSubscription);
+router.post('/:memberId/reactivate', validateSession, SubscriptionController.reactivateSubscription);
 
 // Get payment history (protected)
-router.get('/:memberId/payments', authenticateUser, SubscriptionController.getPaymentHistory);
+router.get('/:memberId/payments', validateSession, SubscriptionController.getPaymentHistory);
 
 export default router;

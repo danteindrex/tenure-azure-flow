@@ -6,7 +6,6 @@ import { Progress } from "@/components/ui/progress";
 import { useCounterAnimation } from "@/hooks/use-counter-animation";
 import { QueueRow } from "@/components/QueueRow";
 import { useSession } from "@/lib/auth-client";
-import PaymentNotificationBanner from "@/components/PaymentNotificationBanner";
 import { businessLogicService as BusinessLogicService, BUSINESS_RULES } from "@/lib/business-logic";
 
 const Dashboard = () => {
@@ -342,9 +341,6 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-        {/* Payment Notification Banner */}
-        <PaymentNotificationBanner />
-        
         {/* Mobile Priority Section - Compact Vertical Layout */}
         <div className="lg:hidden space-y-3 mb-6">
           {/* Compact Payout Fund & Payment Row */}

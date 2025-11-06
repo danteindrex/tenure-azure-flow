@@ -1,10 +1,11 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/env';
 import { logger } from './config/logger';
-import { testConnection, closePool } from './config/database';
+import { pool } from '../drizzle/db';
 import subscriptionRoutes from './routes/subscription.routes';
 import webhookRoutes from './routes/webhook.routes';
 
@@ -31,6 +32,7 @@ app.use(cors({
   origin: config.cors.allowedOrigins,
   credentials: true,
 }));
+app.use(cookieParser());
 
 // Middleware - Body parsing
 // Use raw body for Stripe webhooks, JSON for everything else
@@ -77,11 +79,9 @@ app.use((err: Error, _req: Request, res: Response, _next: any) => {
 // Start server
 async function startServer() {
   try {
-    // Test database connection
-    const dbConnected = await testConnection();
-    if (!dbConnected) {
-      throw new Error('Failed to connect to database');
-    }
+    // Test database connection using Drizzle pool
+    await pool.query('SELECT 1');
+    logger.info('✅ Database connection successful');
 
     app.listen(config.port, () => {
       logger.info(`Subscription Service running on port ${config.port}`);
@@ -90,6 +90,7 @@ async function startServer() {
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
+    logger.error('Database connection failed. Please check DATABASE_URL environment variable.');
     process.exit(1);
   }
 }
@@ -97,13 +98,13 @@ async function startServer() {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  await closePool();
+  await pool.end();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
-  await closePool();
+  await pool.end();
   process.exit(0);
 });
 
