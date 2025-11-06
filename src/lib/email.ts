@@ -25,13 +25,18 @@ class EmailService {
   private transporter: nodemailer.Transporter
 
   constructor() {
+    const smtpHost = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com'
+    const smtpPort = process.env.SMTP_PORT?.trim() || '587'
+    const smtpUser = process.env.SMTP_USER?.trim() || ''
+    const smtpPass = process.env.SMTP_PASS?.trim() || ''
+
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST!.trim(), // Trim whitespace/newlines
-      port: parseInt(process.env.SMTP_PORT!.trim()),
+      host: smtpHost,
+      port: parseInt(smtpPort),
       secure: process.env.SMTP_SECURE === 'true', // false for 587, true for 465
       auth: {
-        user: process.env.SMTP_USER!.trim(),
-        pass: process.env.SMTP_PASS!.trim()
+        user: smtpUser,
+        pass: smtpPass
       },
       tls: {
         rejectUnauthorized: false
