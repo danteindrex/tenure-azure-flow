@@ -952,11 +952,11 @@ export const user = pgTable("user", {
 
 export const session = pgTable("session", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: uuid().notNull(),
-	expiresAt: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-	ipAddress: text(),
-	userAgent: text(),
-	createdAt: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	userId: uuid("user_id").notNull(),
+	expiresAt: timestamp("expires_at", { withTimezone: true, mode: 'string' }).notNull(),
+	ipAddress: text("ip_address"),
+	userAgent: text("user_agent"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	foreignKey({
 			columns: [table.userId],

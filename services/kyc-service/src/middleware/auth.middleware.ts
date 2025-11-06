@@ -25,11 +25,20 @@ export async function validateSession(
   next: NextFunction
 ) {
   try {
+    console.log('🔐 Auth Middleware - All cookies:', req.cookies);
+
     // Get session ID from cookie
     // Better Auth stores the session ID directly in the cookie
-    const sessionId = req.cookies['better-auth.session_token'];
+    // Try multiple possible cookie names
+    const sessionId = req.cookies['better-auth.session_token'] ||
+                      req.cookies['better_auth_session'] ||
+                      req.cookies['authjs.session-token'] ||
+                      req.cookies['__Secure-authjs.session-token'];
+
+    console.log('🔑 Session ID found:', sessionId ? 'Yes' : 'No');
 
     if (!sessionId) {
+      console.log('❌ No session token in cookies');
       return res.status(401).json({
         success: false,
         error: 'No session token provided'
@@ -37,12 +46,20 @@ export async function validateSession(
     }
 
     // Query session from shared database using Drizzle
-    // The session ID in the cookie IS the session.id in the database
+    // The session token in the cookie matches session.token in the database
+    console.log('🔍 Looking for session with token:', sessionId.substring(0, 20) + '...');
+
     const sessionRecord = await db.query.session.findFirst({
-      where: (session, { eq }) => eq(session.id, sessionId)
+      where: (session, { eq }) => eq(session.token, sessionId)
     });
 
+    console.log('📊 Session found:', sessionRecord ? 'Yes' : 'No');
+    if (sessionRecord) {
+      console.log('📊 Session user ID:', sessionRecord.userId);
+    }
+
     if (!sessionRecord) {
+      console.log('❌ Session not found in database with token:', sessionId);
       return res.status(401).json({
         success: false,
         error: 'Invalid session token'

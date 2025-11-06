@@ -1,8 +1,8 @@
-import express from 'express';
+import express, { Router } from 'express';
 import QueueController from '../controllers/queueController';
 import { validateSession } from '../middleware/auth.middleware';
 
-const router = express.Router();
+const router: Router = express.Router();
 const queueController = new QueueController();
 
 // Bind methods to maintain 'this' context

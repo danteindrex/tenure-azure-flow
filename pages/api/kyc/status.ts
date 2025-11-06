@@ -16,15 +16,22 @@ export default async function handler(
   }
 
   try {
-    const KYC_SERVICE_URL = process.env.KYC_SERVICE_URL || 'http://localhost:3002';
+    const KYC_SERVICE_URL = process.env.KYC_SERVICE_URL || 'http://localhost:3003';
+
+    console.log('🔍 KYC Status Request:');
+    console.log('  Service URL:', KYC_SERVICE_URL);
+    console.log('  Cookies:', req.headers.cookie);
 
     // Forward request to KYC microservice with session cookie
     const response = await fetch(`${KYC_SERVICE_URL}/kyc/status`, {
       method: 'GET',
       headers: {
         'Cookie': req.headers.cookie || '', // Forward session cookie
+        'Content-Type': 'application/json',
       },
     });
+
+    console.log('📤 KYC Service Response:', response.status, response.statusText);
 
     const data = await response.json();
 

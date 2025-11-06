@@ -900,7 +900,19 @@ const SignUp = () => {
         method: 'GET',
         credentials: 'include'
       });
-      const sessionCheck = await verifySessionResponse.json();
+
+      // Check if response is OK and has content
+      let sessionCheck = null;
+      if (verifySessionResponse.ok) {
+        const responseText = await verifySessionResponse.text();
+        if (responseText) {
+          try {
+            sessionCheck = JSON.parse(responseText);
+          } catch (e) {
+            console.error('❌ Failed to parse session response:', e);
+          }
+        }
+      }
 
       if (!sessionCheck || !sessionCheck.user) {
         console.error('❌ Session still not available after email verification');
