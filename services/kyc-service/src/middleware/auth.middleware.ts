@@ -30,20 +30,24 @@ export async function validateSession(
     // Get session ID from cookie
     // Better Auth stores the session ID directly in the cookie
     // Try multiple possible cookie names
-    const sessionId = req.cookies['better-auth.session_token'] ||
-                      req.cookies['better_auth_session'] ||
-                      req.cookies['authjs.session-token'] ||
-                      req.cookies['__Secure-authjs.session-token'];
+    const sessionCookie = req.cookies['better-auth.session_token'] ||
+                          req.cookies['better_auth_session'] ||
+                          req.cookies['authjs.session-token'] ||
+                          req.cookies['__Secure-authjs.session-token'];
 
-    console.log('🔑 Session ID found:', sessionId ? 'Yes' : 'No');
+    console.log('🔑 Session cookie found:', sessionCookie ? 'Yes' : 'No');
 
-    if (!sessionId) {
+    if (!sessionCookie) {
       console.log('❌ No session token in cookies');
       return res.status(401).json({
         success: false,
         error: 'No session token provided'
       });
     }
+
+    // Better Auth uses signed tokens in format: token.signature
+    // Extract just the token part (before the dot) to match what's stored in DB
+    const sessionId = sessionCookie.split('.')[0];
 
     // Query session from shared database using Drizzle
     // The session token in the cookie matches session.token in the database

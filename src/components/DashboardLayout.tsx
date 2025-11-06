@@ -7,7 +7,6 @@ import { authClient, useSession } from "@/lib/auth-client";
 import { logLogout } from "@/lib/audit";
 import { useTheme } from "@/contexts/ThemeContext";
 import Sidebar from "./Sidebar";
-import PaymentNotificationBanner from "./PaymentNotificationBanner";
 import IdentityVerificationBanner from "./IdentityVerificationBanner";
 
 const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
@@ -61,9 +60,6 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
 
         {/* Identity Verification Banner */}
         <IdentityVerificationBanner />
-
-        {/* KYC Verification Banner */}
-        <PaymentNotificationBanner />
 
         {/* Header */}
         <header className="sticky top-0 z-40 backdrop-blur-lg bg-background/95 border-b border-border shadow-sm">

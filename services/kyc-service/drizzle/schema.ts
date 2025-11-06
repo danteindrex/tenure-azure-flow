@@ -954,6 +954,7 @@ export const session = pgTable("session", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id").notNull(),
 	expiresAt: timestamp("expires_at", { withTimezone: true, mode: 'string' }).notNull(),
+	token: text("token").notNull().unique(),
 	ipAddress: text("ip_address"),
 	userAgent: text("user_agent"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
