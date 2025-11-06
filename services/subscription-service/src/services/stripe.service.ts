@@ -728,11 +728,11 @@ export class StripeService {
         canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : undefined,
       } as any);
 
-      // Remove user from queue if subscription becomes inactive (they lose their position permanently)
+      // Note: No need to manually remove from queue - the active_member_queue_view
+      // automatically excludes users with inactive subscriptions
       const isActive = ['active', 'trialing'].includes(subscription.status);
       if (!isActive) {
-        await QueueModel.removeFromQueue(parseInt(dbSubscription.user_id));
-        logger.info(`User ${dbSubscription.user_id} removed from queue due to inactive subscription`);
+        logger.info(`User ${dbSubscription.user_id} subscription inactive - will be automatically excluded from queue view`);
       }
 
       logger.info(`Subscription updated for member ${dbSubscription.user_id}`, {
@@ -759,9 +759,9 @@ export class StripeService {
       // Update subscription status
       await SubscriptionModel.cancelSubscription(dbSubscription.id);
 
-      // Remove user from queue permanently when subscription is canceled
-      await QueueModel.removeFromQueue(parseInt(dbSubscription.user_id));
-      logger.info(`User ${dbSubscription.user_id} permanently removed from queue due to subscription cancellation`);
+      // Note: No need to manually remove from queue - the active_member_queue_view
+      // automatically excludes users with canceled subscriptions
+      logger.info(`User ${dbSubscription.user_id} subscription canceled - will be automatically excluded from queue view`);
 
       logger.info(`Subscription canceled for member ${dbSubscription.user_id}`);
     } catch (error) {

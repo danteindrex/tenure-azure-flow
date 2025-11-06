@@ -133,6 +133,8 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
             size="sm"
             onClick={onToggle}
             className="p-1 hover:bg-accent/10"
+            data-cursor-sticky
+            data-cursor-text={isCollapsed ? 'Expand' : 'Collapse'}
           >
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </Button>
@@ -154,6 +156,8 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
                   ? "bg-accent text-accent-foreground shadow-sm"
                   : "hover:bg-accent/10 text-muted-foreground hover:text-foreground"
               }`}
+              data-cursor-sticky
+              data-cursor-text={isCollapsed ? item.label : ''}
             >
               <Icon className={`w-5 h-5 ${active ? "text-accent-foreground" : "text-muted-foreground group-hover:text-foreground"}`} />
               {!isCollapsed && (

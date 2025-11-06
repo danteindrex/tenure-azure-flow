@@ -5,6 +5,7 @@ import { TooltipProvider } from "../src/components/ui/tooltip";
 import { Toaster } from "../src/components/ui/toaster";
 import { Toaster as Sonner } from "../src/components/ui/sonner";
 import PageTracker from "../src/components/PageTracker";
+import StickyCursor from "../src/components/StickyCursor";
 import { ThemeProvider } from "../src/contexts/ThemeContext";
 import "../src/index.css";
 
@@ -15,10 +16,13 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <PageTracker />
-          <Component {...pageProps} />
+          <div className="cursor-none">
+            <StickyCursor />
+            <Toaster />
+            <Sonner />
+            <PageTracker />
+            <Component {...pageProps} />
+          </div>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

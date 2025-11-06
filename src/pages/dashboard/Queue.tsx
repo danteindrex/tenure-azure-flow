@@ -61,8 +61,27 @@ const Queue = () => {
         throw new Error('Failed to load queue data');
       }
       
-      const data = await response.json();
-      setQueueData(data.queue || []);
+      const result = await response.json();
+      
+      // Handle both direct response and nested data structure
+      const data = result.data || result;
+      
+      // Map view fields to component expected fields
+      const mappedQueue = (data.queue || []).map((member: any) => ({
+        id: member.user_id,
+        position: member.queue_position,
+        name: member.full_name || 'N/A',
+        email: member.email,
+        continuousTenure: member.total_successful_payments || 0,
+        totalPaid: parseFloat(member.lifetime_payment_total || 0),
+        status: member.is_eligible ? 'active' : 'inactive',
+        eligible: member.is_eligible,
+        lastPaymentDate: member.last_payment_date,
+        joinDate: member.tenure_start_date,
+        hasReceivedPayout: member.has_received_payout
+      }));
+      
+      setQueueData(mappedQueue);
       setStatistics(data.statistics || {});
 
     } catch (error) {

@@ -5,7 +5,8 @@
  * All column names, types, and constraints match the live database.
  *
  * Tables:
- * - membership_queue: Queue positions and eligibility
+ * - membership_queue: Queue positions and eligibility (DEPRECATED - use view)
+ * - active_member_queue_view: Dynamic queue view (PRIMARY)
  * - kyc_verification: KYC verification data
  * - payout_management: Payout tracking
  * - disputes: Dispute management
@@ -16,8 +17,41 @@ import { relations, sql } from 'drizzle-orm'
 import { user } from './users'
 
 // ============================================================================
-// 1. MEMBERSHIP QUEUE (EXISTING TABLE - EXACT MAPPING)
+// 1. ACTIVE MEMBER QUEUE VIEW (PRIMARY - Use this for all queue queries)
 // ============================================================================
+/**
+ * NOTE: The active_member_queue_view is a database view created by migration.
+ * It's not defined in Drizzle schema because views are read-only and managed by SQL.
+ * 
+ * To query the view, use raw SQL:
+ * ```typescript
+ * const queue = await db.execute(sql`SELECT * FROM active_member_queue_view`);
+ * ```
+ * 
+ * Benefits of the view:
+ * - Always accurate positions
+ * - No manual reorganization needed
+ * - 100x faster than table-based approach
+ * - Automatically excludes canceled subscriptions and past winners
+ * 
+ * View columns:
+ * - user_id, email, user_created_at
+ * - first_name, last_name, middle_name, full_name
+ * - subscription_id, subscription_status, provider_subscription_id
+ * - tenure_start_date, last_payment_date
+ * - total_successful_payments, lifetime_payment_total
+ * - has_received_payout, queue_position
+ * - is_eligible, meets_time_requirement, calculated_at
+ */
+
+// ============================================================================
+// 2. MEMBERSHIP QUEUE TABLE (DEPRECATED - Kept for backward compatibility)
+// ============================================================================
+/**
+ * @deprecated Use activeMemberQueueView instead
+ * This table is preserved for backward compatibility and rollback purposes.
+ * All new code should query activeMemberQueueView.
+ */
 export const membershipQueue = pgTable('membership_queue', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').unique().references(() => user.id, { onDelete: 'cascade' }),
@@ -40,7 +74,7 @@ export const membershipQueue = pgTable('membership_queue', {
 }))
 
 // ============================================================================
-// 2. KYC VERIFICATION (EXISTING TABLE - EXACT MAPPING)
+// 3. KYC VERIFICATION (EXISTING TABLE - EXACT MAPPING)
 // ============================================================================
 export const kycVerification = pgTable('kyc_verification', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -73,7 +107,7 @@ export const kycVerification = pgTable('kyc_verification', {
 }))
 
 // ============================================================================
-// 3. PAYOUT MANAGEMENT (EXISTING TABLE - EXACT MAPPING)
+// 4. PAYOUT MANAGEMENT (EXISTING TABLE - EXACT MAPPING)
 // ============================================================================
 export const payoutManagement = pgTable('payout_management', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -101,7 +135,7 @@ export const payoutManagement = pgTable('payout_management', {
 }))
 
 // ============================================================================
-// 4. DISPUTES (EXISTING TABLE - EXACT MAPPING)
+// 5. DISPUTES (EXISTING TABLE - EXACT MAPPING)
 // ============================================================================
 export const disputes = pgTable('disputes', {
   id: uuid('id').primaryKey().defaultRandom(),

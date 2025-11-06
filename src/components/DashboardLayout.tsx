@@ -80,6 +80,8 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
                   onClick={toggleTheme}
                   className="w-8 h-8 p-0 hover:bg-accent/10 rounded-full"
                   title={`Switch to ${actualTheme === 'light' ? 'dark' : 'light'} mode`}
+                  data-cursor-sticky
+                  data-cursor-text={actualTheme === 'light' ? 'Dark' : 'Light'}
                 >
                   {actualTheme === 'light' ? (
                     <Moon className="w-4 h-4" />
@@ -94,6 +96,8 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
                   variant="ghost"
                   className="flex items-center gap-1 sm:gap-2 hover:bg-accent/10 p-2 sm:px-3"
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  data-cursor-sticky
+                  data-cursor-text="Profile"
                 >
                   <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-accent/20 flex items-center justify-center">
                     <User className="w-3 h-3 sm:w-4 sm:h-4 text-accent" />
@@ -107,6 +111,8 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
                       <button
                         onClick={handleLogout}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent/10 rounded-md text-destructive"
+                        data-cursor-sticky
+                        data-cursor-text="Logout"
                       >
                         <LogOut className="w-4 h-4" />
                         Logout

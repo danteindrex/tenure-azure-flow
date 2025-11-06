@@ -49,32 +49,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-// Fallback function for direct database access
+// Fallback function for direct database access using the view
 async function fallbackToDirectAccess(res: NextApiResponse) {
   try {
-    // Fetch queue data from database
-    const queueData = await db.select().from(membershipQueue);
+    const { sql } = await import('drizzle-orm');
 
-    // Calculate total revenue from payments
-    const payments = await db.select().from(userPayments).where(eq(userPayments.status, 'completed'));
+    // Query statistics directly from the view using helper function
+    const statsResult = await db.execute(sql`SELECT * FROM get_queue_statistics()`);
+    const stats = statsResult.rows[0] as any;
 
-    const totalRevenue = payments.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0);
-
-    // Calculate statistics
-    const activeMembers = queueData.filter((user: any) => user.isActive).length;
-    const eligibleMembers = queueData.filter((user: any) => user.isEligible).length;
-    const totalMembers = queueData.length;
+    // Calculate potential winners based on revenue
+    const rewardPerWinner = 100000; // $100K per winner (BR-4)
+    const potentialWinners = Math.min(
+      Math.floor(Number(stats.total_revenue) / rewardPerWinner),
+      Number(stats.eligible_members)
+    );
 
     return res.status(200).json({
       success: true,
       data: {
-        totalMembers,
-        activeMembers,
-        eligibleMembers,
-        totalRevenue,
-        potentialWinners: Math.min(2, eligibleMembers),
-        payoutThreshold: 500000,
-        receivedPayouts: queueData.filter((m: any) => m.hasReceivedPayout).length
+        totalMembers: Number(stats.total_members),
+        activeMembers: Number(stats.total_members), // All members in view are active
+        eligibleMembers: Number(stats.eligible_members),
+        totalRevenue: Number(stats.total_revenue),
+        potentialWinners,
+        payoutThreshold: 100000, // BR-3: $100K minimum
+        receivedPayouts: 0, // Past winners are excluded from view
+        oldestMemberDate: stats.oldest_member_date,
+        newestMemberDate: stats.newest_member_date
       },
     });
   } catch (error) {

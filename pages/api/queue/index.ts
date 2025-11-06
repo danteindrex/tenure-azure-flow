@@ -56,52 +56,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-// Fallback function for direct database access
+// Fallback function for direct database access using the view
 async function fallbackToDirectAccess(res: NextApiResponse) {
   try {
-    // Import required schemas
-    const { users, userProfiles, userPayments } = await import('@/drizzle/schema');
-    const { sql, eq, asc } = await import('drizzle-orm');
+    const { sql } = await import('drizzle-orm');
 
-    // Fetch queue data with user info using JOIN
-    const enrichedQueueData = await db
-      .select({
-        id: membershipQueue.id,
-        userId: membershipQueue.userId,
-        queuePosition: membershipQueue.queuePosition,
-        joinedQueueAt: membershipQueue.joinedQueueAt,
-        isEligible: membershipQueue.isEligible,
-        subscriptionActive: membershipQueue.subscriptionActive,
-        totalMonthsSubscribed: membershipQueue.totalMonthsSubscribed,
-        lifetimePaymentTotal: membershipQueue.lifetimePaymentTotal,
-        lastPaymentDate: membershipQueue.lastPaymentDate,
-        hasReceivedPayout: membershipQueue.hasReceivedPayout,
-        createdAt: membershipQueue.createdAt,
-        updatedAt: membershipQueue.updatedAt,
-        // Get real user name from profile
-        user_name: sql<string>`COALESCE(${userProfiles.firstName} || ' ' || ${userProfiles.lastName}, 'Member ' || ${membershipQueue.queuePosition})`,
-        user_email: user.email,
-        user_status: sql<string>`CASE WHEN ${membershipQueue.subscriptionActive} THEN 'Active' ELSE 'Inactive' END`,
-        member_join_date: membershipQueue.joinedQueueAt
-      })
-      .from(membershipQueue)
-      .innerJoin(user, eq(membershipQueue.userId, user.id))
-      .leftJoin(userProfiles, eq(user.id, userProfiles.userId))
-      .orderBy(asc(membershipQueue.queuePosition));
+    // Query the active_member_queue_view directly
+    const queueData = await db.execute(sql`
+      SELECT * FROM active_member_queue_view
+      ORDER BY queue_position ASC
+    `);
 
-    // Calculate statistics
-    const activeMembers = enrichedQueueData.filter((user: any) => user.subscriptionActive).length;
-    const eligibleMembers = enrichedQueueData.filter((user: any) => user.isEligible).length;
+    const enrichedQueueData = queueData.rows;
+
+    // Calculate statistics from view data
     const totalMembers = enrichedQueueData.length;
-
-    // Calculate total revenue from payments table
-    const totalRevenueResult = await db.select({
-      total: sql<string>`COALESCE(SUM(${userPayments.amount}), 0)`
-    })
-    .from(userPayments)
-    .where(eq(userPayments.status, 'completed'));
-
-    const totalRevenue = Number(totalRevenueResult[0]?.total || 0);
+    const eligibleMembers = enrichedQueueData.filter((m: any) => m.is_eligible).length;
+    const totalRevenue = enrichedQueueData.reduce((sum: number, m: any) => 
+      sum + parseFloat(m.lifetime_payment_total || 0), 0
+    );
 
     // Calculate potential winners based on revenue
     const rewardPerWinner = 100000; // $100K per winner (BR-4)
@@ -116,12 +89,12 @@ async function fallbackToDirectAccess(res: NextApiResponse) {
         queue: enrichedQueueData,
         statistics: {
           totalMembers,
-          activeMembers,
+          activeMembers: totalMembers, // All members in view are active
           eligibleMembers,
           totalRevenue,
           potentialWinners,
           payoutThreshold: 100000, // BR-3: $100K minimum
-          receivedPayouts: enrichedQueueData.filter((m: any) => m.hasReceivedPayout).length
+          receivedPayouts: enrichedQueueData.filter((m: any) => m.has_received_payout).length
         },
       },
     });
