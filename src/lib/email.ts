@@ -74,22 +74,22 @@ class EmailService {
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Verify Your Email - Tenure</title>
+        <title>Verify Your Email - Home Solutions</title>
       </head>
       <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px;">
           <!-- Header -->
           <div style="text-align: center; padding: 20px 0; border-bottom: 2px solid #0070f3;">
-            <h1 style="color: #0070f3; margin: 0; font-size: 28px;">Tenure</h1>
+            <h1 style="color: #0070f3; margin: 0; font-size: 28px;">Home Solutions</h1>
             <p style="color: #666; margin: 5px 0 0 0;">Secure Email Verification</p>
           </div>
-          
+
           <!-- Content -->
           <div style="padding: 30px 0;">
             <h2 style="color: #333; margin: 0 0 20px 0;">Verify Your Email Address</h2>
-            
+
             <p style="color: #666; font-size: 16px; line-height: 1.5; margin: 0 0 25px 0;">
-              Welcome to Tenure! Please verify your email address to complete your account setup.
+              Welcome to Home Solutions! Please verify your email address to complete your account setup.
             </p>
             
             <!-- OTP Code Box -->
@@ -134,7 +134,7 @@ class EmailService {
           <!-- Footer -->
           <div style="border-top: 1px solid #eee; padding: 20px 0; text-align: center;">
             <p style="color: #999; font-size: 12px; margin: 0;">
-              This email was sent by Tenure<br>
+              This email was sent by Home Solutions<br>
               If you have questions, contact our support team.
             </p>
           </div>
@@ -160,13 +160,13 @@ class EmailService {
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Reset Your Password - Tenure</title>
+        <title>Reset Your Password - Home Solutions</title>
       </head>
       <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px;">
           <!-- Header -->
           <div style="text-align: center; padding: 20px 0; border-bottom: 2px solid #dc3545;">
-            <h1 style="color: #dc3545; margin: 0; font-size: 28px;">Tenure</h1>
+            <h1 style="color: #dc3545; margin: 0; font-size: 28px;">Home Solutions</h1>
             <p style="color: #666; margin: 5px 0 0 0;">Password Reset Request</p>
           </div>
           
@@ -220,7 +220,7 @@ class EmailService {
           <!-- Footer -->
           <div style="border-top: 1px solid #eee; padding: 20px 0; text-align: center;">
             <p style="color: #999; font-size: 12px; margin: 0;">
-              This email was sent by Tenure<br>
+              This email was sent by Home Solutions<br>
               If you have questions, contact our support team.
             </p>
           </div>
@@ -256,7 +256,7 @@ class EmailService {
   async sendTestEmail(to: string = process.env.SMTP_USER!) {
     return this.sendEmail({
       to,
-      subject: '🎉 SMTP Test - Tenure Email Service',
+      subject: '🎉 SMTP Test - Home Solutions Email Service',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h1 style="color: #0070f3;">🎉 SMTP Email Service Working!</h1>

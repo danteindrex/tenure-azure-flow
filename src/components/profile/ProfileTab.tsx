@@ -72,6 +72,7 @@ export function ProfileTab({ user }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          email: profileData.email, // Required field
           phone: profileData.phone,
           street_address: profileData.streetAddress,
           city: profileData.city,

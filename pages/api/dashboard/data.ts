@@ -86,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .from(userPayments)
     .where(and(
       eq(userPayments.userId, dbUser.id),
-      eq(userPayments.status, 'completed')
+      eq(userPayments.status, 'succeeded')
     ));
 
     const totalPaid = Number(totalPaidResult[0]?.total || 0);
@@ -98,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .from(userPayments)
     .where(and(
       eq(userPayments.userId, dbUser.id),
-      eq(userPayments.status, 'completed')
+      eq(userPayments.status, 'succeeded')
     ));
 
     const paymentCount = Number(paymentCountResult[0]?.count || 0);

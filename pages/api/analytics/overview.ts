@@ -102,7 +102,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Potential payout: approximate as total revenue of all completed payments / 2
     let totalRevenueAll = 0;
     const allPayments = await db.query.userPayments.findMany({
-      where: eq(userPayments.status, 'completed'),
+      where: eq(userPayments.status, 'succeeded'),
       columns: {
         amount: true
       }

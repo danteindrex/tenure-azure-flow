@@ -47,7 +47,7 @@ async function runSMSTest() {
     console.log('📱 Test 2: Sending custom SMS...')
     const customResult = await sendSMS(
       '+256745315809',
-      'Hello! This is a custom test message from your Tenure app. SMS integration is working! 🎉'
+      'Hello! This is a custom test message from your Home Solutions app. SMS integration is working! 🎉'
     )
     
     if (customResult.success) {

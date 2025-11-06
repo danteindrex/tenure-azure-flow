@@ -15,7 +15,7 @@ export default function TestSMSPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [phoneNumber, setPhoneNumber] = useState('+256745315809')
-  const [message, setMessage] = useState('Hello from Tenure! This is a test message.')
+  const [message, setMessage] = useState('Hello from Home Solutions! This is a test message.')
 
   const testSMS = async (action: string, customPhone?: string, customMessage?: string) => {
     setLoading(true)

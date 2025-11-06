@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .where(and(
         eq(userPayments.userId, dbUser.id),
         eq(userPayments.paymentType, 'joining_fee'),
-        eq(userPayments.status, 'completed')
+        eq(userPayments.status, 'succeeded')
       ))
       .limit(1)
       .then(rows => rows[0]);
@@ -53,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .where(and(
         eq(userPayments.userId, dbUser.id),
         eq(userPayments.paymentType, 'monthly_fee'),
-        eq(userPayments.status, 'completed')
+        eq(userPayments.status, 'succeeded')
       ))
       .orderBy(desc(userPayments.paymentDate))
       .limit(1)
@@ -66,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .from(userPayments)
     .where(and(
       eq(userPayments.userId, dbUser.id),
-      eq(userPayments.status, 'completed')
+      eq(userPayments.status, 'succeeded')
     ));
 
     const totalPaid = Number(totalPaidResult[0]?.total || 0);
@@ -79,7 +79,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .where(and(
       eq(userPayments.userId, dbUser.id),
       eq(userPayments.paymentType, 'monthly_fee'),
-      eq(userPayments.status, 'completed')
+      eq(userPayments.status, 'succeeded')
     ));
 
     const monthlyPaymentCount = Number(monthlyCountResult[0]?.count || 0);

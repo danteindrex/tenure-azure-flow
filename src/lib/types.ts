@@ -57,6 +57,6 @@ export interface PaymentRecord {
   memberId: number;
   amount: number;
   date: string;
-  status: 'completed' | 'pending' | 'failed';
+  status: 'succeeded' | 'pending' | 'failed';
   type: 'joining_fee' | 'monthly_fee';
 }

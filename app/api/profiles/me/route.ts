@@ -67,8 +67,17 @@ export async function GET(request: Request) {
       };
     }
 
+    // Return data in both formats for compatibility
+    // Flat format for ProfileTab.tsx and nested format for Profile.tsx
     return NextResponse.json({
       success: true,
+      // Flat format (used by ProfileTab.tsx)
+      phone: phoneData ? phoneData.number : "",
+      street_address: address?.streetAddress || "",
+      city: address?.city || "",
+      state: address?.state || "",
+      zip_code: address?.postalCode || "",
+      // Nested format (used by Profile.tsx)
       data: {
         email: dbUser.email,
         profile: profile || {

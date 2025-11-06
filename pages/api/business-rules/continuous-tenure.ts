@@ -50,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .where(and(
             eq(userPayments.userId, member.memberId),
             eq(userPayments.paymentType, 'joining_fee'),
-            eq(userPayments.status, 'completed')
+            eq(userPayments.status, 'succeeded')
           ))
           .limit(1)
           .then(rows => rows[0]);

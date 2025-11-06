@@ -83,7 +83,7 @@ class NotificationService {
         {
           id: '1',
           user_id: userId,
-          title: 'Welcome to Tenure!',
+          title: 'Welcome to Home Solutions!',
           message: 'Your account has been successfully created. Complete your profile to get started.',
           type: 'info',
           priority: 'medium',

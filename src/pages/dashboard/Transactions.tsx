@@ -93,9 +93,9 @@ const Transactions = () => {
       const currentYear = new Date().getFullYear();
       const monthlyTransactions = data.filter(t => {
         const date = new Date(t.created_at);
-        return date.getMonth() === currentMonth && 
+        return date.getMonth() === currentMonth &&
                date.getFullYear() === currentYear &&
-               t.status === 'completed';
+               t.status === 'succeeded';
       });
       
       setMonthlyTotal(monthlyTransactions.reduce((sum, t) => 
@@ -173,7 +173,7 @@ const Transactions = () => {
   });
 
   const totalAmount = transactions
-    .filter(t => t.status === "completed")
+    .filter(t => t.status === "succeeded")
     .reduce((sum, t) => sum + (t.type === "payment" ? -t.amount : t.amount), 0);
 
   return (
@@ -258,7 +258,7 @@ const Transactions = () => {
                 {loading ? (
                   <span className="animate-pulse">...</span>
                 ) : (
-                  transactions.filter(t => t.status === "completed").length
+                  transactions.filter(t => t.status === "succeeded").length
                 )}
               </p>
             </div>

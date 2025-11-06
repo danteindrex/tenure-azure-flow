@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       total: sql<string>`COALESCE(SUM(${userPayments.amount}), 0)`
     })
     .from(userPayments)
-    .where(eq(userPayments.status, 'completed'));
+    .where(eq(userPayments.status, 'succeeded'));
 
     const totalRevenue = Number(totalRevenueResult[0]?.total || 0);
 

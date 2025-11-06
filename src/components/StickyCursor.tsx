@@ -27,7 +27,7 @@ export default function StickyCursor({
         // Import Kursor library
         const kursorModule = await import('kursor/dist/kursor.js')
 
-        // @ts-ignore - kursor doesn't have TypeScript definitions
+        // @ts-expect-error - kursor doesn't have TypeScript definitions
         const Kursor = kursorModule.default || kursorModule.kursor || window.kursor
 
         if (Kursor) {

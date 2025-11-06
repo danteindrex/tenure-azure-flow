@@ -37,14 +37,14 @@ export async function GET(request: NextRequest) {
 
     // Calculate stats
     const totalTransactions = payments.totalDocs
-    const successfulPayments = payments.docs.filter((p: any) => p.status === 'succeeded' || p.status === 'completed').length
+    const successfulPayments = payments.docs.filter((p: any) => p.status === 'succeeded').length
     const failedPayments = payments.docs.filter((p: any) => p.status === 'failed').length
     const pendingPayments = payments.docs.filter((p: any) => p.status === 'pending' || p.status === 'processing').length
     const refundedPayments = payments.docs.filter((p: any) => p.status === 'refunded').length
 
     // Calculate total revenue from successful payments
     const totalRevenue = payments.docs
-      .filter((p: any) => p.status === 'succeeded' || p.status === 'completed')
+      .filter((p: any) => p.status === 'succeeded')
       .reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0)
 
     // Calculate average transaction
@@ -60,9 +60,9 @@ export async function GET(request: NextRequest) {
       const user = userMap.get(payment.user_id)
 
       // Map status to standard format
-      let status: 'completed' | 'pending' | 'failed' | 'refunded' = 'pending'
-      if (payment.status === 'succeeded' || payment.status === 'completed') {
-        status = 'completed'
+      let status: 'succeeded' | 'pending' | 'failed' | 'refunded' = 'pending'
+      if (payment.status === 'succeeded') {
+        status = 'succeeded'
       } else if (payment.status === 'failed') {
         status = 'failed'
       } else if (payment.status === 'refunded') {

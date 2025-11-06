@@ -18,7 +18,7 @@ interface Transaction {
   userId: string
   userEmail: string
   amount: number
-  status: 'completed' | 'pending' | 'failed' | 'refunded'
+  status: 'succeeded' | 'pending' | 'failed' | 'refunded'
   paymentMethod: string
   createdAt: string
 }
@@ -187,7 +187,7 @@ export default function PaymentsCenterClient() {
           font-size: 11px;
           font-weight: 500;
         }
-        .status-completed { background: #14532d; color: #86efac; }
+        .status-succeeded { background: #14532d; color: #86efac; }
         .status-pending { background: #713f12; color: #fcd34d; }
         .status-failed { background: #7f1d1d; color: #fca5a5; }
         .status-refunded { background: #1e3a8a; color: #93c5fd; }

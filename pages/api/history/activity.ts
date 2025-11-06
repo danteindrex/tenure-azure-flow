@@ -71,7 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ? 'Monthly Payment Processed'
         : 'Payment Processed';
 
-      const description = `${payment.status === 'completed' ? 'Successfully processed' : payment.status} payment of $${Number(payment.amount).toFixed(2)}`;
+      const description = `${payment.status === 'succeeded' ? 'Successfully processed' : payment.status} payment of $${Number(payment.amount).toFixed(2)}`;
 
       activities.push({
         id: `payment-${payment.id}`,

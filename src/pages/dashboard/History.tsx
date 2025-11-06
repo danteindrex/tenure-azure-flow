@@ -156,7 +156,7 @@ const History = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Completed</p>
-              <p className="text-2xl font-bold">{historyData.filter(h => h.status === "completed").length}</p>
+              <p className="text-2xl font-bold">{historyData.filter(h => h.status === "succeeded").length}</p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-500" />
           </div>

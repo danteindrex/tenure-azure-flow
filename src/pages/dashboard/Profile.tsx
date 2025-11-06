@@ -118,22 +118,41 @@ const Profile = () => {
 
   const handleSave = async () => {
     if (!user) return;
-    
+
     try {
       setSaving(true);
-      
-      // Update user profile with Better Auth
+
+      // Update user profile with Better Auth (name only)
       const result = await authClient.updateUser({
         name: profileData.fullName
-        // TODO: Store additional profile data in user_profiles table
       });
 
       if (result.error) {
         throw new Error(result.error.message || result.error.code || 'Failed to update profile');
       }
 
+      // Update additional profile data (phone, address) via upsert endpoint
+      const fullPhone = `${profileData.phoneCountryCode}${profileData.phoneNumber}`;
+      const profileUpdateResult = await fetch("/api/profiles/upsert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: profileData.email,
+          phone: fullPhone,
+          street_address: profileData.streetAddress,
+          city: profileData.city,
+          state: profileData.state,
+          zip_code: profileData.zipCode,
+        }),
+      });
+
+      if (!profileUpdateResult.ok) {
+        const errorData = await profileUpdateResult.json();
+        throw new Error(errorData.error || "Failed to update profile details.");
+      }
+
       // Log profile update
-      const changes = Object.keys(profileData).filter(key => 
+      const changes = Object.keys(profileData).filter(key =>
         originalData[key] !== profileData[key]
       ).reduce((acc, key) => {
         acc[key] = {

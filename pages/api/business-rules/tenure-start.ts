@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .where(and(
         eq(userPayments.userId, dbUser.id),
         eq(userPayments.paymentType, 'joining_fee'),
-        eq(userPayments.status, 'completed')
+        eq(userPayments.status, 'succeeded')
       ))
       .orderBy(asc(userPayments.paymentDate))
       .limit(1)
