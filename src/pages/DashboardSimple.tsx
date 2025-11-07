@@ -277,7 +277,7 @@ const DashboardSimple = () => {
                     </div>
                     <div>
                       <p className="font-medium">{member.name}</p>
-                      <p className="text-sm text-muted-foreground">{member.tenureMonths} months</p>
+                      {/* <p className="text-sm text-muted-foreground">{member.tenureMonths} months</p> */}
                     </div>
                   </div>
                   <div className="text-right">
@@ -304,7 +304,7 @@ const DashboardSimple = () => {
                       </div>
                       <div>
                         <p className="font-medium">{currentUserEntry.name}</p>
-                        <p className="text-sm text-muted-foreground">{currentUserEntry.tenureMonths} months</p>
+                        {/* <p className="text-sm text-muted-foreground">{currentUserEntry.tenureMonths} months</p> */}
                       </div>
                     </div>
                     <div className="text-right">
