@@ -78,21 +78,29 @@ app.use((err: Error, _req: Request, res: Response, _next: any) => {
 
 // Start server
 async function startServer() {
-  try {
-    // Test database connection using Drizzle pool
-    await pool.query('SELECT 1');
-    logger.info('✅ Database connection successful');
+  const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV;
 
-    app.listen(config.port, () => {
-      logger.info(`Subscription Service running on port ${config.port}`);
-      logger.info(`Environment: ${config.nodeEnv}`);
-      logger.info(`Health check: http://localhost:${config.port}/health`);
-    });
-  } catch (error) {
-    logger.error('Failed to start server:', error);
-    logger.error('Database connection failed. Please check DATABASE_URL environment variable.');
-    process.exit(1);
+  // In serverless environments (Vercel), skip upfront DB connection test
+  // Connections will be established lazily per request using Supabase Transaction Mode (port 6543)
+  if (!isServerless) {
+    try {
+      // Test database connection using Drizzle pool
+      await pool.query('SELECT 1');
+      logger.info('✅ Database connection successful');
+    } catch (error) {
+      logger.error('Failed to start server:', error);
+      logger.error('Database connection failed. Please check DATABASE_URL environment variable.');
+      process.exit(1);
+    }
+  } else {
+    logger.info('🚀 Running in serverless mode - database connections will be established per-request');
   }
+
+  app.listen(config.port, () => {
+    logger.info(`Subscription Service running on port ${config.port}`);
+    logger.info(`Environment: ${config.nodeEnv}`);
+    logger.info(`Health check: http://localhost:${config.port}/health`);
+  });
 }
 
 // Graceful shutdown

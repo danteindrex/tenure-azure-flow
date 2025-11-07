@@ -116,7 +116,7 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
   };
 
   return (
-    <div className={`bg-card border-r border-border transition-all duration-300 ${
+    <div className={`bg-card border-r border-border shadow-2xl transition-all duration-300 ${
       isCollapsed ? "w-16" : "w-64"
     } flex flex-col h-screen sticky top-0`}>
       {/* Header */}

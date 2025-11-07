@@ -13,9 +13,10 @@ const poolConfig: PoolConfig = {
   // Optimized for serverless environments (Vercel/AWS Lambda)
   max: isServerless ? 1 : 10, // Only 1 connection per serverless instance
   min: isServerless ? 0 : 2,  // No idle connections in serverless
-  idleTimeoutMillis: isServerless ? 10000 : 60000, // Close faster in serverless
-  connectionTimeoutMillis: isServerless ? 5000 : 15000, // Fail faster in serverless
+  idleTimeoutMillis: isServerless ? 5000 : 60000, // Close idle clients quickly in serverless
+  connectionTimeoutMillis: isServerless ? 30000 : 15000, // 30 seconds for Vercel cold starts
   allowExitOnIdle: isServerless ? true : false, // Allow pool to close in serverless
+  statement_timeout: isServerless ? 60000 : undefined, // 60 second query timeout in serverless
 };
 
 // Log configuration in development

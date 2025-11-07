@@ -11,10 +11,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Get current user session
+    // Get current user session - Better Auth uses raw cookie header
     console.log('🔍 Creating checkout - fetching session...');
+
+    // Better Auth's getSession works with the raw cookie header
+    // Just forward the entire cookie header as-is
     const session = await auth.api.getSession({
-      headers: new Headers(req.headers as any)
+      headers: new Headers({
+        'cookie': req.headers.cookie || ''
+      })
     });
 
     if (!session?.user) {
@@ -53,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.user.id}`, // Add authentication
+        'Cookie': req.headers.cookie || '', // Forward Better Auth session cookie
       },
       body: JSON.stringify({
         userId: userData.id, // Using normalized user ID

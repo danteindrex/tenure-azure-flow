@@ -60,9 +60,11 @@ const pool = new Pool({
   // Optimized settings for serverless environments (Vercel)
   max: 1, // Only 1 connection per serverless function instance
   min: 0, // No idle connections in serverless
-  idleTimeoutMillis: 10000, // Close idle clients after 10 seconds
-  connectionTimeoutMillis: 5000, // Wait 5 seconds to connect
+  idleTimeoutMillis: 5000, // Close idle clients quickly (5 seconds)
+  connectionTimeoutMillis: 30000, // Wait 30 seconds for initial connection (Vercel cold starts can be slow)
   allowExitOnIdle: true, // Allow pool to close when idle (important for serverless)
+  // Additional serverless optimizations
+  statement_timeout: 60000, // 60 second query timeout
 })
 
 // Log pool errors but don't exit process

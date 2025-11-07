@@ -5,6 +5,11 @@ const nextConfig = {
   // Ensure Next uses this project as the workspace root (fixes multi-lockfile warning)
   outputFileTracingRoot: path.join(process.cwd()),
   reactStrictMode: true,
+
+  // Fix Better Auth module resolution with Next.js 15
+  // This treats better-auth as an external package to avoid bundling issues
+  serverExternalPackages: ['better-auth'],
+
   async rewrites() {
     return [
       { source: "/SignUp", destination: "/signup" },

@@ -25,24 +25,43 @@ export async function validateSession(
   next: NextFunction
 ) {
   try {
-    // Get session ID from cookie
-    // Better Auth stores the session ID directly in the cookie
-    const sessionId = req.cookies['better-auth.session_token'];
+    // Get session token from cookie
+    // Better Auth stores a SIGNED token: "sessionId.signature"
+    const sessionToken = req.cookies['better-auth.session_token'];
 
-    if (!sessionId) {
+    console.log('🔍 Validating session...');
+    console.log('📝 Cookies received:', Object.keys(req.cookies));
+    console.log('🔑 Session token from cookie:', sessionToken);
+
+    if (!sessionToken) {
+      console.log('❌ No session token in cookies');
       return res.status(401).json({
         success: false,
         error: 'No session token provided'
       });
     }
 
+    // Extract session token from signed cookie (format: "token.signature")
+    // Better Auth signs the token, we need the part before the dot
+    const token = sessionToken.split('.')[0];
+    console.log('🔓 Extracted token:', token);
+
     // Query session from shared database using Drizzle
-    // The session ID in the cookie IS the session.id in the database
+    // Better Auth uses the 'token' field for authentication, not 'id'
+    console.log('🔍 Querying session table by token:', token);
+
     const sessionRecord = await db.query.session.findFirst({
-      where: (session, { eq }) => eq(session.id, sessionId)
+      where: (session, { eq }) => eq(session.token, token)
     });
 
+    console.log('📋 Session found:', sessionRecord ? 'Yes' : 'No');
+    if (sessionRecord) {
+      console.log('   User ID:', sessionRecord.userId);
+      console.log('   Expires:', sessionRecord.expiresAt);
+    }
+
     if (!sessionRecord) {
+      console.log('❌ Session not found in database');
       return res.status(401).json({
         success: false,
         error: 'Invalid session token'

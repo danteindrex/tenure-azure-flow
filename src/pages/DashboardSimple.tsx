@@ -182,7 +182,7 @@ const DashboardSimple = () => {
 
       {/* Key Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4">
+        <Card className="p-4 shadow-lg border-0">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Days Until Payment</p>
@@ -191,8 +191,8 @@ const DashboardSimple = () => {
             <Calendar className="w-8 h-8 text-blue-500" />
           </div>
         </Card>
-        
-        <Card className="p-4">
+
+        <Card className="p-4 shadow-lg border-0">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Queue Position</p>
@@ -203,8 +203,8 @@ const DashboardSimple = () => {
             <Users className="w-8 h-8 text-purple-500" />
           </div>
         </Card>
-        
-        <Card className="p-4">
+
+        <Card className="p-4 shadow-lg border-0">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Total Fund</p>
@@ -214,12 +214,12 @@ const DashboardSimple = () => {
           </div>
         </Card>
         
-        <Card className="p-4">
+        <Card className="p-4 shadow-lg border-0">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Next Draw</p>
               <p className="text-2xl font-bold">
-                {stats.daysUntilDraw > 0 ? `${stats.daysUntilDraw} days` : 
+                {stats.daysUntilDraw > 0 ? `${stats.daysUntilDraw} days` :
                  stats.totalRevenue >= PRIZE_PER_WINNER ? "Ready" : "Pending fund"}
               </p>
             </div>
@@ -229,7 +229,7 @@ const DashboardSimple = () => {
       </div>
 
       {/* Fund Progress */}
-      <Card className="p-6">
+      <Card className="p-6 shadow-lg border-0">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-accent" />
           Fund Progress
@@ -265,8 +265,10 @@ const DashboardSimple = () => {
               {topQueue.slice(0, 3).map((member) => (
                 <div
                   key={member.rank}
-                  className={`flex items-center justify-between p-3 rounded-lg transition-shadow ${
-                    member.isCurrentUser ? 'bg-indigo-50 border-2 border-indigo-200 shadow-md' : 'bg-background/50 border'
+                  className={`flex items-center justify-between p-3 rounded-lg transition-all ${
+                    member.isCurrentUser
+                      ? 'bg-accent/10 dark:bg-accent/20 shadow-lg'
+                      : 'bg-card shadow-md'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -283,7 +285,7 @@ const DashboardSimple = () => {
                   <div className="text-right">
                     <p className="text-sm font-medium">{member.status}</p>
                     {member.isCurrentUser && (
-                      <p className="text-xs text-indigo-600 font-semibold">You are here</p>
+                      <p className="text-xs text-accent font-semibold">You are here</p>
                     )}
                   </div>
                 </div>
@@ -296,7 +298,7 @@ const DashboardSimple = () => {
                     <div className="text-muted-foreground">•••</div>
                   </div>
                   <div
-                    className="flex items-center justify-between p-3 rounded-lg transition-shadow bg-indigo-50 border-2 border-indigo-200 shadow-md"
+                    className="flex items-center justify-between p-3 rounded-lg transition-all bg-accent/10 dark:bg-accent/20 shadow-lg"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold bg-blue-100 text-blue-800">
@@ -309,7 +311,7 @@ const DashboardSimple = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium">{currentUserEntry.status}</p>
-                      <p className="text-xs text-indigo-600 font-semibold">You are here</p>
+                      <p className="text-xs text-accent font-semibold">You are here</p>
                     </div>
                   </div>
                 </>
@@ -329,30 +331,30 @@ const DashboardSimple = () => {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="p-6">
+        <Card className="p-6 shadow-lg border-0">
           <h3 className="text-lg font-semibold mb-4">Next Payment</h3>
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">Due: {userData.nextPaymentDue}</p>
             <p className="text-2xl font-bold">
               {stats.paymentAmount > 0 ? `$${stats.paymentAmount}.00` : "$25.00"}
             </p>
-            <Button className="w-full" disabled={stats.daysUntilPayment <= 0 && stats.paymentAmount > 0}>
+            <Button className="w-full shadow-lg" disabled={stats.daysUntilPayment <= 0 && stats.paymentAmount > 0}>
               {stats.daysUntilPayment <= 0 && stats.paymentAmount > 0 ? "Payment Not Due" : "Make Payment"}
             </Button>
           </div>
         </Card>
-        
-        <Card className="p-6">
+
+        <Card className="p-6 shadow-lg border-0">
           <h3 className="text-lg font-semibold mb-4">Next Draw</h3>
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              {stats.daysUntilDraw > 0 ? `In: ${stats.daysUntilDraw} days` : 
+              {stats.daysUntilDraw > 0 ? `In: ${stats.daysUntilDraw} days` :
                stats.totalRevenue >= PRIZE_PER_WINNER ? "Ready to draw" : "Waiting for fund target"}
             </p>
             <p className="text-2xl font-bold">
               {stats.potentialWinners > 0 ? `${stats.potentialWinners} eligible` : "No eligible members"}
             </p>
-            <Button variant="outline" className="w-full">View Details</Button>
+            <Button variant="outline" className="w-full shadow-lg">View Details</Button>
           </div>
         </Card>
       </div>

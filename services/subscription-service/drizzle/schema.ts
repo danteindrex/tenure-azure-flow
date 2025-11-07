@@ -951,18 +951,21 @@ export const user = pgTable("user", {
 ]);
 
 export const session = pgTable("session", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: uuid().notNull(),
-	expiresAt: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-	ipAddress: text(),
-	userAgent: text(),
-	createdAt: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	id: text().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	expiresAt: timestamp("expires_at", { withTimezone: true, mode: 'string' }).notNull(),
+	token: text().notNull(),
+	ipAddress: text("ip_address"),
+	userAgent: text("user_agent"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
 	foreignKey({
 			columns: [table.userId],
 			foreignColumns: [user.id],
 			name: "session_userId_user_id_fk"
 		}).onDelete("cascade"),
+	unique("session_token_key").on(table.token),
 ]);
 
 export const account = pgTable("account", {

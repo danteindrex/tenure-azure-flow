@@ -105,13 +105,8 @@ export class OnboardingService {
       }
 
       // Determine current step based on actual database state
-      // Users with status 'Active' can access dashboard regardless of other checks
-      if (betterAuthUser.status === 'Active' && status.hasActiveSubscription) {
-        status.step = 'dashboard'
-        status.canAccessDashboard = true
-        status.nextRoute = '/dashboard'
-        status.nextStep = 6 // Completed
-      } else if (!status.isEmailVerified && !isOAuthUser) {
+      // ONLY users with status 'Active' can access dashboard
+      if (!status.isEmailVerified && !isOAuthUser) {
         status.step = 'email-verification'
         status.nextStep = 2
         status.nextRoute = '/signup?step=2'
@@ -127,12 +122,18 @@ export class OnboardingService {
         status.step = 'payment'
         status.nextStep = 5
         status.nextRoute = '/signup?step=5'
-      } else {
-        // All steps completed but status not yet Active - this shouldn't happen
+      } else if (betterAuthUser.status === 'Active') {
+        // All steps completed AND status is Active - grant dashboard access
         status.step = 'dashboard'
         status.canAccessDashboard = true
         status.nextRoute = '/dashboard'
         status.nextStep = 6 // Completed
+      } else {
+        // All steps completed but status is not Active (e.g., Pending)
+        // Keep them on payment step until admin approves
+        status.step = 'payment'
+        status.nextStep = 5
+        status.nextRoute = '/signup?step=5'
       }
 
       return status
