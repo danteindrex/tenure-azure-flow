@@ -3,8 +3,6 @@ node_modules
 .env.local
 *.log
 .git
-src
-tsconfig.json
 README.md
 SETUP.md
 docker-compose.yml

@@ -1,8 +1,8 @@
-import { Router } from 'express';
+import { Router, type Router as RouterType } from 'express';
 import { SubscriptionController } from '../controllers/subscription.controller';
 import { validateSession } from '../middleware/auth.middleware';
 
-const router = Router();
+const router: RouterType = Router();
 
 // Create checkout session (protected)
 router.post('/checkout', validateSession, SubscriptionController.createCheckoutSession);

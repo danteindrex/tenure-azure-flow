@@ -53,12 +53,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Call subscription service to create Stripe checkout session
     const subscriptionServiceUrl = process.env.SUBSCRIPTION_SERVICE_URL || 'http://localhost:3001';
     console.log('🔍 Calling subscription service:', subscriptionServiceUrl);
+    console.log('🍪 Forwarding cookies:', req.headers.cookie);
 
     const checkoutResponse = await fetch(`${subscriptionServiceUrl}/api/subscriptions/checkout`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Cookie': req.headers.cookie || '', // Forward Better Auth session cookie
+        // Add authorization header as backup
+        'Authorization': `Bearer ${session.user.id}`,
       },
       body: JSON.stringify({
         userId: userData.id, // Using normalized user ID

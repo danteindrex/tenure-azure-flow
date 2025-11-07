@@ -16,7 +16,7 @@ declare global {
 }
 
 /**
- * Middleware to validate Better Auth session from cookies
+ * Middleware to validate Better Auth session from cookies or Authorization header
  * Queries the shared database to verify session token
  */
 export async function validateSession(
@@ -25,61 +25,85 @@ export async function validateSession(
   next: NextFunction
 ) {
   try {
-    // Get session token from cookie
-    // Better Auth stores a SIGNED token: "sessionId.signature"
-    const sessionToken = req.cookies['better-auth.session_token'];
-
     console.log('🔍 Validating session...');
     console.log('📝 Cookies received:', Object.keys(req.cookies));
-    console.log('🔑 Session token from cookie:', sessionToken);
+    console.log('🔑 Authorization header:', req.headers.authorization ? 'Present' : 'Missing');
 
-    if (!sessionToken) {
-      console.log('❌ No session token in cookies');
+    // Try to get session token from cookie first
+    let sessionToken = req.cookies['better-auth.session_token'];
+    let userId: string | null = null;
+
+    // If no cookie, check Authorization header as fallback (for service-to-service calls)
+    if (!sessionToken && req.headers.authorization) {
+      const authHeader = req.headers.authorization;
+      if (authHeader.startsWith('Bearer ')) {
+        userId = authHeader.substring(7);
+        console.log('🔓 Using Authorization header with userId:', userId);
+      }
+    }
+
+    if (!sessionToken && !userId) {
+      console.log('❌ No session token in cookies or authorization header');
       return res.status(401).json({
         success: false,
-        error: 'No session token provided'
+        error: 'Missing or invalid authorization header'
       });
     }
 
-    // Extract session token from signed cookie (format: "token.signature")
-    // Better Auth signs the token, we need the part before the dot
-    const token = sessionToken.split('.')[0];
-    console.log('🔓 Extracted token:', token);
+    let user;
 
-    // Query session from shared database using Drizzle
-    // Better Auth uses the 'token' field for authentication, not 'id'
-    console.log('🔍 Querying session table by token:', token);
+    // If we have a session token, validate it
+    if (sessionToken) {
+      console.log('🔑 Session token from cookie:', sessionToken);
 
-    const sessionRecord = await db.query.session.findFirst({
-      where: (session, { eq }) => eq(session.token, token)
-    });
+      // Extract session token from signed cookie (format: "token.signature")
+      // Better Auth signs the token, we need the part before the dot
+      const token = sessionToken.split('.')[0];
+      console.log('🔓 Extracted token:', token);
 
-    console.log('📋 Session found:', sessionRecord ? 'Yes' : 'No');
-    if (sessionRecord) {
-      console.log('   User ID:', sessionRecord.userId);
-      console.log('   Expires:', sessionRecord.expiresAt);
+      // Query session from shared database using Drizzle
+      console.log('🔍 Querying session table by token:', token);
+
+      const sessionRecord = await db.query.session.findFirst({
+        where: (session, { eq }) => eq(session.token, token)
+      });
+
+      console.log('📋 Session found:', sessionRecord ? 'Yes' : 'No');
+      if (sessionRecord) {
+        console.log('   User ID:', sessionRecord.userId);
+        console.log('   Expires:', sessionRecord.expiresAt);
+      }
+
+      if (!sessionRecord) {
+        console.log('❌ Session not found in database');
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid session token'
+        });
+      }
+
+      // Check if session expired
+      const expiresAt = new Date(sessionRecord.expiresAt);
+      if (expiresAt < new Date()) {
+        return res.status(401).json({
+          success: false,
+          error: 'Session expired'
+        });
+      }
+
+      userId = sessionRecord.userId;
     }
 
-    if (!sessionRecord) {
-      console.log('❌ Session not found in database');
+    // Query user by ID
+    if (!userId) {
       return res.status(401).json({
         success: false,
-        error: 'Invalid session token'
+        error: 'User ID not found'
       });
     }
 
-    // Check if session expired
-    const expiresAt = new Date(sessionRecord.expiresAt);
-    if (expiresAt < new Date()) {
-      return res.status(401).json({
-        success: false,
-        error: 'Session expired'
-      });
-    }
-
-    // Query user separately
-    const user = await db.query.users.findFirst({
-      where: (users, { eq }) => eq(users.id, sessionRecord.userId)
+    user = await db.query.users.findFirst({
+      where: (users, { eq }) => eq(users.id, userId)
     });
 
     if (!user) {
@@ -93,6 +117,7 @@ export async function validateSession(
     req.user = user;
     req.userId = user.id;
 
+    console.log('✅ Session validated for user:', user.id);
     next();
   } catch (error) {
     console.error('Session validation error:', error);

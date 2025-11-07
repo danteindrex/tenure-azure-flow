@@ -13,40 +13,31 @@ const app: Application = express();
 
 // Trust proxy for serverless environments (Vercel, AWS Lambda)
 // This is required for rate limiting and getting correct client IPs
-if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV) {
-  app.set('trust proxy', true);
-  logger.info('Running in serverless mode - trust proxy enabled');
-}
+// MUST be set before rate limiter is configured
+app.set('trust proxy', true);
+logger.info('Trust proxy enabled for serverless/proxy environments');
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
-  // Skip failed requests in serverless to avoid false positives
   skipFailedRequests: true,
+  // Use a standard key generator that works with trust proxy
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
-// Middleware - Security
+// Middleware - Security (applied globally)
 app.use(helmet());
 app.use(cors({
   origin: config.cors.allowedOrigins,
   credentials: true,
 }));
+
+// Cookie parser - apply first, works for all routes
 app.use(cookieParser());
 
-// Middleware - Body parsing
-// Use raw body for Stripe webhooks, JSON for everything else
-app.use((req, res, next) => {
-  if (req.originalUrl === '/api/webhooks/stripe') {
-    express.raw({ type: 'application/json' })(req, res, next);
-  } else {
-    express.json()(req, res, next);
-  }
-});
-app.use(express.urlencoded({ extended: true }));
-app.use('/api/', limiter);
-
-// Health check
+// Health check (no body parsing needed)
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'healthy',
@@ -55,9 +46,16 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// Routes
-app.use('/api/subscriptions', subscriptionRoutes);
-app.use('/api/webhooks', webhookRoutes);
+// Stripe webhook route - MUST be defined BEFORE json/urlencoded parsers
+// Raw body is required for Stripe signature verification
+app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
+
+// Now apply JSON and URL encoded parsers for all other routes
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Apply rate limiting only to subscription routes
+app.use('/api/subscriptions', limiter, subscriptionRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -116,7 +114,13 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
-// Start the server
-startServer();
+// For local development, start the server
+// For Vercel serverless, just export the app
+if (!process.env.VERCEL) {
+  startServer();
+}
 
+// Export for Vercel serverless (CommonJS)
+module.exports = app;
+// Also export as default for TypeScript
 export default app;

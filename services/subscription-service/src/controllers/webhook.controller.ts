@@ -17,9 +17,15 @@ export class WebhookController {
     }
 
     try {
+      // Convert Buffer to string for Stripe signature verification
+      // express.raw() gives us a Buffer, but Stripe expects a string
+      const rawBody = Buffer.isBuffer(req.body)
+        ? req.body.toString('utf-8')
+        : req.body;
+
       // Verify webhook signature
       const event = StripeService.verifyWebhookSignature(
-        req.body,
+        rawBody,
         signature
       );
 

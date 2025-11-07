@@ -8,7 +8,8 @@
       "Bash(sed:*)",
       "Bash(npx tsx:*)",
       "Bash(node run-migration.cjs:*)",
-      "Bash(npm run build:next:*)"
+      "Bash(npm run build:next:*)",
+      "Bash(vercel --prod:*)"
     ],
     "deny": [],
     "ask": []
