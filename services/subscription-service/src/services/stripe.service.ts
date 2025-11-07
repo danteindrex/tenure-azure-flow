@@ -3,7 +3,6 @@ import { config } from '../config/env';
 import { logger } from '../config/logger';
 import { SubscriptionModel } from '../models/subscription.model';
 import { PaymentModel } from '../models/payment.model';
-import { QueueModel } from '../models/queue.model';
 import { CreateCheckoutSessionRequest, CreateCheckoutSessionResponse } from '../types';
 import { pool } from '../config/database';
 
@@ -220,32 +219,17 @@ export class StripeService {
         })
       ]);
 
-      // Add member to queue with payment stats
-      const queueQuery = `
-        INSERT INTO membership_queue (
-          user_id, queue_position, joined_queue_at, is_eligible, 
-          subscription_active, total_months_subscribed, lifetime_payment_total,
-          last_payment_date, created_at
-        )
-        VALUES (
-          $1, 
-          (SELECT COALESCE(MAX(queue_position), 0) + 1 FROM membership_queue), 
-          NOW(), 
-          true, 
-          true, 
-          0, 
-          0.00, 
-          NOW(), 
-          NOW()
-        )
+      // Note: Queue position is automatically calculated by active_member_queue_view
+      // based on user_subscriptions and user_payments tables. No manual queue management needed.
+
+      // Create userMemberships record for KYC verification tracking
+      const membershipQuery = `
+        INSERT INTO user_memberships (user_id, join_date, tenure, verification_status, created_at, updated_at)
+        VALUES ($1, CURRENT_DATE, '0', 'PENDING', NOW(), NOW())
         ON CONFLICT (user_id) DO UPDATE SET
-          subscription_active = true,
-          total_months_subscribed = 0,
-          lifetime_payment_total = 0.00,
-          last_payment_date = NOW(),
           updated_at = NOW()
       `;
-      await pool.query(queueQuery, [userId]);
+      await pool.query(membershipQuery, [userId]);
 
       // Get the actual invoice details from Stripe
       let initialPaymentAmount = config.pricing.initialAmount;
@@ -382,17 +366,8 @@ export class StripeService {
         JSON.stringify(initialPaymentMetadata)
       ]);
 
-      // Update queue stats with actual payment data
-      const updateQueueStatsQuery = `
-        UPDATE membership_queue 
-        SET 
-          total_months_subscribed = 1,
-          lifetime_payment_total = $2,
-          last_payment_date = NOW(),
-          updated_at = NOW()
-        WHERE user_id = $1
-      `;
-      await pool.query(updateQueueStatsQuery, [userId, initialPaymentAmount]);
+      // Note: Queue stats are automatically calculated by active_member_queue_view
+      // No manual updates needed - the view calculates from user_payments table
 
       // Create user agreement records
       const agreementQuery = `
@@ -553,22 +528,8 @@ export class StripeService {
       const lifetimeTotalResult = await pool.query(lifetimeTotalQuery, [dbSubscription.user_id]);
       const lifetimeTotal = parseFloat(lifetimeTotalResult.rows[0].total);
 
-      // Update queue stats
-      const updateQueueStatsQuery = `
-        UPDATE membership_queue
-        SET
-          total_months_subscribed = $2,
-          lifetime_payment_total = $3,
-          last_payment_date = $4,
-          updated_at = NOW()
-        WHERE user_id = $1
-      `;
-      await pool.query(updateQueueStatsQuery, [
-        dbSubscription.user_id,
-        totalMonths,
-        lifetimeTotal,
-        new Date()
-      ]);
+      // Note: Queue stats are automatically calculated by active_member_queue_view
+      // No manual updates needed - the view calculates from user_payments table
 
       logger.info(`Payment recorded for member ${dbSubscription.user_id}`, {
         paymentId: paymentResult.rows[0]?.id,

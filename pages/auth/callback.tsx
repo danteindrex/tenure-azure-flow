@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { useSession, authClient } from '@/lib/auth-client';
+import { useSession } from '@/lib/auth-client';
 import { logError } from '@/lib/audit';
+import { Loader2, Crown } from 'lucide-react';
 
 const AuthCallback = () => {
   const router = useRouter();
@@ -107,10 +108,47 @@ const AuthCallback = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Completing authentication...</p>
+      <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+        {/* Animated Background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-cyan-500/5 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
+        </div>
+
+        <div className="text-center relative z-10 space-y-8">
+          {/* Logo */}
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Crown className="w-10 h-10 text-accent animate-pulse" />
+            <span className="text-3xl font-bold text-foreground">Home Solutions</span>
+          </div>
+
+          {/* Main Spinner */}
+          <div className="relative">
+            <div className="w-24 h-24 mx-auto mb-6">
+              <Loader2 className="w-24 h-24 text-accent animate-spin" />
+            </div>
+
+            {/* Pulsing Ring */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-32 h-32 rounded-full border-2 border-accent/20 animate-ping" />
+            </div>
+          </div>
+
+          {/* Text */}
+          <div className="space-y-3">
+            <h1 className="text-2xl font-bold text-foreground">Completing Authentication</h1>
+            <p className="text-muted-foreground text-lg">
+              Setting up your account...
+            </p>
+          </div>
+
+          {/* Progress Dots */}
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-2.5 h-2.5 bg-accent rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+            <div className="w-2.5 h-2.5 bg-accent rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+            <div className="w-2.5 h-2.5 bg-accent rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+          </div>
         </div>
       </div>
     );

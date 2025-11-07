@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../../drizzle/db';
-import { kycVerification } from '../../drizzle/schema';
+import { kycVerification, userMemberships } from '../../drizzle/schema';
 import { eq } from 'drizzle-orm';
 import * as plaidService from '../services/plaid.service';
 
@@ -122,6 +122,17 @@ export async function verifyKYC(req: Request, res: Response) {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
+    }
+
+    // If verification is successful, update userMemberships table to mark as VERIFIED
+    if (status === 'verified') {
+      await db
+        .update(userMemberships)
+        .set({
+          verificationStatus: 'VERIFIED',
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(userMemberships.userId, req.userId));
     }
 
     res.status(200).json({

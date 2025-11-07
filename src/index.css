@@ -151,12 +151,117 @@ All colors MUST be HSL.
     @apply bg-background text-foreground font-sans antialiased;
     min-height: 100vh;
   }
-  
+
+  /* Typography Hierarchy - Professional Font Weights with Varying Styles */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+    font-feature-settings: "liga" 1, "calt" 1;
+    letter-spacing: -0.01em;
+  }
+
+  /* H1 - Hero/Main headings: Bold, large, commanding */
+  h1 {
+    @apply text-4xl md:text-5xl;
+    font-weight: 900; /* Black - Maximum impact */
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  /* H2 - Section headings: Bold, prominent */
+  h2 {
+    @apply text-3xl md:text-4xl;
+    font-weight: 700; /* Bold - Strong hierarchy */
+    line-height: 1.2;
+  }
+
+  /* H3 - Subsection headings: Regular weight, elegant */
+  h3 {
+    @apply text-2xl md:text-3xl;
+    font-weight: 400; /* Regular - Refined, readable */
+    line-height: 1.3;
+  }
+
+  /* H4 - Minor headings: Light weight, subtle */
+  h4 {
+    @apply text-xl md:text-2xl;
+    font-weight: 300; /* Light - Sophisticated */
+    line-height: 1.4;
+  }
+
+  /* H5 & H6 - Small headings: Use sans-serif for UI elements */
+  h5 {
+    @apply text-lg md:text-xl font-sans font-semibold;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+  }
+
+  h6 {
+    @apply text-base md:text-lg font-sans font-medium;
+    line-height: 1.5;
+    letter-spacing: 0;
+  }
+
+  /* Body text - IBM Plex Sans with varying weights for hierarchy */
+  p {
+    font-feature-settings: "liga" 1, "calt" 1;
+    font-weight: 400; /* Regular - Standard body text */
+    line-height: 1.6;
+  }
+
+  /* Lead paragraphs / introductory text */
+  .lead,
+  p.lead {
+    @apply text-lg md:text-xl;
+    font-weight: 300; /* Light - Elegant for large text */
+    line-height: 1.7;
+    letter-spacing: -0.01em;
+  }
+
+  /* Small text / captions */
+  small,
+  .text-sm {
+    font-weight: 400; /* Regular - Readable at small sizes */
+  }
+
+  /* Bold emphasis */
+  strong,
+  b {
+    font-weight: 600; /* Semibold - Clear emphasis without being too heavy */
+  }
+
+  /* Subtle text for meta info */
+  .text-muted-foreground,
+  [class*="muted"] {
+    font-weight: 400; /* Regular - Maintains readability */
+  }
+
+  /* Numbers and financial data - use tabular figures for alignment */
+  [class*="currency"],
+  [class*="amount"],
+  [class*="price"],
+  [class*="balance"] {
+    font-family: 'IBM Plex Mono', Monaco, 'Courier New', monospace;
+    font-feature-settings: "tnum" 1, "zero" 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Button and UI text should be medium weight */
+  button,
+  [role="button"] {
+    @apply font-sans font-medium;
+    letter-spacing: -0.01em;
+  }
+
+  /* Form labels - slightly bolder */
+  label {
+    @apply font-sans font-medium;
+  }
+
   /* Proper theme handling */
   html {
     color-scheme: light;
   }
-  
+
   html.dark {
     color-scheme: dark;
   }

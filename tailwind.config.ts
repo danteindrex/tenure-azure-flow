@@ -14,7 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['IBM Plex Sans', 'system-ui', '-apple-system', 'sans-serif'],
+        heading: ['Merriweather', 'Georgia', 'serif'],
+        mono: ['IBM Plex Mono', 'Monaco', 'Courier New', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border))",

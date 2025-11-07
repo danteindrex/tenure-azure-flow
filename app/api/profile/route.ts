@@ -157,15 +157,22 @@ export async function POST(req: NextRequest) {
             })
             .where(eq(userAddresses.id, address.id))
         } else {
-          // Create new address
+          // Create new address - validate required fields
+          if (!address.streetAddress || !address.city || !address.state || !address.postalCode) {
+            return NextResponse.json(
+              { success: false, error: 'Address must include street address, city, state, and postal code' },
+              { status: 400 }
+            )
+          }
+
           await db.insert(userAddresses).values({
             userId: userId,
             addressType: address.addressType ?? 'primary',
-            streetAddress: address.streetAddress ?? null,
+            streetAddress: address.streetAddress,
             addressLine2: address.addressLine2 ?? null,
-            city: address.city ?? null,
-            state: address.state ?? null,
-            postalCode: address.postalCode ?? null,
+            city: address.city,
+            state: address.state,
+            postalCode: address.postalCode,
             countryCode: address.countryCode ?? 'US',
             isPrimary: address.isPrimary ?? false,
           })

@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { auth } from "@/lib/auth";
 import { db } from "@/drizzle/db";
-import { user, userProfiles, userContacts, userAddresses, userMemberships } from "@/drizzle/schema";
+import { userProfiles, userContacts, userAddresses } from "@/drizzle/schema";
 import { eq } from "drizzle-orm";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -114,7 +114,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // 4. Upsert address
-      if (street_address || city || state || zip_code) {
+      // All fields except address_line_2 are required
+      if (street_address && city && state && zip_code) {
         // Check if address exists first
         const existingAddress = await db
           .select()
@@ -129,59 +130,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .update(userAddresses)
             .set({
               addressType: 'primary',
-              streetAddress: street_address ?? null,
+              streetAddress: street_address,
               addressLine2: address_line_2 ?? null,
-              city: city ?? null,
-              state: state ?? null,
-              postalCode: zip_code ?? null,
+              city: city,
+              state: state,
+              postalCode: zip_code,
               countryCode: country_code ?? 'US',
               isPrimary: true,
               updatedAt: new Date()
             })
             .where(eq(userAddresses.userId, userId));
         } else {
-          // Create new address
+          // Create new address - all fields required except address_line_2
           await db.insert(userAddresses)
             .values({
               userId: userId,
               addressType: 'primary',
-              streetAddress: street_address ?? null,
+              streetAddress: street_address,
               addressLine2: address_line_2 ?? null,
-              city: city ?? null,
-              state: state ?? null,
-              postalCode: zip_code ?? null,
+              city: city,
+              state: state,
+              postalCode: zip_code,
               countryCode: country_code ?? 'US',
               isPrimary: true,
             });
         }
       }
 
-      // 5. Upsert membership record
-      const existingMembership = await db
-        .select()
-        .from(userMemberships)
-        .where(eq(userMemberships.userId, userId))
-        .limit(1)
-        .then(rows => rows[0]);
-
-      if (existingMembership) {
-        // Update existing membership
-        await db
-          .update(userMemberships)
-          .set({
-            updatedAt: new Date()
-          })
-          .where(eq(userMemberships.userId, userId));
-      } else {
-        // Create new membership
-        await db.insert(userMemberships)
-          .values({
-            userId: userId,
-            joinDate: new Date().toISOString().split('T')[0],
-            tenure: '0',
-            verificationStatus: 'PENDING',
-          });
-      }
+      // Note: userMemberships records are created automatically when payment is successful
+      // via the Stripe webhook handler. Only paying users become members.
 
     } catch (error: any) {
       console.error('Profile upsert error:', error);

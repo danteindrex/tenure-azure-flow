@@ -1,0 +1,57 @@
+{
+  "name": "payout-service",
+  "version": "1.0.0",
+  "description": "Payout Service Microservice for managing $100K member rewards",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "migrate": "drizzle-kit push:pg",
+    "migrate:generate": "drizzle-kit generate:pg",
+    "lint": "eslint src --ext .ts",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "payout",
+    "microservice",
+    "rewards"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "drizzle-orm": "^0.29.0",
+    "postgres": "^3.4.3",
+    "zod": "^3.22.4",
+    "better-auth": "^0.9.0",
+    "dotenv": "^16.3.1",
+    "node-cron": "^3.0.3",
+    "winston": "^3.11.0",
+    "nodemailer": "^6.9.7",
+    "pdfkit": "^0.13.0",
+    "cors": "^2.8.5",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^6.4.14",
+    "@types/pdfkit": "^0.13.3",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.0",
+    "vitest": "^1.0.4",
+    "drizzle-kit": "^0.20.7",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

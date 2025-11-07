@@ -1020,8 +1020,8 @@ const SignUp = () => {
       return;
     }
 
-    if (!formData.streetAddress || !formData.city || !formData.zipCode) {
-      toast.error("Please complete your address information");
+    if (!formData.streetAddress || !formData.city || !formData.state || !formData.zipCode) {
+      toast.error("Please complete all required address fields");
       return;
     }
 
@@ -1931,7 +1931,7 @@ const SignUp = () => {
 
               <Button
                 onClick={handleStep3Submit}
-                disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
+                disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.state || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
                 className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transition-all duration-200 px-8 py-2"
               >
                 {loading ? (
