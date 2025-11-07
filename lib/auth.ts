@@ -51,8 +51,22 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      // Request additional scopes if needed
-      // scope: ['email', 'profile', 'openid']
+      // Request required scopes for OAuth compliance
+      scope: ['openid', 'email', 'profile']
+    }
+  },
+
+  // Account linking configuration
+  account: {
+    accountLinking: {
+      // Enable automatic account linking for users with same email
+      enabled: true,
+      // Automatically link Google OAuth accounts to existing accounts
+      // Google is trusted because it verifies email addresses
+      trustedProviders: ["google"],
+      // Only link accounts if emails match exactly
+      // This prevents security issues with different emails
+      allowDifferentEmails: false
     }
   },
 

@@ -18,7 +18,7 @@ const PORT = process.env.PORT || 3002;
 app.use(express.json());
 
 // Basic health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 

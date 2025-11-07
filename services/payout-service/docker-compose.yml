@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  payout-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - EMAIL_PROVIDER=${EMAIL_PROVIDER}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - EMAIL_FROM=${EMAIL_FROM}
+    volumes:
+      - ./src:/app/src
+      - ./drizzle:/app/drizzle
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - payout-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=tenure
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - payout-network
+
+volumes:
+  postgres-data:
+
+networks:
+  payout-network:
+    driver: bridge

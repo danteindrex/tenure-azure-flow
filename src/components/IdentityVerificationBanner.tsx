@@ -11,39 +11,40 @@ const IdentityVerificationBanner = () => {
   const [showKYCModal, setShowKYCModal] = useState(false);
   const { data: session } = useSession();
 
-  // Check verification status and dismissal state
-  useEffect(() => {
-    const checkVerificationStatus = async () => {
-      if (!session?.user) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        // Check if user has completed identity verification
-        const response = await fetch('/api/auth/check-user-status', {
-          method: 'GET',
-          credentials: 'include'
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setIsVerified(data.isVerified || false);
-        }
-      } catch (error) {
-        console.error('Error checking verification status:', error);
-      }
-
-      // Check if banner was previously dismissed for this session
-      const dismissedKey = `identity-verification-banner-dismissed-${session.user.id}`;
-      const dismissed = sessionStorage.getItem(dismissedKey);
-      if (dismissed === 'true') {
-        setIsDismissed(true);
-      }
-
+  // Check verification status function - defined outside useEffect so it can be called from multiple places
+  const checkVerificationStatus = async () => {
+    if (!session?.user) {
       setLoading(false);
-    };
+      return;
+    }
 
+    try {
+      // Check if user has completed identity verification
+      const response = await fetch('/api/auth/check-user-status', {
+        method: 'GET',
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setIsVerified(data.isVerified || false);
+      }
+    } catch (error) {
+      console.error('Error checking verification status:', error);
+    }
+
+    // Check if banner was previously dismissed for this session
+    const dismissedKey = `identity-verification-banner-dismissed-${session.user.id}`;
+    const dismissed = sessionStorage.getItem(dismissedKey);
+    if (dismissed === 'true') {
+      setIsDismissed(true);
+    }
+
+    setLoading(false);
+  };
+
+  // Check verification status on mount and when session changes
+  useEffect(() => {
     checkVerificationStatus();
   }, [session?.user]);
 
