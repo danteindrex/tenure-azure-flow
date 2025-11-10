@@ -136,6 +136,7 @@ export const FinancialCollectionView: React.FC = () => {
             .table-body {
               max-height: 600px;
               overflow-y: auto;
+              scroll-behavior: smooth;
             }
 
             .table-row {
@@ -143,11 +144,22 @@ export const FinancialCollectionView: React.FC = () => {
               padding: 1rem;
               border-bottom: 1px solid #1a1a1a;
               font-size: 0.875rem;
-              transition: background-color 0.2s ease;
+              transition: background-color 0.2s ease, border-left 0.3s ease;
             }
 
             .table-row:hover {
               background: #1a1a1a;
+            }
+
+            .table-row.focused {
+              background: #1e3a5f !important;
+              border-left: 4px solid #3b82f6;
+              animation: pulse-focus 2s ease-in-out;
+            }
+
+            @keyframes pulse-focus {
+              0%, 100% { background: #1e3a5f; }
+              50% { background: #2563eb; }
             }
 
             .table-row:last-child {
@@ -284,6 +296,40 @@ export const FinancialCollectionView: React.FC = () => {
         ;(window as any).changePage = (newPage: number) => {
           setPage(newPage)
         }
+
+        // Auto-scroll to focused queue position
+        if (collectionSlug === 'queueEntries') {
+          setTimeout(() => {
+            const urlParams = new URLSearchParams(window.location.search)
+            const focusPosition = urlParams.get('focusPosition')
+            const focusMembershipId = urlParams.get('focusMembershipId')
+            const tableBody = document.querySelector('#financial-${collectionSlug} .table-body')
+
+            if (tableBody && (focusPosition || focusMembershipId)) {
+              let focusedRow: HTMLElement | null = null
+
+              if (focusMembershipId) {
+                focusedRow = tableBody.querySelector('[data-membership-id="' + focusMembershipId + '"]')
+              } else if (focusPosition) {
+                focusedRow = tableBody.querySelector('[data-position="' + focusPosition + '"]')
+              }
+
+              if (focusedRow) {
+                // Add focused class
+                focusedRow.classList.add('focused')
+
+                // Calculate center position
+                const containerHeight = tableBody.clientHeight
+                const rowTop = (focusedRow as HTMLElement).offsetTop
+                const rowHeight = (focusedRow as HTMLElement).clientHeight
+
+                // Scroll to center the row (middle of visible area)
+                const scrollPosition = rowTop - (containerHeight / 2) + (rowHeight / 2)
+                tableBody.scrollTop = scrollPosition
+              }
+            }
+          }, 200)
+        }
       }
     }
 
@@ -338,14 +384,14 @@ function getTableRow(collectionSlug: string, doc: any): string {
       `
     case 'queueEntries':
       return `
-        <div class="table-row" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr;">
-          <div class="table-cell">${doc.user?.email || doc.user_id || 'N/A'}</div>
-          <div class="table-cell">${doc.position || 'N/A'}</div>
+        <div class="table-row" data-position="${doc.queue_position || doc.position}" data-membership-id="${doc.membership_id || doc.id}" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr;">
+          <div class="table-cell">${doc.full_name || doc.user?.email || doc.email || doc.user_id || 'N/A'}</div>
+          <div class="table-cell"><strong>#${doc.queue_position || doc.position || 'N/A'}</strong></div>
           <div class="table-cell status">
-            <span class="status-badge status-${(doc.status || 'pending').toLowerCase()}">${doc.status || 'Pending'}</span>
+            <span class="status-badge status-${(doc.subscription_status || doc.status || 'pending').toLowerCase()}">${doc.subscription_status || doc.status || 'Pending'}</span>
           </div>
-          <div class="table-cell secondary">${formatDate(doc.createdAt)}</div>
-          <div class="table-cell secondary">${doc.eligible_date ? formatDate(doc.eligible_date) : 'N/A'}</div>
+          <div class="table-cell secondary">${formatDate(doc.tenure_start_date || doc.join_date || doc.createdAt)}</div>
+          <div class="table-cell secondary">${doc.total_successful_payments || 0} payments</div>
         </div>
       `
     case 'kycVerification':

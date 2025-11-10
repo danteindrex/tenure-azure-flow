@@ -72,37 +72,30 @@ const DashboardSimple = () => {
           if (mine) {
             setQueuePosition(mine.queue_position);
 
-            // Set current user entry
+            // Set current user entry (privacy mode: minimal data)
             setCurrentUserEntry({
               rank: mine.queue_position,
-              name: mine.user_name || 'You',
-              tenureMonths: mine.total_months_subscribed ?? 0,
-              status: mine.subscription_active ? 'Active' : 'Inactive',
+              name: 'You',
+              tenureMonths: 0, // Not available in privacy mode
+              status: 'Active', // Don't show inactive status
               isCurrentUser: true
             });
 
-            // Set payment info from queue data
-            if (mine.last_payment_date) {
-              setPaymentAmount(mine.lifetime_payment_total || 0);
-              // Calculate days until next payment (30 days after last payment)
-              const lastPayment = new Date(mine.last_payment_date);
-              const nextPayment = new Date(lastPayment);
-              nextPayment.setDate(lastPayment.getDate() + 30);
-              const diff = Math.ceil((nextPayment.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-              setDaysUntilPayment(Math.max(diff, 0));
-            }
+            // Payment info not available in privacy mode
+            setPaymentAmount(0);
+            setDaysUntilPayment(0);
           } else {
             setCurrentUserEntry(null);
             setQueuePosition(null);
           }
         }
 
-        // Build top 5 queue preview
-        const preview = queue.slice(0, 5).map((q: any) => ({
+        // Show all queue members (privacy mode: only user_id and queue_position)
+        const preview = queue.map((q: any) => ({
           rank: q.queue_position,
-          name: q.user_name || `Member ${q.queue_position}`,
-          tenureMonths: q.total_months_subscribed ?? 0,
-          status: q.subscription_active ? 'Active' : 'Inactive',
+          name: q.user_id, // Show user_id for privacy
+          tenureMonths: 0, // Not available in privacy mode
+          status: 'Active', // Don't show inactive status
           isCurrentUser: currentUserId ? q.user_id === currentUserId : false,
         }));
         setTopQueue(preview);
@@ -258,31 +251,30 @@ const DashboardSimple = () => {
             <span className="ml-auto text-sm font-medium text-muted-foreground">Your position: #{currentUserEntry.rank}</span>
           )}
         </h3>
-        <div className="space-y-3">
+        <div className="max-h-96 overflow-y-auto space-y-2">
           {topQueue.length > 0 ? (
             <>
-              {/* Show top 3 positions */}
-              {topQueue.slice(0, 3).map((member) => (
+              {/* Show all queue members in scrollable list */}
+              {topQueue.map((member) => (
                 <div
                   key={member.rank}
                   className={`flex items-center justify-between p-3 rounded-lg transition-all ${
                     member.isCurrentUser
-                      ? 'bg-accent/10 dark:bg-accent/20 shadow-lg'
+                      ? 'bg-accent/10 dark:bg-accent/20 shadow-lg border-2 border-accent'
                       : 'bg-card shadow-md'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
                       member.rank <= 2 ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
                     }`}>
                       {member.rank}
                     </div>
                     <div>
-                      <p className="font-medium">{member.name}</p>
-                      {/* <p className="text-sm text-muted-foreground">{member.tenureMonths} months</p> */}
+                      <p className="font-medium text-sm break-all">{member.name}</p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex-shrink-0">
                     <p className="text-sm font-medium">{member.status}</p>
                     {member.isCurrentUser && (
                       <p className="text-xs text-accent font-semibold">You are here</p>
@@ -290,32 +282,6 @@ const DashboardSimple = () => {
                   </div>
                 </div>
               ))}
-              
-              {/* Show ellipsis if current user is not in top 3 */}
-              {currentUserEntry && !topQueue.slice(0, 3).some(member => member.isCurrentUser) && (
-                <>
-                  <div className="text-center py-2">
-                    <div className="text-muted-foreground">•••</div>
-                  </div>
-                  <div
-                    className="flex items-center justify-between p-3 rounded-lg transition-all bg-accent/10 dark:bg-accent/20 shadow-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold bg-blue-100 text-blue-800">
-                        {currentUserEntry.rank}
-                      </div>
-                      <div>
-                        <p className="font-medium">{currentUserEntry.name}</p>
-                        {/* <p className="text-sm text-muted-foreground">{currentUserEntry.tenureMonths} months</p> */}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium">{currentUserEntry.status}</p>
-                      <p className="text-xs text-accent font-semibold">You are here</p>
-                    </div>
-                  </div>
-                </>
-              )}
             </>
           ) : (
             <div className="text-center py-8">

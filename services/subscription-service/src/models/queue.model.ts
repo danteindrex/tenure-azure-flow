@@ -8,6 +8,7 @@ import { pool } from '../config/database';
  */
 
 export interface ActiveMemberQueue {
+  membership_id: string; // Primary identifier - each membership is a separate queue entry
   user_id: string;
   email: string;
   user_created_at: Date;
@@ -18,6 +19,8 @@ export interface ActiveMemberQueue {
   subscription_id: string;
   subscription_status: string;
   provider_subscription_id: string | null;
+  join_date: Date;
+  verification_status: string;
   tenure_start_date: Date;
   last_payment_date: Date;
   total_successful_payments: number;
@@ -40,15 +43,38 @@ export interface QueueStatistics {
 
 export class QueueModel {
   /**
-   * Get queue position and details for a specific user
+   * Get queue positions for a specific user (may return multiple memberships)
+   * Note: Users can have multiple active subscriptions/memberships
    */
-  static async getUserQueuePosition(userId: string): Promise<ActiveMemberQueue | null> {
+  static async getUserQueuePositions(userId: string): Promise<ActiveMemberQueue[]> {
     const query = `
       SELECT * FROM active_member_queue_view
       WHERE user_id = $1
+      ORDER BY queue_position ASC
     `;
     const result = await pool.query<ActiveMemberQueue>(query, [userId]);
+    return result.rows;
+  }
+
+  /**
+   * Get queue position for a specific membership
+   */
+  static async getMembershipQueuePosition(membershipId: string): Promise<ActiveMemberQueue | null> {
+    const query = `
+      SELECT * FROM active_member_queue_view
+      WHERE membership_id = $1
+    `;
+    const result = await pool.query<ActiveMemberQueue>(query, [membershipId]);
     return result.rows[0] || null;
+  }
+
+  /**
+   * @deprecated Use getUserQueuePositions instead (returns array for multi-membership support)
+   * Get first queue position for a user (backward compatibility)
+   */
+  static async getUserQueuePosition(userId: string): Promise<ActiveMemberQueue | null> {
+    const positions = await this.getUserQueuePositions(userId);
+    return positions[0] || null;
   }
 
   /**

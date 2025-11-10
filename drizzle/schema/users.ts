@@ -15,6 +15,7 @@
 import { pgTable, uuid, text, varchar, boolean, timestamp, date, numeric, integer, index, unique } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { user } from './auth'
+import { userSubscriptions } from './financial'
 
 // Note: We now use Better Auth's user table directly instead of a custom users table
 // Export the Better Auth user for convenience
@@ -84,9 +85,12 @@ export const userAddresses = pgTable('user_addresses', {
 // ============================================================================
 // 5. USER MEMBERSHIPS: Membership Data (EXISTING TABLE - EXACT MAPPING)
 // ============================================================================
+// Note: Users can have multiple memberships (one per subscription)
+// Each subscription creates its own membership entry in the queue
 export const userMemberships = pgTable('user_memberships', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').unique().references(() => user.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => user.id, { onDelete: 'cascade' }), // NO unique constraint - users can have multiple memberships
+  subscriptionId: uuid('subscription_id').unique().references(() => userSubscriptions.id, { onDelete: 'cascade' }), // One membership per subscription
   joinDate: date('join_date').notNull().defaultNow(),
   tenure: numeric('tenure').default('0'),
   verificationStatus: varchar('verification_status', { length: 20 }).default('PENDING'),
@@ -96,6 +100,7 @@ export const userMemberships = pgTable('user_memberships', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
   userIdIdx: index('idx_user_memberships_user_id').on(table.userId),
+  subscriptionIdIdx: index('idx_user_memberships_subscription_id').on(table.subscriptionId),
   joinDateIdx: index('idx_user_memberships_join_date').on(table.joinDate)
 }))
 

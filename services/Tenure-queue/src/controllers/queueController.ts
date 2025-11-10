@@ -19,9 +19,12 @@ class QueueController {
       if (search && typeof search === 'string') {
         const searchTerm = search.toLowerCase();
         queueData = queueData.filter((member: any) =>
-          member.member_name?.toLowerCase().includes(searchTerm) ||
-          member.member_email?.toLowerCase().includes(searchTerm) ||
-          member.memberid?.toString().includes(searchTerm)
+          member.full_name?.toLowerCase().includes(searchTerm) ||
+          member.first_name?.toLowerCase().includes(searchTerm) ||
+          member.last_name?.toLowerCase().includes(searchTerm) ||
+          member.email?.toLowerCase().includes(searchTerm) ||
+          member.user_id?.toString().includes(searchTerm) ||
+          member.membership_id?.toString().includes(searchTerm)
         );
       }
 
@@ -33,12 +36,23 @@ class QueueController {
         queueData = queueData.slice(offsetNum, offsetNum + limitNum);
       }
 
+      // Only return position and user_id for privacy
+      const sanitizedQueue = queueData.map((member: any) => ({
+        queue_position: member.queue_position,
+        user_id: member.user_id
+      }));
+
+      console.log('📊 Returning queue data:');
+      console.log('   Total members before pagination:', totalCount);
+      console.log('   Members after sanitization:', sanitizedQueue.length);
+      console.log('   Queue data:', JSON.stringify(sanitizedQueue, null, 2));
+
       const statistics = await this.queueModel.getQueueStatistics();
 
       res.json({
         success: true,
         data: {
-          queue: queueData,
+          queue: sanitizedQueue,
           statistics,
           pagination: {
             total: totalCount,

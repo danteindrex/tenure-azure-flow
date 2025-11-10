@@ -57,11 +57,11 @@ if (isServerless && connectionString?.includes(':5432')) {
 const pool = new Pool({
   connectionString,
   ssl: { rejectUnauthorized: false }, // Always use SSL for Supabase
-  // Optimized settings for serverless environments (Vercel)
-  max: 1, // Only 1 connection per serverless function instance
+  // Optimized settings for development and serverless environments
+  max: isServerless ? 1 : 10, // 1 connection per serverless instance, 10 for local dev
   min: 0, // No idle connections in serverless
-  idleTimeoutMillis: 10000, // Close idle clients after 10 seconds
-  connectionTimeoutMillis: 5000, // Wait 5 seconds to connect
+  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+  connectionTimeoutMillis: 20000, // Wait 20 seconds to connect
   allowExitOnIdle: true, // Allow pool to close when idle (important for serverless)
 })
 
