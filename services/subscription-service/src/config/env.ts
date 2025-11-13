@@ -12,6 +12,7 @@ const envSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   INITIAL_PAYMENT_AMOUNT: z.string().default('325'),
   RECURRING_PAYMENT_AMOUNT: z.string().default('25'),
+  ANNUAL_PAYMENT_AMOUNT: z.string().default('300'),
   CURRENCY: z.string().default('usd'),
   ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
   FRONTEND_URL: z.string().default('http://localhost:3000'),
@@ -31,6 +32,7 @@ export const config = {
   pricing: {
     initialAmount: parseFloat(env.INITIAL_PAYMENT_AMOUNT),
     recurringAmount: parseFloat(env.RECURRING_PAYMENT_AMOUNT),
+    annualAmount: parseFloat(env.ANNUAL_PAYMENT_AMOUNT),
     currency: env.CURRENCY,
   },
   cors: {

@@ -7,7 +7,7 @@ import { CreateCheckoutSessionRequest, CreateCheckoutSessionResponse } from '../
 import { pool } from '../config/database';
 
 const stripe = new Stripe(config.stripe.secretKey, {
-  apiVersion: '2023-10-16',
+  apiVersion: '2025-10-29.clover',
   typescript: true,
 });
 
@@ -62,50 +62,43 @@ export class StripeService {
         });
       }
 
-      // Create checkout session with both setup fee and subscription
+      // Create checkout session for joining fee payment + setup payment method
+      // Note: Mixed interval subscriptions cannot be created via Checkout Sessions
+      // We'll collect payment for joining fee and setup payment method, then create subscription via API
       const session = await stripe.checkout.sessions.create({
         customer: customer.id,
-        mode: 'subscription',
+        mode: 'payment',
         payment_method_types: ['card'],
         // Apple Pay and Google Pay are automatically enabled with 'card' type
-        // They will show up based on user's device and browser capabilities
         line_items: [
-          // Setup fee (one-time)
+          // Joining fee (one-time) - $325 (includes first month $25 + first year $300)
           {
             price_data: {
               currency: config.pricing.currency,
-              unit_amount: Math.round((config.pricing.initialAmount - config.pricing.recurringAmount) * 100), // $275 setup fee
+              unit_amount: Math.round(config.pricing.initialAmount * 100), // $325
               product_data: {
-                name: 'Tenure Membership Setup Fee',
-              },
-            },
-            quantity: 1,
-          },
-          // Monthly subscription
-          {
-            price_data: {
-              currency: config.pricing.currency,
-              unit_amount: Math.round(config.pricing.recurringAmount * 100), // $25
-              recurring: {
-                interval: 'month',
-              },
-              product_data: {
-                name: 'Tenure Monthly Subscription',
+                name: 'Tenure Membership Joining Fee',
+                description: 'One-time joining fee - includes first month ($25) and first year ($300). Recurring: $25/month + $300/year starting next period.',
               },
             },
             quantity: 1,
           },
         ],
-        subscription_data: {
+        payment_intent_data: {
+          setup_future_usage: 'off_session', // Save payment method for future charges
           metadata: {
             userId: userId.toString(),
+            paymentType: 'initial_payment_with_subscription_setup',
           },
         },
         success_url: successUrl || `${config.frontendUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: cancelUrl || `${config.frontendUrl}/signup?canceled=true`,
         metadata: {
           userId: userId.toString(),
-          paymentType: 'subscription_with_setup_fee',
+          paymentType: 'mixed_interval_subscription_setup',
+          joiningFee: config.pricing.initialAmount.toString(),
+          monthlyFee: config.pricing.recurringAmount.toString(),
+          annualFee: config.pricing.annualAmount.toString(),
         },
         allow_promotion_codes: true,
       });
@@ -127,14 +120,57 @@ export class StripeService {
 
   /**
    * Handle successful checkout session (initial payment + subscription setup)
+   * Creates mixed interval subscription after payment is collected
    */
   static async handleCheckoutComplete(session: Stripe.Checkout.Session): Promise<void> {
     try {
       const userId = session.metadata!.userId; // UUID string, not integer
-      const subscriptionId = session.subscription as string;
 
-      // Get subscription details from Stripe
-      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      // Get payment intent to retrieve payment method and charge details
+      const paymentIntentId = session.payment_intent as string;
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+        expand: ['latest_charge']
+      });
+      const paymentMethodId = paymentIntent.payment_method as string;
+
+      // Create mixed interval subscription using API (not Checkout Session)
+      // This is required because Checkout Sessions don't support mixed intervals
+      // First, create or retrieve product and prices
+
+      // Create monthly price
+      const monthlyPrice = await stripe.prices.create({
+        currency: config.pricing.currency,
+        unit_amount: Math.round(config.pricing.recurringAmount * 100), // $25
+        recurring: { interval: 'month' },
+        product_data: {
+          name: 'Tenure Monthly Subscription',
+        },
+      });
+
+      // Create annual price
+      const annualPrice = await stripe.prices.create({
+        currency: config.pricing.currency,
+        unit_amount: Math.round(config.pricing.annualAmount * 100), // $300
+        recurring: { interval: 'year' },
+        product_data: {
+          name: 'Tenure Annual Subscription',
+        },
+      });
+
+      // Create subscription with both prices
+      const subscription = await stripe.subscriptions.create({
+        customer: session.customer as string,
+        items: [
+          { price: monthlyPrice.id },
+          { price: annualPrice.id },
+        ],
+        default_payment_method: paymentMethodId,
+        metadata: {
+          userId: userId.toString(),
+          subscriptionType: 'mixed_interval',
+        },
+        proration_behavior: 'none',
+      });
 
       // Update user status to Active
       const updateUserQuery = `
@@ -163,6 +199,12 @@ export class StripeService {
       }
 
       // Create subscription record in database
+      // Note: In Stripe API v2025+, current_period_start/end are on subscription items, not the subscription itself
+      // For mixed intervals, each item has its own billing cycle. We'll use the earliest start and latest end.
+      const subscriptionItems = subscription.items.data;
+      const earliestPeriodStart = Math.min(...subscriptionItems.map(item => item.current_period_start));
+      const latestPeriodEnd = Math.max(...subscriptionItems.map(item => item.current_period_end));
+
       const subscriptionQuery = `
         INSERT INTO user_subscriptions (
           user_id, provider, provider_subscription_id, provider_customer_id,
@@ -171,31 +213,62 @@ export class StripeService {
         VALUES ($1, 'stripe', $2, $3, $4, $5, $6)
         RETURNING id
       `;
-      
+
       const subscriptionResult = await pool.query(subscriptionQuery, [
         userId,
         subscription.id,
         subscription.customer,
         subscription.status,
-        new Date(subscription.current_period_start * 1000),
-        new Date(subscription.current_period_end * 1000)
+        new Date(earliestPeriodStart * 1000),
+        new Date(latestPeriodEnd * 1000)
       ]);
 
-      // Create billing schedule
-      const billingQuery = `
-        INSERT INTO user_billing_schedules (user_id, subscription_id, billing_cycle, next_billing_date, amount, currency, is_active, created_at)
-        VALUES ($1, $2, 'MONTHLY', $3, $4, $5, true, NOW())
-        RETURNING id
-      `;
-      
-      const nextBillingDate = new Date(subscription.current_period_end * 1000);
-      await pool.query(billingQuery, [
-        userId,
-        subscriptionResult.rows[0].id,
-        nextBillingDate,
-        config.pricing.recurringAmount,
-        config.pricing.currency.toUpperCase()
-      ]);
+      // Create billing schedules for both monthly and annual intervals
+      // Monthly billing schedule
+      // Get billing dates from each subscription item (monthly and annual have different cycles)
+      const monthlyItem = subscriptionItems.find(item =>
+        item.price.recurring?.interval === 'month'
+      );
+      const annualItem = subscriptionItems.find(item =>
+        item.price.recurring?.interval === 'year'
+      );
+
+      // Monthly billing schedule
+      if (monthlyItem) {
+        const monthlyBillingQuery = `
+          INSERT INTO user_billing_schedules (user_id, subscription_id, billing_cycle, next_billing_date, amount, currency, is_active, created_at)
+          VALUES ($1, $2, 'MONTHLY', $3, $4, $5, true, NOW())
+          RETURNING id
+        `;
+
+        const nextMonthlyBillingDate = new Date(monthlyItem.current_period_end * 1000);
+        await pool.query(monthlyBillingQuery, [
+          userId,
+          subscriptionResult.rows[0].id,
+          nextMonthlyBillingDate,
+          config.pricing.recurringAmount,
+          config.pricing.currency.toUpperCase()
+        ]);
+      }
+
+      // Annual billing schedule
+      if (annualItem) {
+        const annualBillingQuery = `
+          INSERT INTO user_billing_schedules (user_id, subscription_id, billing_cycle, next_billing_date, amount, currency, is_active, created_at)
+          VALUES ($1, $2, 'YEARLY', $3, $4, $5, true, NOW())
+          RETURNING id
+        `;
+
+        const nextAnnualBillingDate = new Date(annualItem.current_period_end * 1000);
+
+        await pool.query(annualBillingQuery, [
+          userId,
+          subscriptionResult.rows[0].id,
+          nextAnnualBillingDate,
+          config.pricing.annualAmount,
+          config.pricing.currency.toUpperCase()
+        ]);
+      }
 
       // Store payment method info
       const paymentMethodQuery = `
@@ -207,13 +280,16 @@ export class StripeService {
       await pool.query(paymentMethodQuery, [
         userId,
         'card',
-        subscription.id,
+        paymentMethodId,
         true,
         JSON.stringify({
           stripe_subscription_id: subscription.id,
           stripe_customer_id: subscription.customer,
-          initial_amount: config.pricing.initialAmount,
-          recurring_amount: config.pricing.recurringAmount,
+          stripe_payment_method_id: paymentMethodId,
+          joining_fee: config.pricing.initialAmount,
+          monthly_amount: config.pricing.recurringAmount,
+          annual_amount: config.pricing.annualAmount,
+          subscription_type: 'mixed_interval',
           currency: config.pricing.currency,
           status: subscription.status
         })
@@ -231,119 +307,28 @@ export class StripeService {
       `;
       await pool.query(membershipQuery, [userId]);
 
-      // Get the actual invoice details from Stripe
-      let initialPaymentAmount = config.pricing.initialAmount;
-      let paymentIntentId = null;
-      let chargeId = null;
-      let receiptUrl = null;
-      let paymentMethodId = null;
-      let paymentMethodDetails = null;
-
-      if (subscription.latest_invoice) {
-        try {
-          const invoice = await stripe.invoices.retrieve(subscription.latest_invoice as string);
-          initialPaymentAmount = invoice.amount_paid / 100; // Convert from cents
-          paymentIntentId = invoice.payment_intent as string;
-          chargeId = invoice.charge as string;
-          receiptUrl = invoice.hosted_invoice_url || null;
-
-          // Get payment method details
-          if (paymentIntentId) {
-            try {
-              const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-
-              if (paymentIntent.payment_method) {
-                const paymentMethod = await stripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
-
-                // Store payment method details for metadata
-                paymentMethodDetails = {
-                  id: paymentMethod.id,
-                  type: paymentMethod.type,
-                  ...(paymentMethod.card && {
-                    card: {
-                      brand: paymentMethod.card.brand,
-                      last4: paymentMethod.card.last4,
-                      exp_month: paymentMethod.card.exp_month,
-                      exp_year: paymentMethod.card.exp_year,
-                      funding: paymentMethod.card.funding,
-                      country: paymentMethod.card.country
-                    }
-                  })
-                };
-
-                // Check if we have this payment method stored
-                const pmQuery = `SELECT id FROM user_payment_methods WHERE provider_payment_method_id = $1 AND user_id = $2`;
-                const pmResult = await pool.query(pmQuery, [paymentMethod.id, userId]);
-
-                if (pmResult.rows.length > 0) {
-                  paymentMethodId = pmResult.rows[0].id;
-
-                  // Update the existing payment method to be default and update details
-                  await pool.query(`
-                    UPDATE user_payment_methods
-                    SET is_default = true, last_four = $2, brand = $3, expires_month = $4, expires_year = $5,
-                        method_subtype = $6, metadata = $7, updated_at = NOW()
-                    WHERE id = $1
-                  `, [
-                    paymentMethodId,
-                    paymentMethod.card?.last4,
-                    paymentMethod.card?.brand,
-                    paymentMethod.card?.exp_month,
-                    paymentMethod.card?.exp_year,
-                    paymentMethod.card?.brand,
-                    JSON.stringify({
-                      funding: paymentMethod.card?.funding,
-                      country: paymentMethod.card?.country,
-                      fingerprint: paymentMethod.card?.fingerprint
-                    })
-                  ]);
-                } else if (paymentMethod.card) {
-                  // Store new payment method with proper card details
-                  const insertPmQuery = `
-                    INSERT INTO user_payment_methods (
-                      user_id, provider, method_type, method_subtype, provider_payment_method_id,
-                      last_four, brand, expires_month, expires_year, is_default, is_active, metadata
-                    )
-                    VALUES ($1, 'stripe', 'card', $2, $3, $4, $5, $6, $7, true, true, $8)
-                    RETURNING id
-                  `;
-                  const pmInsertResult = await pool.query(insertPmQuery, [
-                    userId,
-                    paymentMethod.card.brand,
-                    paymentMethod.id,
-                    paymentMethod.card.last4,
-                    paymentMethod.card.brand,
-                    paymentMethod.card.exp_month,
-                    paymentMethod.card.exp_year,
-                    JSON.stringify({
-                      funding: paymentMethod.card.funding,
-                      country: paymentMethod.card.country,
-                      fingerprint: paymentMethod.card.fingerprint
-                    })
-                  ]);
-                  paymentMethodId = pmInsertResult.rows[0].id;
-                }
-              }
-            } catch (pmError) {
-              logger.warn('Could not retrieve payment method for initial payment:', pmError);
-            }
-          }
-        } catch (error) {
-          logger.warn('Could not retrieve invoice details, using config amount', error);
-        }
-      }
+      // Get checkout payment details (not subscription invoice - that hasn't been created yet)
+      const initialPaymentAmount = config.pricing.initialAmount; // $325
+      // Get receipt URL from the latest charge (expanded above)
+      const latestCharge = paymentIntent.latest_charge as Stripe.Charge | null;
+      const checkoutReceiptUrl = latestCharge?.receipt_url || null;
 
       // Build metadata for initial payment
       const initialPaymentMetadata = {
         checkout_session_id: session.id,
         subscription_created: true,
         initial_payment: true,
-        payment_method: paymentMethodDetails,
-        setup_fee: config.pricing.initialAmount - config.pricing.recurringAmount,
-        monthly_amount: config.pricing.recurringAmount
+        joining_fee: config.pricing.initialAmount,
+        includes_first_month: config.pricing.recurringAmount,
+        includes_first_year: config.pricing.annualAmount,
       };
 
-      // Create initial payment record with real Stripe data
+      // Get payment method ID from database (was stored earlier)
+      const pmQuery = `SELECT id FROM user_payment_methods WHERE provider_payment_method_id = $1 AND user_id = $2`;
+      const pmResult = await pool.query(pmQuery, [paymentMethodId, userId]);
+      const dbPaymentMethodId = pmResult.rows.length > 0 ? pmResult.rows[0].id : null;
+
+      // Create initial payment record with checkout session data
       const paymentQuery = `
         INSERT INTO user_payments (
           user_id, subscription_id, payment_method_id, provider_payment_id, provider_invoice_id,
@@ -356,13 +341,13 @@ export class StripeService {
       await pool.query(paymentQuery, [
         userId,
         subscriptionResult.rows[0].id,
-        paymentMethodId,
+        dbPaymentMethodId,
         paymentIntentId,
-        subscription.latest_invoice,
-        chargeId,
+        null, // No invoice for checkout session payment
+        null, // No charge ID available
         initialPaymentAmount,
-        subscription.currency || config.pricing.currency,
-        receiptUrl,
+        config.pricing.currency,
+        checkoutReceiptUrl,
         JSON.stringify(initialPaymentMetadata)
       ]);
 
@@ -379,13 +364,12 @@ export class StripeService {
       `;
       await pool.query(agreementQuery, [userId]);
 
-      logger.info(`Initial payment + subscription created for member ${userId}`, {
+      logger.info(`Initial payment + mixed interval subscription created for member ${userId}`, {
         subscriptionId: subscription.id,
-        actualPaymentAmount: initialPaymentAmount,
-        configuredInitialAmount: config.pricing.initialAmount,
+        initialPayment: initialPaymentAmount,
         monthlyRecurring: config.pricing.recurringAmount,
-        nextBilling: nextBillingDate,
-        currency: subscription.currency || config.pricing.currency
+        annualRecurring: config.pricing.annualAmount,
+        currency: config.pricing.currency
       });
     } catch (error) {
       logger.error('Error handling checkout complete:', error);
@@ -398,7 +382,14 @@ export class StripeService {
    */
   static async handleInvoicePaymentSucceeded(invoice: Stripe.Invoice): Promise<void> {
     try {
-      const subscriptionId = invoice.subscription as string;
+      // In Stripe API v2025+, subscription is on invoice line items, not the invoice itself
+      const subscriptionLineItem = invoice.lines?.data?.find(line => line.subscription);
+      if (!subscriptionLineItem || !subscriptionLineItem.subscription) {
+        logger.warn(`No subscription found in invoice ${invoice.id} line items`);
+        return;
+      }
+
+      const subscriptionId = subscriptionLineItem.subscription as string;
       const dbSubscription = await SubscriptionModel.findByStripeSubscriptionId(subscriptionId);
 
       if (!dbSubscription) {
@@ -413,61 +404,62 @@ export class StripeService {
       let paymentMethodId = null;
       let paymentMethodDetails = null;
 
-      if (invoice.payment_intent) {
+      // In Stripe API v2025+, payment_intent is not directly on invoice - use metadata or retrieve via charge
+      // For now, we'll retrieve the payment intent ID from the default payment method on the subscription
+      const subscriptionDetails = await stripe.subscriptions.retrieve(subscriptionId);
+      const defaultPaymentMethodId = subscriptionDetails.default_payment_method as string | null;
+
+      if (defaultPaymentMethodId) {
         try {
-          const paymentIntent = await stripe.paymentIntents.retrieve(invoice.payment_intent as string);
+          const paymentMethod = await stripe.paymentMethods.retrieve(defaultPaymentMethodId);
 
-          if (paymentIntent.payment_method) {
-            const paymentMethod = await stripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
+          // Store payment method details for metadata
+          paymentMethodDetails = {
+            id: paymentMethod.id,
+            type: paymentMethod.type,
+            ...(paymentMethod.card && {
+              card: {
+                brand: paymentMethod.card.brand,
+                last4: paymentMethod.card.last4,
+                exp_month: paymentMethod.card.exp_month,
+                exp_year: paymentMethod.card.exp_year,
+                funding: paymentMethod.card.funding,
+                country: paymentMethod.card.country
+              }
+            })
+          };
 
-            // Store payment method details for metadata
-            paymentMethodDetails = {
-              id: paymentMethod.id,
-              type: paymentMethod.type,
-              ...(paymentMethod.card && {
-                card: {
-                  brand: paymentMethod.card.brand,
-                  last4: paymentMethod.card.last4,
-                  exp_month: paymentMethod.card.exp_month,
-                  exp_year: paymentMethod.card.exp_year,
-                  funding: paymentMethod.card.funding,
-                  country: paymentMethod.card.country
-                }
+          // Check if we have this payment method stored in user_payment_methods table
+          const pmQuery = `SELECT id FROM user_payment_methods WHERE provider_payment_method_id = $1 AND user_id = $2`;
+          const pmResult = await pool.query(pmQuery, [paymentMethod.id, dbSubscription.user_id]);
+
+          if (pmResult.rows.length > 0) {
+            paymentMethodId = pmResult.rows[0].id;
+          } else if (paymentMethod.card) {
+            // Store new payment method
+            const insertPmQuery = `
+              INSERT INTO user_payment_methods (
+                user_id, provider, method_type, method_subtype, provider_payment_method_id,
+                last_four, brand, expires_month, expires_year, is_default, is_active, metadata
+              )
+              VALUES ($1, 'stripe', 'card', $2, $3, $4, $5, $6, $7, false, true, $8)
+              RETURNING id
+            `;
+            const pmInsertResult = await pool.query(insertPmQuery, [
+              dbSubscription.user_id,
+              paymentMethod.card.brand,
+              paymentMethod.id,
+              paymentMethod.card.last4,
+              paymentMethod.card.brand,
+              paymentMethod.card.exp_month,
+              paymentMethod.card.exp_year,
+              JSON.stringify({
+                funding: paymentMethod.card.funding,
+                country: paymentMethod.card.country,
+                fingerprint: paymentMethod.card.fingerprint
               })
-            };
-
-            // Check if we have this payment method stored in user_payment_methods table
-            const pmQuery = `SELECT id FROM user_payment_methods WHERE provider_payment_method_id = $1 AND user_id = $2`;
-            const pmResult = await pool.query(pmQuery, [paymentMethod.id, dbSubscription.user_id]);
-
-            if (pmResult.rows.length > 0) {
-              paymentMethodId = pmResult.rows[0].id;
-            } else if (paymentMethod.card) {
-              // Store new payment method
-              const insertPmQuery = `
-                INSERT INTO user_payment_methods (
-                  user_id, provider, method_type, method_subtype, provider_payment_method_id,
-                  last_four, brand, expires_month, expires_year, is_default, is_active, metadata
-                )
-                VALUES ($1, 'stripe', 'card', $2, $3, $4, $5, $6, $7, false, true, $8)
-                RETURNING id
-              `;
-              const pmInsertResult = await pool.query(insertPmQuery, [
-                dbSubscription.user_id,
-                paymentMethod.card.brand,
-                paymentMethod.id,
-                paymentMethod.card.last4,
-                paymentMethod.card.brand,
-                paymentMethod.card.exp_month,
-                paymentMethod.card.exp_year,
-                JSON.stringify({
-                  funding: paymentMethod.card.funding,
-                  country: paymentMethod.card.country,
-                  fingerprint: paymentMethod.card.fingerprint
-                })
-              ]);
-              paymentMethodId = pmInsertResult.rows[0].id;
-            }
+            ]);
+            paymentMethodId = pmInsertResult.rows[0].id;
           }
         } catch (error) {
           logger.warn('Could not retrieve payment method details:', error);
@@ -478,7 +470,7 @@ export class StripeService {
       const paymentMetadata = {
         invoice_metadata: invoice.metadata || {},
         billing_reason: invoice.billing_reason,
-        subscription_id: invoice.subscription,
+        subscription_id: subscriptionId,
         customer_id: invoice.customer,
         invoice_number: invoice.number || null,
         payment_method: paymentMethodDetails,
@@ -486,6 +478,7 @@ export class StripeService {
       };
 
       // Create payment record in user_payments table
+      // Note: In Stripe API v2025+, payment_intent and charge are not on Invoice
       const paymentQuery = `
         INSERT INTO user_payments (
           user_id, subscription_id, payment_method_id, provider_payment_id, provider_invoice_id,
@@ -499,9 +492,9 @@ export class StripeService {
         dbSubscription.user_id,  // UUID - no parseInt needed
         dbSubscription.id,       // UUID - no parseInt needed
         paymentMethodId,         // UUID or null
-        invoice.payment_intent as string,
+        null,                    // provider_payment_id - not available on invoice in v2025+
         invoice.id,
-        invoice.charge as string,
+        null,                    // provider_charge_id - not available on invoice in v2025+
         amount,
         invoice.currency,
         isFirstPayment ? 'initial' : 'recurring',
@@ -549,7 +542,14 @@ export class StripeService {
    */
   static async handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
     try {
-      const subscriptionId = invoice.subscription as string;
+      // In Stripe API v2025+, subscription is on invoice line items
+      const subscriptionLineItem = invoice.lines?.data?.find(line => line.subscription);
+      if (!subscriptionLineItem || !subscriptionLineItem.subscription) {
+        logger.warn(`No subscription found in failed invoice ${invoice.id} line items`);
+        return;
+      }
+
+      const subscriptionId = subscriptionLineItem.subscription as string;
       const dbSubscription = await SubscriptionModel.findByStripeSubscriptionId(subscriptionId);
 
       if (!dbSubscription) {
@@ -563,51 +563,40 @@ export class StripeService {
       // Get payment method and failure details
       let paymentMethodId = null;
       let paymentMethodDetails = null;
-      let failureReason = null;
+      let failureReason = 'Payment failed - no details available';
 
-      if (invoice.payment_intent) {
+      // In Stripe API v2025+, retrieve payment method from subscription
+      const subscriptionDetails = await stripe.subscriptions.retrieve(subscriptionId);
+      const defaultPaymentMethodId = subscriptionDetails.default_payment_method as string | null;
+
+      if (defaultPaymentMethodId) {
         try {
-          const paymentIntent = await stripe.paymentIntents.retrieve(invoice.payment_intent as string);
+          const paymentMethod = await stripe.paymentMethods.retrieve(defaultPaymentMethodId);
 
-          // Get failure details
-          if (paymentIntent.last_payment_error) {
-            failureReason = [
-              paymentIntent.last_payment_error.code,
-              paymentIntent.last_payment_error.decline_code,
-              paymentIntent.last_payment_error.message
-            ].filter(Boolean).join(' - ');
-          }
+          paymentMethodDetails = {
+            id: paymentMethod.id,
+            type: paymentMethod.type,
+            ...(paymentMethod.card && {
+              card: {
+                brand: paymentMethod.card.brand,
+                last4: paymentMethod.card.last4,
+                exp_month: paymentMethod.card.exp_month,
+                exp_year: paymentMethod.card.exp_year,
+                funding: paymentMethod.card.funding,
+                country: paymentMethod.card.country
+              }
+            })
+          };
 
-          // Get payment method details
-          if (paymentIntent.payment_method) {
-            const paymentMethod = await stripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
+          // Check if we have this payment method stored
+          const pmQuery = `SELECT id FROM user_payment_methods WHERE provider_payment_method_id = $1 AND user_id = $2`;
+          const pmResult = await pool.query(pmQuery, [paymentMethod.id, dbSubscription.user_id]);
 
-            paymentMethodDetails = {
-              id: paymentMethod.id,
-              type: paymentMethod.type,
-              ...(paymentMethod.card && {
-                card: {
-                  brand: paymentMethod.card.brand,
-                  last4: paymentMethod.card.last4,
-                  exp_month: paymentMethod.card.exp_month,
-                  exp_year: paymentMethod.card.exp_year,
-                  funding: paymentMethod.card.funding,
-                  country: paymentMethod.card.country
-                }
-              })
-            };
-
-            // Check if we have this payment method stored
-            const pmQuery = `SELECT id FROM user_payment_methods WHERE provider_payment_method_id = $1 AND user_id = $2`;
-            const pmResult = await pool.query(pmQuery, [paymentMethod.id, dbSubscription.user_id]);
-
-            if (pmResult.rows.length > 0) {
-              paymentMethodId = pmResult.rows[0].id;
-            }
+          if (pmResult.rows.length > 0) {
+            paymentMethodId = pmResult.rows[0].id;
           }
         } catch (error) {
-          logger.warn('Could not retrieve payment intent for failed payment:', error);
-          failureReason = 'Unable to retrieve failure details';
+          logger.warn('Could not retrieve payment method for failed payment:', error);
         }
       }
 
@@ -615,7 +604,7 @@ export class StripeService {
       const paymentMetadata = {
         invoice_metadata: invoice.metadata || {},
         billing_reason: invoice.billing_reason,
-        subscription_id: invoice.subscription,
+        subscription_id: subscriptionId,
         customer_id: invoice.customer,
         invoice_number: invoice.number || null,
         payment_method: paymentMethodDetails,
@@ -639,9 +628,9 @@ export class StripeService {
         dbSubscription.user_id,
         dbSubscription.id,
         paymentMethodId,
-        invoice.payment_intent as string,
+        null,  // provider_payment_id - not available on invoice in v2025+
         invoice.id,
-        invoice.charge as string,
+        null,  // provider_charge_id - not available on invoice in v2025+
         amount,
         invoice.currency,
         isFirstPayment ? 'initial' : 'recurring',
@@ -659,8 +648,35 @@ export class StripeService {
         nextAttempt: invoice.next_payment_attempt
       });
 
-      // TODO: Consider sending notification email to user about payment failure
-      // TODO: If too many failures, consider suspending subscription
+      // BR-8: Immediate cancellation on first payment failure
+      // Cancel the subscription immediately - user must update payment method to reactivate
+      logger.warn(`Canceling subscription ${subscriptionId} due to payment failure`);
+
+      try {
+        await stripe.subscriptions.update(subscriptionId, {
+          cancel_at_period_end: false, // Cancel immediately
+          pause_collection: {
+            behavior: 'mark_uncollectible' // Mark outstanding invoices as uncollectible
+          }
+        });
+
+        // Update database subscription status
+        await pool.query(
+          `UPDATE user_subscriptions
+           SET status = 'paused',
+               canceled_at = NOW(),
+               updated_at = NOW()
+           WHERE id = $1`,
+          [dbSubscription.id]
+        );
+
+        logger.info(`Subscription ${subscriptionId} paused due to payment failure. User must update payment method.`);
+      } catch (cancelError) {
+        logger.error('Error pausing subscription after payment failure:', cancelError);
+        // Continue execution - payment failure was already recorded
+      }
+
+      // TODO: Send notification email to user about payment failure and need to update payment method
 
     } catch (error) {
       logger.error('Error handling invoice payment failed:', error);
@@ -680,11 +696,16 @@ export class StripeService {
         return;
       }
 
+      // In Stripe API v2025+, current_period_start/end are on subscription items
+      const subscriptionItems = subscription.items.data;
+      const earliestPeriodStart = Math.min(...subscriptionItems.map(item => item.current_period_start));
+      const latestPeriodEnd = Math.max(...subscriptionItems.map(item => item.current_period_end));
+
       // Update subscription in database
       await SubscriptionModel.update(dbSubscription.id, {
         status: subscription.status as any,
-        current_period_start: new Date(subscription.current_period_start * 1000),
-        current_period_end: new Date(subscription.current_period_end * 1000),
+        current_period_start: new Date(earliestPeriodStart * 1000),
+        current_period_end: new Date(latestPeriodEnd * 1000),
         cancel_at_period_end: subscription.cancel_at_period_end,
         canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : undefined,
       } as any);
@@ -813,6 +834,53 @@ export class StripeService {
    */
   static async getPaymentHistory(userId: number) {
     return PaymentModel.findByMemberId(userId);
+  }
+
+  /**
+   * Create Stripe Billing Portal Session for payment method updates
+   * Users can update their payment method, view billing history, etc.
+   */
+  static async createBillingPortalSession(userId: string, returnUrl?: string): Promise<{ url: string }> {
+    try {
+      // Get user's subscription to find their Stripe customer ID
+      const subscription = await pool.query(
+        `SELECT provider_customer_id, status
+         FROM user_subscriptions
+         WHERE user_id = $1
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [userId]
+      );
+
+      if (subscription.rows.length === 0) {
+        throw new Error('No subscription found for user');
+      }
+
+      const { provider_customer_id, status } = subscription.rows[0];
+
+      if (!provider_customer_id) {
+        throw new Error('No Stripe customer ID found for subscription');
+      }
+
+      // Create billing portal session with restricted permissions
+      // Only allow payment method updates - no subscription cancellation or pausing
+      const session = await stripe.billingPortal.sessions.create({
+        customer: provider_customer_id,
+        return_url: returnUrl || `${config.frontendUrl}/dashboard`,
+        flow_data: {
+          type: 'payment_method_update',
+        },
+      });
+
+      logger.info(`Created billing portal session for user ${userId}, customer ${provider_customer_id}`);
+
+      return {
+        url: session.url,
+      };
+    } catch (error) {
+      logger.error('Error creating billing portal session:', error);
+      throw error;
+    }
   }
 
   /**

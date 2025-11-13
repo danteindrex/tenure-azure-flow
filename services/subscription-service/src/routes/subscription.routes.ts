@@ -19,4 +19,7 @@ router.post('/:memberId/reactivate', validateSession, SubscriptionController.rea
 // Get payment history (protected)
 router.get('/:memberId/payments', validateSession, SubscriptionController.getPaymentHistory);
 
+// Create billing portal session for payment method updates (protected)
+router.post('/:userId/update-payment', validateSession, SubscriptionController.createUpdatePaymentSession);
+
 export default router;

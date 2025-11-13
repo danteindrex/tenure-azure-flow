@@ -293,13 +293,21 @@ const Settings = () => {
                 <SettingsIcon className="w-4 h-4 mr-2" />
                 Appearance
               </Button>
-              <Button 
-                variant={activeTab === 'payment' ? 'default' : 'ghost'} 
+              <Button
+                variant={activeTab === 'payment' ? 'default' : 'ghost'}
                 className="w-full justify-start"
                 onClick={() => setActiveTab('payment')}
               >
                 <CreditCard className="w-4 h-4 mr-2" />
                 Payment
+              </Button>
+              <Button
+                variant={activeTab === 'billing' ? 'default' : 'ghost'}
+                className="w-full justify-start"
+                onClick={() => setActiveTab('billing')}
+              >
+                <CreditCard className="w-4 h-4 mr-2" />
+                Billing
               </Button>
             </nav>
           </Card>
@@ -428,6 +436,90 @@ const Settings = () => {
                       <SelectItem value="yearly">Yearly</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Billing Tab */}
+          {activeTab === 'billing' && (
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-accent" />
+                Billing & Payment Methods
+              </h3>
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <div>
+                    <Label>Manage Payment Method</Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Update your credit card, billing address, and view your payment history through Stripe's secure portal.
+                    </p>
+                  </div>
+                  <Button
+                    variant="default"
+                    className="w-full bg-accent hover:bg-accent/90"
+                    onClick={async () => {
+                      if (!user) return;
+                      try {
+                        setSaving(true);
+                        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/subscriptions/${user.id}/update-payment`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({
+                            returnUrl: window.location.href
+                          })
+                        });
+
+                        if (!response.ok) {
+                          const error = await response.json();
+                          throw new Error(error.message || 'Failed to create billing portal session');
+                        }
+
+                        const result = await response.json();
+                        if (result.success && result.data?.url) {
+                          window.location.href = result.data.url;
+                        } else {
+                          throw new Error('Invalid response from server');
+                        }
+                      } catch (error: any) {
+                        console.error('Error opening billing portal:', error);
+                        await logError(`Error opening billing portal: ${error.message}`, user.id);
+                        toast.error(error.message || 'Failed to open billing portal');
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Opening Billing Portal...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Open Billing Portal
+                      </>
+                    )}
+                  </Button>
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                    <p className="text-sm font-medium">What you can do in the Billing Portal:</p>
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Update your credit card information</li>
+                      <li>Change your billing address</li>
+                      <li>View payment history and invoices</li>
+                      <li>Download receipts for your records</li>
+                    </ul>
+                    <p className="text-xs text-muted-foreground mt-2 italic">
+                      Note: Subscription cancellation is not available. Please contact support for cancellation requests.
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    🔒 Powered by Stripe - Your payment information is secure and encrypted
+                  </p>
                 </div>
               </div>
             </Card>

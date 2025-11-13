@@ -170,4 +170,38 @@ export class SubscriptionController {
       });
     }
   }
+
+  /**
+   * POST /api/subscriptions/:userId/update-payment
+   * Create a Stripe Billing Portal session for payment method updates
+   */
+  static async createUpdatePaymentSession(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.params.userId;
+
+      // Ensure user can only access their own billing portal
+      if (req.user?.id !== userId) {
+        res.status(403).json({
+          error: 'Access denied',
+          message: 'You can only update your own payment method'
+        });
+        return;
+      }
+
+      const { returnUrl } = req.body;
+
+      const result = await StripeService.createBillingPortalSession(userId, returnUrl);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Error in createUpdatePaymentSession:', error);
+      res.status(500).json({
+        error: 'Failed to create billing portal session',
+        message: error.message,
+      });
+    }
+  }
 }

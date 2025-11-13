@@ -2,8 +2,9 @@
 
 // Business Rules Constants (BR-1 through BR-10)
 export const BUSINESS_RULES = {
-  JOINING_FEE: 300,           // BR-1: $300 one-time joining fee
+  JOINING_FEE: 325,           // BR-1: $325 one-time joining fee
   MONTHLY_FEE: 25,            // BR-2: $25 monthly recurring fee
+  ANNUAL_FEE: 300,            // BR-2b: $300 annual recurring fee
   PAYOUT_THRESHOLD: 100000,   // BR-3: $100K minimum for payout
   REWARD_PER_WINNER: 100000,  // BR-4: $100K per winning member
   RETENTION_FEE: 300,         // BR-7: 12 months pre-pay ($25 x 12)
