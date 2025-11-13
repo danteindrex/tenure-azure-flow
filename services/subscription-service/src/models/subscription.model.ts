@@ -33,6 +33,19 @@ export class SubscriptionModel {
     return result.rows[0];
   }
 
+  /**
+   * Find all subscriptions for a user (users can have multiple subscriptions)
+   */
+  static async findAllByUserId(userId: string): Promise<Subscription[]> {
+    const query = 'SELECT * FROM user_subscriptions WHERE user_id = $1 ORDER BY created_at DESC';
+    const result = await pool.query<Subscription>(query, [userId]);
+    return result.rows;
+  }
+
+  /**
+   * @deprecated Use findAllByUserId instead (returns array for multi-subscription support)
+   * Find most recent subscription for a user (backward compatibility)
+   */
   static async findByUserId(userId: string): Promise<Subscription | null> {
     const query = 'SELECT * FROM user_subscriptions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1';
     const result = await pool.query<Subscription>(query, [userId]);

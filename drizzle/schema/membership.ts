@@ -113,6 +113,7 @@ export const payoutManagement = pgTable('payout_management', {
   id: uuid('id').primaryKey().defaultRandom(),
   payoutId: text('payout_id').notNull().unique(),
   userId: uuid('user_id').notNull().references(() => user.id),
+  membershipId: uuid('membership_id'), // References user_memberships(id) - tracks which membership received payout
   queuePosition: integer('queue_position').notNull(),
   amount: decimal('amount', { precision: 12, scale: 2 }).notNull().default('100000.00'),
   currency: text('currency').default('USD'),
@@ -131,6 +132,7 @@ export const payoutManagement = pgTable('payout_management', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
   userIdIdx: index('idx_payout_management_user_id').on(table.userId),
+  membershipIdIdx: index('idx_payout_management_membership_id').on(table.membershipId),
   statusIdx: index('idx_payout_management_status').on(table.status)
 }))
 

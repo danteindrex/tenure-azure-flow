@@ -1,0 +1,56 @@
+                                                                   Table "public.users"
+       Column       |           Type           | Collation | Nullable |           Default            | Storage  | Compression | Stats target | Description 
+--------------------+--------------------------+-----------+----------+------------------------------+----------+-------------+--------------+-------------
+ id                 | uuid                     |           | not null | gen_random_uuid()            | plain    |             |              | 
+ auth_user_id       | text                     |           |          |                              | extended |             |              | 
+ email              | character varying(255)   |           | not null |                              | extended |             |              | 
+ email_verified     | boolean                  |           |          | false                        | plain    |             |              | 
+ status             | enum_users_status        |           | not null | 'Pending'::enum_users_status | plain    |             |              | 
+ created_at         | timestamp with time zone |           |          | now()                        | plain    |             |              | 
+ updated_at         | timestamp with time zone |           |          | now()                        | plain    |             |              | 
+ name               | text                     |           |          |                              | extended |             |              | 
+ image              | text                     |           |          |                              | extended |             |              | 
+ two_factor_enabled | boolean                  |           |          | false                        | plain    |             |              | 
+Indexes:
+    "users_pkey" PRIMARY KEY, btree (id)
+    "idx_users_email" btree (email)
+    "idx_users_email_verified" btree (email_verified)
+    "idx_users_name" btree (name)
+    "idx_users_two_factor" btree (two_factor_enabled)
+    "idx_users_updated_at" btree (updated_at)
+    "users_email_key" UNIQUE CONSTRAINT, btree (email)
+Referenced by:
+    TABLE "account" CONSTRAINT "account_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "disputes" CONSTRAINT "disputes_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "kyc_verification" CONSTRAINT "kyc_verification_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "membership_queue" CONSTRAINT "membership_queue_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "organization_invitation" CONSTRAINT "organization_invitation_inviterId_users_id_fk" FOREIGN KEY ("inviterId") REFERENCES users(id) ON DELETE CASCADE
+    TABLE "organization_member" CONSTRAINT "organization_member_userId_users_id_fk" FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
+    TABLE "passkey" CONSTRAINT "passkey_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "payout_management" CONSTRAINT "payout_management_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id)
+    TABLE "session" CONSTRAINT "session_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "system_audit_logs" CONSTRAINT "system_audit_logs_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    TABLE "tax_forms" CONSTRAINT "tax_forms_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "transaction_monitoring" CONSTRAINT "transaction_monitoring_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "two_factor" CONSTRAINT "two_factor_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_addresses" CONSTRAINT "user_addresses_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_agreements" CONSTRAINT "user_agreements_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_appearance_settings" CONSTRAINT "user_appearance_settings_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_billing_schedules" CONSTRAINT "user_billing_schedules_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_contacts" CONSTRAINT "user_contacts_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_memberships" CONSTRAINT "user_memberships_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_notification_preferences" CONSTRAINT "user_notification_preferences_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_payment_methods" CONSTRAINT "user_payment_methods_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_payment_settings" CONSTRAINT "user_payment_settings_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_payments" CONSTRAINT "user_payments_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_privacy_settings" CONSTRAINT "user_privacy_settings_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_profiles" CONSTRAINT "user_profiles_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_security_settings" CONSTRAINT "user_security_settings_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_settings" CONSTRAINT "user_settings_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    TABLE "user_subscriptions" CONSTRAINT "user_subscriptions_user_id_users_id_fk" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+Publications:
+    "supabase_realtime"
+Triggers:
+    update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+Access method: heap
+

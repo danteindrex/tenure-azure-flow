@@ -54,33 +54,44 @@ const Queue = () => {
 
     try {
       setLoading(true);
-      
-      const response = await fetch(`/api/queue?${searchTerm ? `search=${encodeURIComponent(searchTerm)}` : ''}`);
-      
+
+      const response = await fetch('/api/queue', {
+        credentials: 'include'
+      });
+
       if (!response.ok) {
+        console.error('API response not ok:', response.status, response.statusText);
         throw new Error('Failed to load queue data');
       }
-      
+
       const result = await response.json();
       
       // Handle both direct response and nested data structure
       const data = result.data || result;
-      
+
+      console.log('🎯 Frontend received data:', result);
+      console.log('📦 data.queue length:', (data.queue || []).length);
+      console.log('📦 data.queue:', data.queue);
+
       // Map view fields to component expected fields
+      // Only user_id and queue_position are returned for privacy
       const mappedQueue = (data.queue || []).map((member: any) => ({
         id: member.user_id,
         position: member.queue_position,
-        name: member.full_name || 'N/A',
-        email: member.email,
-        continuousTenure: member.total_successful_payments || 0,
-        totalPaid: parseFloat(member.lifetime_payment_total || 0),
-        status: member.is_eligible ? 'active' : 'inactive',
-        eligible: member.is_eligible,
-        lastPaymentDate: member.last_payment_date,
-        joinDate: member.tenure_start_date,
-        hasReceivedPayout: member.has_received_payout
+        name: member.user_id, // Show user_id instead of name for privacy
+        email: '',
+        continuousTenure: 0,
+        totalPaid: 0,
+        status: 'active', // Don't show inactive status
+        eligible: true,
+        lastPaymentDate: null,
+        joinDate: null,
+        hasReceivedPayout: false
       }));
-      
+
+      console.log('✅ Mapped queue length:', mappedQueue.length);
+      console.log('✅ Mapped queue:', mappedQueue);
+
       setQueueData(mappedQueue);
       setStatistics(data.statistics || {});
 
@@ -341,30 +352,25 @@ const Queue = () => {
         </div>
       </Card>
 
-      {/* Queue Table */}
+      {/* Queue Table - Privacy Mode */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Users className="w-5 h-5 text-accent" />
           Queue Members ({filteredQueue.length})
         </h3>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table className="w-full">
-            <thead>
+            <thead className="sticky top-0 bg-card">
               <tr className="border-b border-border">
                 <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Position</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">user_id</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Subscription</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">eligibility</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Last Payment</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Total Paid</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Payout Status</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Joined Queue</th>
+                <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">User ID</th>
+                <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Status</th>
               </tr>
             </thead>
             <tbody>
               {filteredQueue.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={3} className="py-8 text-center text-muted-foreground">
                     {searchTerm ? 'No members found matching your search.' : 'No queue members found.'}
                   </td>
                 </tr>
@@ -372,12 +378,12 @@ const Queue = () => {
                 filteredQueue.map((member) => {
                   const isCurrentUser = member.id && user?.id && member.id.toString() === user.id;
                   const isWinner = member.position <= winnersCount;
-                  
+
                   return (
-                    <tr 
-                      key={member.id} 
+                    <tr
+                      key={member.id}
                       className={`border-b border-border hover:bg-accent/5 transition-colors ${
-                        isCurrentUser ? 'bg-accent/10' : ''
+                        isCurrentUser ? 'bg-accent/10 border-l-4 border-l-accent' : ''
                       }`}
                     >
                       <td className="py-3 px-2">
@@ -391,54 +397,16 @@ const Queue = () => {
                       <td className="py-3 px-2">
                         <div>
                           {isCurrentUser ? (
-                            <>
-                              <p className="font-medium text-accent">{member.id} (You)</p>
-                              <p className="text-xs text-muted-foreground">{member.email}</p>
-                            </>
+                            <p className="font-medium text-accent break-all">{member.id} <span className="text-xs">(You)</span></p>
                           ) : (
-                            <>
-                              <p className="font-medium text-muted-foreground">{member.id}</p>
-                              <p className="text-xs text-muted-foreground">{member.email ?? 'Privacy Protected'}</p>
-                            </>
+                            <p className="font-medium text-muted-foreground text-sm break-all">{member.id}</p>
                           )}
                         </div>
                       </td>
                       <td className="py-3 px-2">
-                        <div>
-                          <p className="font-medium">{member.continuousTenure} months</p>
-                          <div className="flex items-center gap-1 mt-1">
-                            {member.status === 'active' ? (
-                              <CheckCircle className="w-3 h-3 text-green-500" />
-                            ) : (
-                              <AlertCircle className="w-3 h-3 text-red-500" />
-                            )}
-                            <span className="text-xs">
-                              {member.status === 'active' ? 'Active' : 'Inactive'}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-2">
-                        {(() => {
-                          // Prefer explicit eligibility flag from API, otherwise fallback to active status
-                          const isEligible = (member as any).eligible ?? (member.status === 'active');
-                          return getEligibilityBadge(!!isEligible, member.status === 'active');
-                        })()}
-                      </td>
-                      <td className="py-3 px-2">
-                        <p className="text-sm">{formatDate(member.lastPaymentDate)}</p>
-                      </td>
-                      <td className="py-3 px-2">
-                        <p className="font-medium">{formatCurrency(member.totalPaid)}</p>
-                      </td>
-                      <td className="py-3 px-2">
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-yellow-500" />
-                          <span className="text-xs text-yellow-600">Pending</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-2">
-                        <p className="text-sm">{formatDate(member.joinDate)}</p>
+                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                          Active
+                        </Badge>
                       </td>
                     </tr>
                   );

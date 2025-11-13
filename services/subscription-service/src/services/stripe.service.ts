@@ -37,11 +37,8 @@ export class StripeService {
 
       const user = userResult.rows[0];
 
-      // Check if user already has active subscription
-      const existingSub = await SubscriptionModel.findByUserId(userId);
-      if (existingSub && existingSub.status === 'active') {
-        throw new Error('User already has an active subscription');
-      }
+      // Note: Users can have multiple active subscriptions
+      // Each subscription creates its own membership (queue entry)
 
       // Create or retrieve Stripe customer
       let customer: Stripe.Customer;
@@ -298,11 +295,12 @@ export class StripeService {
       // Note: Queue position is automatically calculated by active_member_queue_view
       // based on user_subscriptions and user_payments tables. No manual queue management needed.
 
-      // Create userMemberships record for KYC verification tracking
+      // Create userMemberships record linked to this subscription
+      // Each subscription gets its own membership (queue entry)
       const membershipQuery = `
-        INSERT INTO user_memberships (user_id, join_date, tenure, verification_status, created_at, updated_at)
-        VALUES ($1, CURRENT_DATE, '0', 'PENDING', NOW(), NOW())
-        ON CONFLICT (user_id) DO UPDATE SET
+        INSERT INTO user_memberships (user_id, subscription_id, join_date, tenure, verification_status, created_at, updated_at)
+        VALUES ($1, $2, CURRENT_DATE, '0', 'PENDING', NOW(), NOW())
+        ON CONFLICT (subscription_id) DO UPDATE SET
           updated_at = NOW()
       `;
       await pool.query(membershipQuery, [userId]);
