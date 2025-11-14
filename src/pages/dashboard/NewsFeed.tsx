@@ -32,7 +32,7 @@ const NewsFeed = () => {
   const fundStats = {
     totalRevenue: statsResponse?.data?.totalRevenue || 0,
     totalMembers: statsResponse?.data?.totalMembers || 0,
-    potentialWinners: statsResponse?.data?.potentialWinners || 0,
+    potentialWinners: statsResponse?.data?.activeMembers || 0,
     nextPayoutDate: 'March 15, 2025'
   };
 

@@ -110,7 +110,6 @@ export class MembershipManagerService {
         .update(payoutManagement)
         .set({
           processing: processing as any,
-          membershipRemovalDate: removalDate,
           updatedAt: new Date()
         })
         .where(eq(payoutManagement.id, payout.id))
@@ -172,33 +171,41 @@ export class MembershipManagerService {
 
       const now = new Date()
 
-      // Query for payouts where removal is due
-      // Filter: membership_removal_scheduled <= NOW() AND membership_removed != true
+      // Query for all completed payouts
+      // We'll filter by removal date in code since it's stored in the processing JSON field
       const payouts = await db.query.payoutManagement.findMany({
-        where: and(
-          eq(payoutManagement.status, 'completed'),
-          lte(payoutManagement.membershipRemovalDate, now)
-        )
+        where: eq(payoutManagement.status, 'completed')
       })
 
-      logger.debug('Found payouts to check for removal', {
+      logger.debug('Found completed payouts to check for removal', {
         count: payouts.length,
         currentTime: now.toISOString()
       })
 
-      // Filter out payouts that have already been removed
+      // Filter payouts where removal is due and not already removed
       const dueForRemoval = payouts.filter(payout => {
         const processing = (payout.processing as any) || {}
         const alreadyRemoved = processing.membership_removed === true
-        
+        const scheduledRemovalDate = processing.membership_removal_scheduled
+          ? new Date(processing.membership_removal_scheduled)
+          : null
+
+        // Skip if already removed
         if (alreadyRemoved) {
           logger.debug('Skipping already removed membership', {
             userId: payout.userId,
             payoutId: payout.payoutId
           })
+          return false
         }
-        
-        return !alreadyRemoved
+
+        // Skip if no removal date scheduled
+        if (!scheduledRemovalDate) {
+          return false
+        }
+
+        // Include if scheduled date has passed
+        return scheduledRemovalDate <= now
       })
 
       logger.info('Memberships due for removal', {
@@ -209,7 +216,9 @@ export class MembershipManagerService {
       // Build removal results
       const results: RemovalResult[] = dueForRemoval.map(payout => {
         const processing = (payout.processing as any) || {}
-        const scheduledDate = payout.membershipRemovalDate || new Date()
+        const scheduledDate = processing.membership_removal_scheduled
+          ? new Date(processing.membership_removal_scheduled)
+          : new Date()
         
         return {
           userId: payout.userId,
@@ -311,7 +320,7 @@ export class MembershipManagerService {
         details: {
           userId,
           payoutId: payout.payoutId,
-          scheduledRemovalDate: payout.membershipRemovalDate?.toISOString(),
+          scheduledRemovalDate: processing.membership_removal_scheduled,
           actualRemovalDate: new Date().toISOString()
         }
       })
@@ -511,7 +520,7 @@ export class MembershipManagerService {
             userId,
             payoutId: payout.payoutId,
             newPaymentDate: newPaymentDate.toISOString(),
-            previousRemovalDate: payout.membershipRemovalDate?.toISOString()
+            previousRemovalDate: processing.membership_removal_scheduled
           }
         })
 
@@ -626,11 +635,13 @@ export class MembershipManagerService {
 
       const processing = (payout.processing as any) || {}
       const membershipRemoved = processing.membership_removed === true
-      const scheduledRemovalDate = payout.membershipRemovalDate
+      const scheduledRemovalDate = processing.membership_removal_scheduled
+        ? new Date(processing.membership_removal_scheduled)
+        : null
       const now = new Date()
 
       // Determine if membership is still active
-      const isActive = !membershipRemoved && 
+      const isActive = !membershipRemoved &&
         (!scheduledRemovalDate || scheduledRemovalDate > now)
 
       // Can reactivate if membership has been removed

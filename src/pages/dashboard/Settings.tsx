@@ -62,6 +62,7 @@ const Settings = () => {
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
   const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [appearanceSettings, setAppearanceSettings] = useState<AppearanceSettings | null>(null);
+  const [openingBillingPortal, setOpeningBillingPortal] = useState(false);
 
   const loading = loadingUserSettings || loadingNotificationSettings || loadingPaymentSettings || loadingAppearanceSettings;
   const saving = updateSettingsMutation.isPending;
@@ -126,8 +127,6 @@ const Settings = () => {
     }
 
     try {
-      setSaving(true);
-      
       const response = await fetch('/api/settings/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -146,12 +145,10 @@ const Settings = () => {
 
       toast.success("Password changed successfully!");
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error changing password:', error);
       await logError(`Error changing password: ${error.message}`, user.id);
       toast.error(error.message || "Failed to change password");
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -411,7 +408,7 @@ const Settings = () => {
                     onClick={async () => {
                       if (!user) return;
                       try {
-                        setSaving(true);
+                        setOpeningBillingPortal(true);
                         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/subscriptions/${user.id}/update-payment`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
@@ -436,13 +433,12 @@ const Settings = () => {
                         console.error('Error opening billing portal:', error);
                         await logError(`Error opening billing portal: ${error.message}`, user.id);
                         toast.error(error.message || 'Failed to open billing portal');
-                      } finally {
-                        setSaving(false);
+                        setOpeningBillingPortal(false);
                       }
                     }}
-                    disabled={saving}
+                    disabled={openingBillingPortal}
                   >
-                    {saving ? (
+                    {openingBillingPortal ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         Opening Billing Portal...

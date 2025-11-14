@@ -52,17 +52,18 @@ const Queue = () => {
       eligible: true,
       lastPaymentDate: null,
       joinDate: null,
-      hasReceivedPayout: false
+      hasReceivedPayout: false,
+      nextPaymentDue: null
     }));
 
     const stats = {
-      totalMembers: rawStats.totalMembers || 0,
-      activeMembers: rawStats.activeMembers || 0,
-      eligibleMembers: rawStats.eligibleMembers || 0,
-      totalRevenue: rawStats.totalRevenue || 0,
-      potentialWinners: rawStats.potentialWinners || 0,
+      totalMembers: (rawStats as any).totalMembers || rawQueue.length || 0,
+      activeMembers: (rawStats as any).activeMembers || rawQueue.length || 0,
+      eligibleMembers: (rawStats as any).eligibleMembers || rawQueue.filter((m: any) => m.eligible).length || 0,
+      totalRevenue: (rawStats as any).totalRevenue || 0,
+      potentialWinners: (rawStats as any).potentialWinners || rawQueue.filter((m: any) => m.eligible).length || 0,
       payoutThreshold: 500000,
-      receivedPayouts: rawStats.receivedPayouts || 0
+      receivedPayouts: (rawStats as any).receivedPayouts || 0
     };
 
     const currentUser = mappedQueue.find((member: QueueMember) =>

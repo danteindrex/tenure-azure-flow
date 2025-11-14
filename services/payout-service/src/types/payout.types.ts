@@ -1,8 +1,11 @@
 /**
  * Payout Management Types
- * 
+ *
  * Core types for payout records and status management
  */
+
+import type { ApprovalDecision } from './approval.types';
+import type { BankDetails } from './payment.types';
 
 export type PayoutStatus = 
   | 'pending_approval'
@@ -26,21 +29,6 @@ export interface EligibilitySnapshot {
   lifetimeTotal: number;
   selectionCriteria: string;
   timestamp: string;
-}
-
-export interface ApprovalDecision {
-  adminId: number;
-  decision: 'approved' | 'rejected';
-  reason?: string;
-  timestamp: string;
-}
-
-export interface BankDetails {
-  accountHolderName: string;
-  routingNumber: string;
-  accountNumber: string;
-  accountType: 'checking' | 'savings';
-  encrypted: boolean;
 }
 
 export interface TaxWithholding {

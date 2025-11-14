@@ -36,6 +36,7 @@ export interface AuthenticatedRequest extends Request {
   user?: {
     id: string
     email: string
+    authUserId: string
     name?: string | null
     emailVerified: boolean
     role?: string | null
@@ -143,6 +144,7 @@ export async function validateSession(
     req.user = {
       id: userData.id,
       email: userData.email,
+      authUserId: userData.authUserId || userData.id,
       name: userData.name,
       emailVerified: userData.emailVerified || false,
       role: adminData?.role || null,

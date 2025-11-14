@@ -371,7 +371,7 @@ export class WinnerSelector {
                 payoutId,
                 userId: winner.userId,
                 queuePosition: winner.queuePosition,
-                amount: 100000.0,
+                amount: '100000.00',
                 currency: 'USD',
                 status: 'pending_approval',
                 eligibilityCheck,
