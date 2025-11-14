@@ -134,7 +134,13 @@ export const auth = betterAuth({
     // Passkey plugin (WebAuthn support)
     passkey({
       rpName: 'Tenure',
-      rpID: process.env.NODE_ENV === 'production' ? 'yourdomain.com' : 'localhost'
+      // rpID must match your domain (e.g., 'app.tenure.com' or 'tenure.com')
+      // For development, use 'localhost'
+      rpID: process.env.NODE_ENV === 'production'
+        ? process.env.PASSKEY_RP_ID || new URL(process.env.BETTER_AUTH_URL || 'http://localhost:3000').hostname
+        : 'localhost',
+      // Origin should match your full app URL
+      origin: process.env.BETTER_AUTH_URL || 'http://localhost:3000'
     }),
 
     // Two-Factor Authentication plugin (TOTP + backup codes)

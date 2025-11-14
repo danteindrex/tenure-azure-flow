@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
@@ -25,25 +25,76 @@ const LoginNew = () => {
   const [showTwoFactor, setShowTwoFactor] = useState(false);
 
   const [showPasskeyOption, setShowPasskeyOption] = useState(false);
+  const [conditionalUISupported, setConditionalUISupported] = useState(false);
+  const autofillAbortController = useRef<AbortController | null>(null);
 
   // Log page visit and redirect if already authenticated
   useEffect(() => {
     logPageVisit('/login');
-    
+
     // If user is already authenticated, redirect to auth callback to check status
     if (session?.user && !isPending) {
       router.push('/auth/callback');
     }
   }, [session, isPending, router]);
 
-  // Check if passkeys are available
+  // Check if passkeys are available and initialize autofill
   useEffect(() => {
-    const checkPasskeySupport = async () => {
-      if (typeof window !== 'undefined' && window.PublicKeyCredential) {
-        setShowPasskeyOption(true);
+    const initializePasskeyAutofill = async () => {
+      if (typeof window === 'undefined' || !window.PublicKeyCredential) {
+        return;
+      }
+
+      // Check basic passkey support
+      setShowPasskeyOption(true);
+
+      // Check if conditional UI (autofill) is supported
+      if (PublicKeyCredential.isConditionalMediationAvailable) {
+        try {
+          const isConditionalUIAvailable = await PublicKeyCredential.isConditionalMediationAvailable();
+
+          if (isConditionalUIAvailable) {
+            setConditionalUISupported(true);
+
+            // Start the autofill flow automatically
+            // This creates a pending WebAuthn request that shows up in browser autofill
+            autofillAbortController.current = new AbortController();
+
+            try {
+              const result = await authClient.signIn.passkey({
+                autoFill: true
+              });
+
+              // If user selects a passkey from autofill, this resolves
+              if (result.error) {
+                console.log("Passkey autofill cancelled or failed:", result.error);
+                return;
+              }
+
+              // Successful passkey autofill login
+              await logLogin("passkey_autofill", true, result.data?.user?.id);
+              toast.success("Welcome back!");
+              router.push('/auth/callback');
+
+            } catch (err) {
+              // Silent fail - user probably didn't select a passkey from autofill
+              console.log("Passkey autofill not used:", err);
+            }
+          }
+        } catch (error) {
+          console.error("Error checking conditional UI support:", error);
+        }
       }
     };
-    checkPasskeySupport();
+
+    initializePasskeyAutofill();
+
+    // Cleanup: abort the autofill request when component unmounts
+    return () => {
+      if (autofillAbortController.current) {
+        autofillAbortController.current.abort();
+      }
+    };
   }, []);
 
   const handleInputChange = (field: string, value: string | boolean): void => {
@@ -312,8 +363,10 @@ const LoginNew = () => {
                 <Label htmlFor="email">Email Address</Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   placeholder="you@example.com"
+                  autoComplete="username webauthn"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
                   className="bg-background/50 border-border focus:border-accent transition-colors"
