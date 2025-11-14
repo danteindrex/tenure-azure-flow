@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,13 +6,13 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Settings as SettingsIcon, 
-  Bell, 
-  Shield, 
-  CreditCard, 
-  Globe, 
-  Moon, 
+import {
+  Settings as SettingsIcon,
+  Bell,
+  Shield,
+  CreditCard,
+  Globe,
+  Moon,
   Sun,
   Save,
   Eye,
@@ -21,14 +21,19 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "@/lib/auth-client";
-import SettingsService, { UserSettings, NotificationPreferences, SecuritySettings, PaymentSettings, PrivacySettings, AppearanceSettings } from "@/lib/settings";
+import { UserSettings, NotificationPreferences, SecuritySettings, PaymentSettings, PrivacySettings, AppearanceSettings } from "@/lib/settings";
 import { logError } from "@/lib/audit";
 import { useTheme } from "@/contexts/ThemeContext";
 import Security from "./Security";
+import {
+  useUserSettings,
+  useNotificationSettings,
+  usePaymentSettings,
+  useAppearanceSettings,
+  useUpdateSettings
+} from "@/hooks/useSettingsData";
 
 const Settings = () => {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('notifications');
   const [showPassword, setShowPassword] = useState(false);
   const [passwordData, setPasswordData] = useState({
@@ -37,7 +42,20 @@ const Settings = () => {
     confirmPassword: ''
   });
 
-  // Settings state
+  const { data: session, isPending } = useSession();
+  const user = session?.user;
+  const { theme: currentTheme, setTheme: setCurrentTheme } = useTheme();
+
+  // React Query hooks - replaces manual fetching
+  const { data: fetchedUserSettings, isLoading: loadingUserSettings } = useUserSettings(user?.id);
+  const { data: fetchedNotificationPreferences, isLoading: loadingNotificationSettings } = useNotificationSettings(user?.id);
+  const { data: fetchedPaymentSettings, isLoading: loadingPaymentSettings } = usePaymentSettings(user?.id);
+  const { data: fetchedAppearanceSettings, isLoading: loadingAppearanceSettings } = useAppearanceSettings(user?.id);
+
+  // Mutation for updating settings
+  const updateSettingsMutation = useUpdateSettings();
+
+  // Local state for editing
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences | null>(null);
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings | null>(null);
@@ -45,76 +63,25 @@ const Settings = () => {
   const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [appearanceSettings, setAppearanceSettings] = useState<AppearanceSettings | null>(null);
 
-  const { data: session, isPending } = useSession();
-  const user = session?.user;
-  const { theme: currentTheme, setTheme: setCurrentTheme } = useTheme();
+  const loading = loadingUserSettings || loadingNotificationSettings || loadingPaymentSettings || loadingAppearanceSettings;
+  const saving = updateSettingsMutation.isPending;
 
-  // Memoize the settings service to prevent recreation on every render
-  const settingsService = useMemo(() => new SettingsService(), []);
-
-  // Load all user settings
+  // Sync fetched data to local state
   useEffect(() => {
-    let isMounted = true;
-    
-    const loadSettings = async () => {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        setLoading(true);
-        
-        // Load all settings in parallel
-        const [
-          userSettingsData,
-          notificationData,
-          paymentData,
-          appearanceData
-        ] = await Promise.all([
-          settingsService.getUserSettings(user.id),
-          settingsService.getNotificationPreferences(user.id),
-          settingsService.getPaymentSettings(user.id),
-          settingsService.getAppearanceSettings(user.id)
-        ]);
+    if (fetchedUserSettings) setUserSettings(fetchedUserSettings);
+  }, [fetchedUserSettings]);
 
-        // Only update state if component is still mounted
-        if (isMounted) {
-          // If no settings exist, initialize defaults
-          if (!userSettingsData) {
-            await settingsService.initializeUserSettings(user.id);
-            // Reload settings after initialization
-            const reloadedSettings = await settingsService.getUserSettings(user.id);
-            setUserSettings(reloadedSettings);
-          } else {
-            setUserSettings(userSettingsData);
-          }
+  useEffect(() => {
+    if (fetchedNotificationPreferences) setNotificationPreferences(fetchedNotificationPreferences);
+  }, [fetchedNotificationPreferences]);
 
-          setNotificationPreferences(notificationData);
-          setPaymentSettings(paymentData);
-          setAppearanceSettings(appearanceData);
-        }
+  useEffect(() => {
+    if (fetchedPaymentSettings) setPaymentSettings(fetchedPaymentSettings);
+  }, [fetchedPaymentSettings]);
 
-      } catch (error) {
-        console.error('Error loading settings:', error);
-        if (isMounted) {
-          await logError(`Error loading settings: ${error.message}`, user.id);
-          toast.error("Failed to load settings");
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadSettings();
-    
-    // Cleanup function to prevent state updates after unmount
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.id]); // Only depend on user.id, not the entire user object
+  useEffect(() => {
+    if (fetchedAppearanceSettings) setAppearanceSettings(fetchedAppearanceSettings);
+  }, [fetchedAppearanceSettings]);
 
   // Sync theme from database with theme context
   useEffect(() => {
@@ -125,41 +92,23 @@ const Settings = () => {
 
   const handleSave = async () => {
     if (!user) return;
-    
-    try {
-      setSaving(true);
-      
-      // Save all settings
-      const promises = [];
-      
-      if (userSettings) {
-        promises.push(settingsService.upsertUserSettings(user.id, userSettings));
-      }
-      if (notificationPreferences) {
-        promises.push(settingsService.updateNotificationPreferences(user.id, notificationPreferences));
-      }
-      if (securitySettings) {
-        promises.push(settingsService.updateSecuritySettings(user.id, securitySettings));
-      }
-      if (paymentSettings) {
-        promises.push(settingsService.updatePaymentSettings(user.id, paymentSettings));
-      }
-      if (privacySettings) {
-        promises.push(settingsService.updatePrivacySettings(user.id, privacySettings));
-      }
-      if (appearanceSettings) {
-        promises.push(settingsService.updateAppearanceSettings(user.id, appearanceSettings));
-      }
 
-      await Promise.all(promises);
-      
+    try {
+      await updateSettingsMutation.mutateAsync({
+        userId: user.id,
+        userSettings: userSettings || undefined,
+        notificationPreferences: notificationPreferences || undefined,
+        securitySettings: securitySettings || undefined,
+        paymentSettings: paymentSettings || undefined,
+        privacySettings: privacySettings || undefined,
+        appearanceSettings: appearanceSettings || undefined
+      });
+
       toast.success("Settings saved successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving settings:', error);
       await logError(`Error saving settings: ${error.message}`, user.id);
       toast.error("Failed to save settings");
-    } finally {
-      setSaving(false);
     }
   };
 

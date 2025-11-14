@@ -221,8 +221,21 @@ export class StripeService {
       ]);
 
       // Create billing schedules for both monthly and annual intervals
-      // Monthly billing schedule
+      // Populate billing dates directly from Stripe response (current_period_end on each item)
       // Get billing dates from each subscription item (monthly and annual have different cycles)
+
+      logger.info('Subscription items for billing schedule creation:', {
+        userId,
+        subscriptionId: subscription.id,
+        itemCount: subscriptionItems.length,
+        items: subscriptionItems.map(item => ({
+          id: item.id,
+          priceId: item.price.id,
+          interval: item.price.recurring?.interval,
+          amount: item.price.unit_amount
+        }))
+      });
+
       const monthlyItem = subscriptionItems.find(item =>
         item.price.recurring?.interval === 'month'
       );
@@ -230,7 +243,14 @@ export class StripeService {
         item.price.recurring?.interval === 'year'
       );
 
-      // Monthly billing schedule
+      logger.info('Found billing items:', {
+        hasMonthly: !!monthlyItem,
+        hasAnnual: !!annualItem,
+        monthlyInterval: monthlyItem?.price.recurring?.interval,
+        annualInterval: annualItem?.price.recurring?.interval
+      });
+
+      // Monthly billing schedule - populated from Stripe subscription item
       if (monthlyItem) {
         const monthlyBillingQuery = `
           INSERT INTO user_billing_schedules (user_id, subscription_id, billing_cycle, next_billing_date, amount, currency, is_active, created_at)
@@ -238,6 +258,7 @@ export class StripeService {
           RETURNING id
         `;
 
+        // Use Stripe's current_period_end directly (no calculation needed)
         const nextMonthlyBillingDate = new Date(monthlyItem.current_period_end * 1000);
         await pool.query(monthlyBillingQuery, [
           userId,
@@ -248,7 +269,7 @@ export class StripeService {
         ]);
       }
 
-      // Annual billing schedule
+      // Annual billing schedule - populated from Stripe subscription item
       if (annualItem) {
         const annualBillingQuery = `
           INSERT INTO user_billing_schedules (user_id, subscription_id, billing_cycle, next_billing_date, amount, currency, is_active, created_at)
@@ -256,6 +277,7 @@ export class StripeService {
           RETURNING id
         `;
 
+        // Use Stripe's current_period_end directly (no calculation needed)
         const nextAnnualBillingDate = new Date(annualItem.current_period_end * 1000);
 
         await pool.query(annualBillingQuery, [
@@ -265,6 +287,18 @@ export class StripeService {
           config.pricing.annualAmount,
           config.pricing.currency.toUpperCase()
         ]);
+
+        logger.info('Created YEARLY billing schedule', {
+          userId,
+          nextBillingDate: nextAnnualBillingDate.toISOString(),
+          amount: config.pricing.annualAmount
+        });
+      } else {
+        logger.error('CRITICAL: Annual item not found in subscription items!', {
+          userId,
+          subscriptionId: subscription.id,
+          itemCount: subscriptionItems.length
+        });
       }
 
       // Store payment method info
@@ -522,6 +556,57 @@ export class StripeService {
       // Note: Queue stats are automatically calculated by active_member_queue_view
       // No manual updates needed - the view calculates from user_payments table
 
+      // Update billing schedules with next billing dates from Stripe invoice line items
+      // Important: Only update schedules for items that were actually billed on THIS invoice
+      // In mixed intervals, monthly invoices only contain the monthly item, annual invoices only contain annual
+      const invoiceLineItems = invoice.lines?.data || [];
+
+      logger.info('Updating billing schedules from invoice line items', {
+        userId: dbSubscription.user_id,
+        invoiceId: invoice.id,
+        lineItemCount: invoiceLineItems.length
+      });
+
+      for (const lineItem of invoiceLineItems) {
+        // Only process subscription line items with recurring prices
+        // Check if line item has subscription and price data (API v2025+ structure)
+        // Use type assertion to access plan property which exists in runtime but not in types
+        const lineItemWithPlan = lineItem as any;
+
+        if (lineItem.subscription && lineItemWithPlan.plan?.interval) {
+          const interval = lineItemWithPlan.plan.interval;
+          const billingCycle = interval === 'month' ? 'MONTHLY' : interval === 'year' ? 'YEARLY' : null;
+
+          if (billingCycle && lineItem.period?.end) {
+            // Use Stripe's period.end from the invoice line item for next billing date
+            const nextBillingDate = new Date(lineItem.period.end * 1000);
+
+            const updateResult = await pool.query(
+              `UPDATE user_billing_schedules
+               SET next_billing_date = $1, updated_at = NOW()
+               WHERE subscription_id = $2 AND billing_cycle = $3
+               RETURNING id`,
+              [nextBillingDate, dbSubscription.id, billingCycle]
+            );
+
+            if (updateResult.rows.length > 0) {
+              logger.info(`Updated ${billingCycle} billing schedule from invoice`, {
+                userId: dbSubscription.user_id,
+                billingCycle,
+                nextBillingDate: nextBillingDate.toISOString(),
+                invoiceId: invoice.id
+              });
+            } else {
+              logger.warn(`No billing schedule found to update for ${billingCycle}`, {
+                userId: dbSubscription.user_id,
+                subscriptionId: dbSubscription.id,
+                billingCycle
+              });
+            }
+          }
+        }
+      }
+
       logger.info(`Payment recorded for member ${dbSubscription.user_id}`, {
         paymentId: paymentResult.rows[0]?.id,
         amount,
@@ -765,9 +850,10 @@ export class StripeService {
         // Cancel immediately
         await stripe.subscriptions.cancel(dbSubscription.provider_subscription_id);
       } else {
-        // Cancel at period end
+        // Cancel at period end using new cancel_at enum for mixed intervals
+        // Use 'max_period_end' to cancel at the latest billing period (most user-friendly)
         await stripe.subscriptions.update(dbSubscription.provider_subscription_id, {
-          cancel_at_period_end: true,
+          cancel_at: 'max_period_end' as any, // Cancel at the end of the longest billing cycle
         });
       }
 
@@ -796,8 +882,9 @@ export class StripeService {
       }
 
       // Update subscription to remove cancellation
+      // Set cancel_at to null to remove any pending cancellation
       await stripe.subscriptions.update(dbSubscription.provider_subscription_id, {
-        cancel_at_period_end: false,
+        cancel_at: null as any, // Remove pending cancellation
       });
 
       logger.info(`Subscription reactivated for member ${userId}`);

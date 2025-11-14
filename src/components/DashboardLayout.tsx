@@ -8,6 +8,7 @@ import { logLogout } from "@/lib/audit";
 import { useTheme } from "@/contexts/ThemeContext";
 import Sidebar from "./Sidebar";
 import IdentityVerificationBanner from "./IdentityVerificationBanner";
+import MobileBottomNav from "./MobileBottomNav";
 
 const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
   const router = useRouter();
@@ -67,8 +68,8 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
             <div className="flex items-center justify-between">
               {/* Page Title */}
               <div>
-                <h1 className="text-2xl font-bold">Dashboard</h1>
-                <p className="text-muted-foreground">Welcome back, {displayUserData.name}</p>
+                <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground hidden xs:block">Welcome back, {displayUserData.name}</p>
               </div>
 
               {/* Right Side Actions */}
@@ -126,9 +127,12 @@ const DashboardLayout = ({ children }: { children?: React.ReactNode }) => {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 container mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        <main className="flex-1 container mx-auto px-3 sm:px-4 py-4 sm:py-8 pb-20 md:pb-8">
           {children}
         </main>
+
+        {/* Mobile Bottom Navigation */}
+        <MobileBottomNav />
       </div>
     </div>
   );

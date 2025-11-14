@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,34 +15,12 @@ import {
   Activity
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const Analytics = () => {
-
   const { data: session } = useSession();
   const user = session?.user;
   const [timeRange, setTimeRange] = useState("6months");
-
-  const [overview, setOverview] = useState({
-    totalInvested: 0,
-    totalEarned: 0,
-    netPosition: 0,
-    tenureMonths: 0,
-    queuePosition: 0,
-    potentialPayout: 0,
-  });
-
-  const [monthlyData, setMonthlyData] = useState<Array<{ month: string; invested: number; earned: number; net: number }>>([]);
-  const [performance, setPerformance] = useState({
-    paymentConsistency: 0,
-    queueProgress: 0,
-    fundGrowth: 0,
-    riskLevel: "Low",
-  });
-  const [projections, setProjections] = useState({
-    nextPayout: "",
-    estimatedPayout: 0,
-    confidence: 0,
-  });
 
   const rangeMonths = useMemo(() => {
     switch (timeRange) {
@@ -54,58 +32,73 @@ const Analytics = () => {
     }
   }, [timeRange]);
 
+  // React Query hook - replaces manual fetching
+  const { data: analyticsData, isLoading } = useAnalytics(user?.id, rangeMonths);
 
+  // Compute derived data using useMemo
+  const { overview, monthlyData, performance, projections } = useMemo(() => {
+    if (!analyticsData) {
+      return {
+        overview: {
+          totalInvested: 0,
+          totalEarned: 0,
+          netPosition: 0,
+          tenureMonths: 0,
+          queuePosition: 0,
+          potentialPayout: 0,
+        },
+        monthlyData: [],
+        performance: {
+          paymentConsistency: 0,
+          queueProgress: 0,
+          fundGrowth: 0,
+          riskLevel: "Low" as const,
+        },
+        projections: {
+          nextPayout: "",
+          estimatedPayout: 0,
+          confidence: 0,
+        },
+      };
+    }
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const response = await fetch(`/api/analytics/overview?rangeMonths=${rangeMonths}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch analytics data');
-        }
-        
-        const data = await response.json();
-        const { overview: apiOverview, monthly } = data;
+    const { overview: apiOverview, monthly } = analyticsData;
 
-        // Calculate additional metrics from the monthly data
-        const monthsWithPayments = monthly.filter((m: any) => m.invested > 0).length;
-        const paymentConsistency = Math.round((monthsWithPayments / Math.max(monthly.length, 1)) * 100);
-        const queueProgress = apiOverview.queueCount > 0 && apiOverview.queuePosition > 0 
-          ? Math.round(((apiOverview.queueCount - apiOverview.queuePosition + 1) / apiOverview.queueCount) * 100) 
-          : 0;
-        const startInvest = monthly[0]?.invested ?? 0;
-        const endInvest = monthly[monthly.length - 1]?.invested ?? 0;
-        const fundGrowth = startInvest > 0 ? Number((((endInvest - startInvest) / startInvest) * 100).toFixed(1)) : 0;
-        const riskLevel = paymentConsistency >= 80 ? "Low" : paymentConsistency >= 50 ? "Medium" : "High";
+    // Calculate additional metrics
+    const monthsWithPayments = monthly.filter(m => m.invested > 0).length;
+    const paymentConsistency = Math.round((monthsWithPayments / Math.max(monthly.length, 1)) * 100);
+    const queueProgress = apiOverview.queueCount > 0 && apiOverview.queuePosition > 0
+      ? Math.round(((apiOverview.queueCount - apiOverview.queuePosition + 1) / apiOverview.queueCount) * 100)
+      : 0;
+    const startInvest = monthly[0]?.invested ?? 0;
+    const endInvest = monthly[monthly.length - 1]?.invested ?? 0;
+    const fundGrowth = startInvest > 0 ? Number((((endInvest - startInvest) / startInvest) * 100).toFixed(1)) : 0;
+    const riskLevel = paymentConsistency >= 80 ? "Low" : paymentConsistency >= 50 ? "Medium" : "High";
+    const confidence = Math.min(100, Math.max(0, Math.round((paymentConsistency + queueProgress) / 2)));
 
-        // Add net calculation to monthly data
-        const monthlyWithNet = monthly.map((m: any) => ({
-          ...m,
-          net: m.earned - m.invested
-        }));
-
-        // Projections
-        const nextPayout = apiOverview.nextPayoutDate;
-        const confidence = Math.min(100, Math.max(0, Math.round((paymentConsistency + queueProgress) / 2)));
-
-        setOverview({
-          totalInvested: apiOverview.investedTotal,
-          totalEarned: apiOverview.totalEarned,
-          netPosition: apiOverview.netPosition,
-          tenureMonths: apiOverview.tenureMonths,
-          queuePosition: apiOverview.queuePosition,
-          potentialPayout: apiOverview.potentialPayout,
-        });
-        setMonthlyData(monthlyWithNet);
-        setPerformance({ paymentConsistency, queueProgress, fundGrowth, riskLevel });
-        setProjections({ nextPayout, estimatedPayout: apiOverview.potentialPayout, confidence });
-      } catch (error) {
-        console.error('Failed to load analytics data:', error);
-        // Keep defaults on error
-      }
+    return {
+      overview: {
+        totalInvested: apiOverview.investedTotal,
+        totalEarned: apiOverview.totalEarned,
+        netPosition: apiOverview.netPosition,
+        tenureMonths: apiOverview.tenureMonths,
+        queuePosition: apiOverview.queuePosition,
+        potentialPayout: apiOverview.potentialPayout,
+      },
+      monthlyData: monthly,
+      performance: {
+        paymentConsistency,
+        queueProgress,
+        fundGrowth,
+        riskLevel,
+      },
+      projections: {
+        nextPayout: apiOverview.nextPayoutDate,
+        estimatedPayout: apiOverview.potentialPayout,
+        confidence,
+      },
     };
-    load();
-  }, [user?.id, rangeMonths]);
+  }, [analyticsData]);
 
   const getRiskColor = (risk: string) => {
     switch (risk) {

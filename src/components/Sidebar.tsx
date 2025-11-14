@@ -118,7 +118,7 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
   return (
     <div className={`bg-card border-r border-border shadow-2xl transition-all duration-300 ${
       isCollapsed ? "w-16" : "w-64"
-    } flex flex-col h-screen sticky top-0`}>
+    } hidden md:flex flex-col h-screen sticky top-0`}>
       {/* Header */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between">
@@ -159,7 +159,7 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
               data-cursor-sticky
               data-cursor-text={isCollapsed ? item.label : ''}
             >
-              <Icon className={`w-5 h-5 ${active ? "text-accent-foreground" : "text-muted-foreground group-hover:text-foreground"}`} />
+              <Icon className={`w-6 h-6 lg:w-5 lg:h-5 ${active ? "text-accent-foreground" : "text-muted-foreground group-hover:text-foreground"}`} />
               {!isCollapsed && (
                 <>
                   <span className="flex-1 text-sm font-medium">{item.label}</span>

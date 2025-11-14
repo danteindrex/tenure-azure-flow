@@ -1,152 +1,123 @@
-import { useEffect, useState, useRef } from "react";
-import { Crown, Calendar, DollarSign, Users, Clock, TrendingUp, Award, CreditCard, Loader2 } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { Crown, Calendar, DollarSign, Users, Clock, TrendingUp, Award, CreditCard, Loader2, AlertTriangle, X, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useSession } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { logError } from "@/lib/audit";
+import { useQueueData } from "@/hooks/useQueueData";
+import { useStatistics } from "@/hooks/useStatistics";
+import { useBillingSchedules } from "@/hooks/useBillingSchedules";
 
 const DashboardSimple = () => {
 
   const { data: session } = useSession();
   const user = session?.user;
 
-  const [totalRevenue, setTotalRevenue] = useState<number>(0);
-  const [queuePosition, setQueuePosition] = useState<number | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState<number>(0);
-  const [daysUntilPayment, setDaysUntilPayment] = useState<number>(0);
-  const [daysUntilDraw, setDaysUntilDraw] = useState<number>(0);
-  const [topQueue, setTopQueue] = useState<Array<{ rank: number; name: string; tenureMonths: number; status: string; isCurrentUser?: boolean }>>([]);
-  const [currentUserIdState, setCurrentUserIdState] = useState<string | null>(null);
-  const [currentUserEntry, setCurrentUserEntry] = useState<{ rank: number; name: string; tenureMonths: number; status: string; isCurrentUser: boolean } | null>(null);
+  // React Query hooks - replaces manual fetching and state management
+  const { data: queueData, isLoading: isLoadingQueue, isFetching: isFetchingQueue, refreshQueue } = useQueueData();
+  const { data: statsData, isLoading: isLoadingStats } = useStatistics();
+  const { data: billingData, isLoading: isLoadingBilling } = useBillingSchedules(user?.id);
+
+  // UI state
   const [updatingPayment, setUpdatingPayment] = useState(false);
-  const pollRef = useRef<number | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
   const BUSINESS_LAUNCH_DATE = process.env.NEXT_PUBLIC_BUSINESS_LAUNCH_DATE || ""; // ISO string fallback
   const PRIZE_PER_WINNER = 100000; // BR-4
   const FUND_TARGET = 500000; // Target fund amount for payouts
 
-  // Compute next draw as days until the 15th of next month
-  const computeDaysUntilNextDraw = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const target = new Date(year, month, 15);
-    if (now > target) {
-      target.setMonth(month + 1);
+  // Compute derived data from React Query results using useMemo
+  const {
+    queuePosition,
+    userDatabaseId,
+    currentUserEntry,
+    topQueue,
+    totalRevenue,
+    billingSchedules,
+    paymentAmount,
+    daysUntilPayment,
+    daysUntilDraw
+  } = useMemo(() => {
+    const queue = queueData?.data?.queue || [];
+    const currentUserId = user?.id || null;
+    const revenue = statsData?.data?.totalRevenue || 0;
+    const schedules = billingData?.data?.schedules || [];
+
+    // Find current user in queue
+    let position: number | null = null;
+    let dbId: number | null = null;
+    let userEntry: { rank: number; name: string; tenureMonths: number; status: string; isCurrentUser: boolean } | null = null;
+
+    if (currentUserId && queue.length > 0) {
+      const mine = queue.find((q: any) => q.user_id === currentUserId);
+      if (mine) {
+        position = mine.queue_position;
+        dbId = mine.id || null;
+        userEntry = {
+          rank: mine.queue_position,
+          name: 'You',
+          tenureMonths: 0,
+          status: 'Active',
+          isCurrentUser: true
+        };
+      }
     }
-    const diffDays = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    return Math.max(diffDays, 0);
+
+    // Map queue for display
+    const queueDisplay = queue.map((q: any) => ({
+      rank: q.queue_position,
+      name: q.user_id,
+      tenureMonths: 0,
+      status: 'Active',
+      isCurrentUser: currentUserId ? q.user_id === currentUserId : false,
+    }));
+
+    // Get payment info from billing schedules
+    const monthlySchedule = schedules.find((s: any) => s.billingCycle === 'MONTHLY');
+    const payment = monthlySchedule?.amount || 0;
+    const daysPayment = monthlySchedule?.daysUntil || 0;
+
+    // Calculate days until draw
+    let daysDraw = 0;
+    const launch = BUSINESS_LAUNCH_DATE ? new Date(BUSINESS_LAUNCH_DATE) : null;
+    if (launch) {
+      const twelveMonths = new Date(launch);
+      twelveMonths.setMonth(twelveMonths.getMonth() + 12);
+      if (Date.now() < twelveMonths.getTime()) {
+        daysDraw = Math.max(Math.ceil((twelveMonths.getTime() - Date.now()) / (1000 * 60 * 60 * 24)), 0);
+      }
+    } else {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const target = new Date(year, month, 15);
+      if (now > target) {
+        target.setMonth(month + 1);
+      }
+      daysDraw = Math.max(Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)), 0);
+    }
+
+    return {
+      queuePosition: position,
+      userDatabaseId: dbId,
+      currentUserEntry: userEntry,
+      topQueue: queueDisplay,
+      totalRevenue: revenue,
+      billingSchedules: schedules,
+      paymentAmount: payment,
+      daysUntilPayment: daysPayment,
+      daysUntilDraw: daysDraw
+    };
+  }, [queueData, statsData, billingData, user?.id, BUSINESS_LAUNCH_DATE, PRIZE_PER_WINNER]);
+
+  // Manual refresh function
+  const handleRefresh = async () => {
+    toast.info('Refreshing data...');
+    await refreshQueue();
   };
-
-  useEffect(() => {
-    const fetchQueueAndUsers = async () => {
-      try {
-        // Fetch queue data and statistics from API
-        const [queueResponse, statsResponse] = await Promise.all([
-          fetch('/api/queue', { credentials: 'include' }),
-          fetch('/api/queue/statistics', { credentials: 'include' })
-        ]);
-
-        if (!queueResponse.ok || !statsResponse.ok) {
-          console.error('Failed to fetch queue data');
-          return;
-        }
-
-        const queueData = await queueResponse.json();
-        const statsData = await statsResponse.json();
-
-        if (!queueData.success || !statsData.success) {
-          console.error('API returned error');
-          return;
-        }
-
-        // Set total revenue from statistics
-        setTotalRevenue(statsData.data.totalRevenue || 0);
-
-        // Find current user in queue
-        const currentUserId: string | null = user?.id || null;
-        const queue = queueData.data.queue || [];
-
-        if (currentUserId && queue.length > 0) {
-          setCurrentUserIdState(currentUserId);
-          const mine = queue.find((q: any) => q.user_id === currentUserId);
-
-          if (mine) {
-            setQueuePosition(mine.queue_position);
-
-            // Set current user entry (privacy mode: minimal data)
-            setCurrentUserEntry({
-              rank: mine.queue_position,
-              name: 'You',
-              tenureMonths: 0, // Not available in privacy mode
-              status: 'Active', // Don't show inactive status
-              isCurrentUser: true
-            });
-
-            // Payment info not available in privacy mode
-            setPaymentAmount(0);
-            setDaysUntilPayment(0);
-          } else {
-            setCurrentUserEntry(null);
-            setQueuePosition(null);
-          }
-        }
-
-        // Show all queue members (privacy mode: only user_id and queue_position)
-        const preview = queue.map((q: any) => ({
-          rank: q.queue_position,
-          name: q.user_id, // Show user_id for privacy
-          tenureMonths: 0, // Not available in privacy mode
-          status: 'Active', // Don't show inactive status
-          isCurrentUser: currentUserId ? q.user_id === currentUserId : false,
-        }));
-        setTopQueue(preview);
-
-        // Calculate days until draw
-        const launch = BUSINESS_LAUNCH_DATE ? new Date(BUSINESS_LAUNCH_DATE) : null;
-        if (launch) {
-          const twelveMonths = new Date(launch);
-          twelveMonths.setMonth(twelveMonths.getMonth() + 12);
-          const threshold = PRIZE_PER_WINNER;
-
-          if (Date.now() < twelveMonths.getTime()) {
-            const d = Math.ceil((twelveMonths.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-            setDaysUntilDraw(Math.max(d, 0));
-          } else if (statsData.data.totalRevenue < threshold) {
-            setDaysUntilDraw(0);
-          } else {
-            setDaysUntilDraw(0);
-          }
-        } else {
-          setDaysUntilDraw(computeDaysUntilNextDraw());
-        }
-
-      } catch (e) {
-        console.error('Error in fetchQueueAndUsers:', e);
-      }
-    };
-
-    // Initial fetch
-    if (user?.id) {
-      fetchQueueAndUsers();
-    }
-
-    // Poll for updates every 30 seconds
-    pollRef.current = window.setInterval(() => {
-      if (user?.id) {
-        fetchQueueAndUsers();
-      }
-    }, 30000);
-
-    return () => {
-      // cleanup polling
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-  }, [user?.id, BUSINESS_LAUNCH_DATE, totalRevenue]);
 
   const handleUpdatePaymentMethod = async () => {
     if (!user) {
@@ -186,8 +157,45 @@ const DashboardSimple = () => {
     }
   };
 
+  const handleCancelSubscription = async () => {
+    if (!user) {
+      toast.error("Please sign in to cancel your subscription");
+      return;
+    }
+
+    try {
+      setCancelling(true);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/subscriptions/${user.id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to cancel subscription');
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success('Subscription cancelled successfully. You will be removed from the queue.');
+        setShowCancelModal(false);
+        // Refresh data
+        window.location.reload();
+      } else {
+        throw new Error('Invalid response from server');
+      }
+    } catch (error: any) {
+      console.error('Error cancelling subscription:', error);
+      await logError(`Error cancelling subscription: ${error.message}`, user.id);
+      toast.error(error.message || 'Failed to cancel subscription');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const userData = {
-    memberId: queuePosition ? `#${queuePosition.toString().padStart(3, '0')}` : "Not in queue",
+    memberId: userDatabaseId ? `#${userDatabaseId.toString().padStart(3, '0')}` : (queuePosition ? `#${queuePosition.toString().padStart(3, '0')}` : "Not in queue"),
     tenureStart: "", // Not available here
     nextPaymentDue: daysUntilPayment > 0 ? `${daysUntilPayment} days` : "No payment due",
   };
@@ -207,13 +215,24 @@ const DashboardSimple = () => {
   return (
     <div className="space-y-3 sm:space-y-4 md:space-y-6 px-2 sm:px-0">
       {/* Welcome Section - Responsive */}
-      <div className="text-center py-3 sm:py-4 md:py-6 lg:py-8">
+      <div className="text-center py-3 sm:py-4 md:py-6 lg:py-8 relative">
         <h1 className="text-xl xs:text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2 px-2">
           Welcome to Your Dashboard
         </h1>
         <p className="text-xs sm:text-sm md:text-base text-muted-foreground px-4">
           {queuePosition ? `Member ID: ${userData.memberId}` : "Complete your membership to get your Member ID"}
         </p>
+        {/* Refresh Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="absolute top-3 right-3 gap-2"
+          onClick={handleRefresh}
+          disabled={isFetchingQueue}
+        >
+          <RefreshCw className={`w-4 h-4 ${isFetchingQueue ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">Refresh</span>
+        </Button>
       </div>
 
       {/* Key Stats - 2 columns on mobile, 4 on desktop */}
@@ -382,14 +401,34 @@ const DashboardSimple = () => {
             <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-accent shrink-0" />
             <span className="truncate">Payment & Billing</span>
           </h3>
-          <div className="space-y-2 sm:space-y-3">
-            <div>
-              <p className="text-xs sm:text-sm text-muted-foreground">Next Payment Due</p>
-              <p className="text-xl sm:text-2xl md:text-3xl font-bold">
-                {stats.paymentAmount > 0 ? `$${stats.paymentAmount}.00` : "$25.00"}
-              </p>
-              <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground mt-1">{userData.nextPaymentDue}</p>
-            </div>
+          <div className="space-y-3 sm:space-y-4">
+            {/* Monthly and Annual Billing Schedules */}
+            {billingSchedules.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {billingSchedules.map((schedule) => (
+                  <div key={schedule.billingCycle} className="p-3 rounded-lg bg-accent/5 border border-accent/20">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      {schedule.billingCycle === 'MONTHLY' ? 'Monthly Payment' : 'Annual Payment'}
+                    </p>
+                    <p className="text-xl sm:text-2xl font-bold">
+                      ${schedule.amount.toFixed(2)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Due in {schedule.daysUntil} days
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-3 rounded-lg bg-accent/5 border border-accent/20">
+                <p className="text-xs sm:text-sm text-muted-foreground">Next Payment Due</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold">
+                  {stats.paymentAmount > 0 ? `$${stats.paymentAmount}.00` : "$25.00"}
+                </p>
+                <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground mt-1">{userData.nextPaymentDue}</p>
+              </div>
+            )}
+
             <div className="space-y-2 pt-2 border-t">
               <Button
                 variant="outline"
@@ -405,12 +444,21 @@ const DashboardSimple = () => {
                 ) : (
                   <>
                     <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 mr-2 shrink-0" />
-                    <span className="truncate">Update Payment Method</span>
+                    <span className="truncate">Manage Billing</span>
                   </>
                 )}
               </Button>
+              <Button
+                variant="destructive"
+                className="w-full shadow-lg text-xs sm:text-sm py-2 sm:py-2.5"
+                onClick={() => setShowCancelModal(true)}
+                disabled={!queuePosition}
+              >
+                <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4 mr-2 shrink-0" />
+                <span className="truncate">Cancel Subscription</span>
+              </Button>
               <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground text-center px-2">
-                Manage your billing through Stripe's secure portal
+                Update payment method and manage billing through Stripe's secure portal
               </p>
             </div>
           </div>
@@ -441,6 +489,69 @@ const DashboardSimple = () => {
           </div>
         </Card>
       </div>
+
+      {/* Cancel Subscription Warning Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="max-w-md w-full p-4 sm:p-6 relative">
+            <button
+              onClick={() => setShowCancelModal(false)}
+              className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
+              disabled={cancelling}
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-destructive" />
+              </div>
+
+              <div>
+                <h3 className="text-lg sm:text-xl font-bold mb-2">Cancel Subscription?</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Are you sure you want to cancel your subscription?
+                </p>
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 mb-4">
+                  <p className="text-sm font-semibold text-destructive flex items-center gap-2 justify-center">
+                    <AlertTriangle className="w-4 h-4" />
+                    Warning
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Cancelling your subscription will remove you from the queue. You will lose your current queue position and will need to rejoin at the end if you subscribe again.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 w-full">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCancelModal(false)}
+                  disabled={cancelling}
+                  className="flex-1"
+                >
+                  Keep Subscription
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleCancelSubscription}
+                  disabled={cancelling}
+                  className="flex-1"
+                >
+                  {cancelling ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Cancelling...
+                    </>
+                  ) : (
+                    'Yes, Cancel'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,79 +15,41 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "@/lib/auth-client";
-import NotificationService, { Notification, NotificationPreferences } from "@/lib/notifications";
-import { logError } from "@/lib/audit";
+import {
+  useNotifications,
+  useUnreadCount,
+  useNotificationPreferences,
+  useMarkAsRead,
+  useMarkAllAsRead,
+  useDeleteNotification
+} from "@/hooks/useNotificationsData";
 
 const Notifications = () => {
-  const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [notificationCounts, setNotificationCounts] = useState({
-    total: 0,
-    unread: 0,
-    high_priority: 0,
-    by_type: {} as Record<string, number>
-  });
-  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
-
-
   const { data: session } = useSession();
   const user = session?.user;
-  
-  // Memoize the notification service to prevent recreation on every render
-  const notificationService = useMemo(() => new NotificationService(), []);
 
-  // Load notifications data
-  useEffect(() => {
-    let isMounted = true;
-    
-    const loadNotifications = async () => {
-      if (!user) return;
-      
-      try {
-        if (isMounted) {
-          setLoading(true);
-        }
-        
-        // Load data in parallel
-        const [notificationsData, unreadCount, preferencesData] = await Promise.all([
-          notificationService.getUserNotifications(user.id),
-          notificationService.getUnreadCount(user.id),
-          notificationService.getUserPreferences(user.id)
-        ]);
+  // React Query hooks - replaces manual fetching
+  const { data: notifications = [], isLoading: loadingNotifications } = useNotifications(user?.id);
+  const { data: unreadCount = 0, isLoading: loadingUnread } = useUnreadCount(user?.id);
+  const { data: preferences } = useNotificationPreferences(user?.id);
 
-        // Only update state if component is still mounted
-        if (isMounted) {
-          setNotifications(notificationsData);
-          setNotificationCounts({ 
-            unread: unreadCount, 
-            total: notificationsData.length,
-            high_priority: notificationsData.filter(n => n.priority === 'high' || n.priority === 'urgent').length,
-            by_type: notificationsData.reduce((acc, n) => {
-              acc[n.type] = (acc[n.type] || 0) + 1;
-              return acc;
-            }, {} as Record<string, number>)
-          });
-          setPreferences(preferencesData);
-          setLoading(false);
-        }
+  // Mutations
+  const markAsReadMutation = useMarkAsRead();
+  const markAllAsReadMutation = useMarkAllAsRead();
+  const deleteNotificationMutation = useDeleteNotification();
 
-      } catch (error) {
-        console.error('Error loading notifications:', error);
-        if (isMounted) {
-          await logError(`Error loading notifications: ${error.message}`, user.id);
-          toast.error("Failed to load notifications");
-          setLoading(false);
-        }
-      }
-    };
+  const loading = loadingNotifications || loadingUnread;
 
-    loadNotifications();
-    
-    // Cleanup function to prevent state updates after unmount
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.id, notificationService]);
+  // Compute notification counts using useMemo
+  const notificationCounts = useMemo(() => ({
+    total: notifications.length,
+    unread: unreadCount,
+    high_priority: notifications.filter(n => n.priority === 'high' || n.priority === 'urgent').length,
+    by_type: notifications.reduce((acc, n) => {
+      acc[n.type] = (acc[n.type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
+  }), [notifications, unreadCount]);
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -123,95 +85,36 @@ const Notifications = () => {
 
   const markAsRead = async (notificationId: string) => {
     if (!user) return;
-    
+
     try {
-      const success = await notificationService.markNotificationAsRead(notificationId, user.id);
-      
-      if (success) {
-        setNotifications(prev => 
-          prev.map(notification => 
-            notification.id === notificationId 
-              ? { ...notification, is_read: true, read_at: new Date().toISOString() }
-              : notification
-          )
-        );
-        
-        // Update counts
-        setNotificationCounts(prev => ({
-          ...prev,
-          unread: Math.max(0, prev.unread - 1)
-        }));
-        
-        toast.success("Notification marked as read");
-      } else {
-        throw new Error("Failed to mark notification as read");
-      }
+      await markAsReadMutation.mutateAsync({ notificationId, userId: user.id });
+      toast.success("Notification marked as read");
     } catch (error) {
       console.error('Error marking notification as read:', error);
-      await logError(`Error marking notification as read: ${error.message}`, user.id);
       toast.error("Failed to mark notification as read");
     }
   };
 
   const markAllAsRead = async () => {
     if (!user) return;
-    
+
     try {
-      const success = await notificationService.markAllNotificationsAsRead(user.id);
-      
-      if (success) {
-        setNotifications(prev => 
-          prev.map(notification => ({ 
-            ...notification, 
-            is_read: true, 
-            read_at: new Date().toISOString() 
-          }))
-        );
-        
-        // Update counts
-        setNotificationCounts(prev => ({
-          ...prev,
-          unread: 0
-        }));
-        
-        toast.success("All notifications marked as read");
-      } else {
-        throw new Error("Failed to mark all notifications as read");
-      }
+      await markAllAsReadMutation.mutateAsync(user.id);
+      toast.success("All notifications marked as read");
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
-      await logError(`Error marking all notifications as read: ${error.message}`, user.id);
       toast.error("Failed to mark all notifications as read");
     }
   };
 
   const deleteNotification = async (notificationId: string) => {
     if (!user) return;
-    
+
     try {
-      const success = await notificationService.deleteNotification(notificationId, user.id);
-      
-      if (success) {
-        const deletedNotification = notifications.find(n => n.id === notificationId);
-        setNotifications(prev => prev.filter(notification => notification.id !== notificationId));
-        
-        // Update counts
-        setNotificationCounts(prev => ({
-          ...prev,
-          total: prev.total - 1,
-          unread: deletedNotification?.is_read ? prev.unread : Math.max(0, prev.unread - 1),
-          high_priority: deletedNotification?.priority === 'high' || deletedNotification?.priority === 'urgent' 
-            ? Math.max(0, prev.high_priority - 1) 
-            : prev.high_priority
-        }));
-        
-        toast.success("Notification deleted");
-      } else {
-        throw new Error("Failed to delete notification");
-      }
+      await deleteNotificationMutation.mutateAsync({ notificationId, userId: user.id });
+      toast.success("Notification deleted");
     } catch (error) {
       console.error('Error deleting notification:', error);
-      await logError(`Error deleting notification: ${error.message}`, user.id);
       toast.error("Failed to delete notification");
     }
   };

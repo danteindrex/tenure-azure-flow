@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,129 +19,59 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "@/lib/auth-client";
-import HistoryService, { UserActivityHistory, TransactionHistory, PaymentHistory, QueueHistory, MilestoneHistory, HistorySummary } from "@/lib/history";
-import { logError } from "@/lib/audit";
+import { UserActivityHistory, TransactionHistory } from "@/lib/history";
+import { useHistoryData, useHistorySummary, useSearchHistory } from "@/hooks/useHistoryData";
 
 const HistoryNew = () => {
-  const [loading, setLoading] = useState(true);
-  const [searching, setSearching] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
-  // Data state
-  const [activities, setActivities] = useState<UserActivityHistory[]>([]);
-  const [transactions, setTransactions] = useState<TransactionHistory[]>([]);
-  const [queueChanges, setQueueChanges] = useState<QueueHistory[]>([]);
-  const [milestones, setMilestones] = useState<MilestoneHistory[]>([]);
-  const [summary, setSummary] = useState<HistorySummary>({
+  const { data: session } = useSession();
+  const user = session?.user;
+
+  // React Query hooks - replaces manual fetching
+  const { data: historyData, isLoading: loadingHistory, isFetching: refreshingHistory, refreshHistory } = useHistoryData(user?.id);
+  const { data: summaryData, isLoading: loadingSummary } = useHistorySummary(user?.id);
+  const searchMutation = useSearchHistory();
+
+  const activities = historyData?.activities || [];
+  const transactions = historyData?.transactions || [];
+  const queueChanges = historyData?.queue_changes || [];
+  const milestones = historyData?.milestones || [];
+  const summary = summaryData || {
     total_activities: 0,
     completed_activities: 0,
     failed_activities: 0,
     total_transactions: 0,
     total_amount: 0,
     recent_activities: []
-  });
+  };
 
-
-  const { data: session } = useSession();
-  const user = session?.user;
-
-  // Memoize the history service to prevent recreation on every render
-  const historyService = useMemo(() => new HistoryService(), []);
-
-  // Load history data
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadHistoryData = async () => {
-      if (!user) return;
-
-      try {
-        if (isMounted) {
-          setLoading(true);
-        }
-
-        // Load data in parallel
-        const [historyData, summaryData] = await Promise.all([
-          historyService.getCombinedHistory(user.id, { limit: 100 }),
-          historyService.getHistorySummary(user.id)
-        ]);
-
-        // Only update state if component is still mounted
-        if (isMounted) {
-          setActivities(historyData.activities);
-          setTransactions(historyData.transactions);
-          setQueueChanges(historyData.queue_changes);
-          setMilestones(historyData.milestones);
-          setSummary(summaryData);
-          setLoading(false);
-        }
-
-      } catch (error: any) {
-        console.error('Error loading history data:', error);
-        if (isMounted) {
-          await logError(`Error loading history data: ${error.message}`, user.id);
-          toast.error("Failed to load history data");
-          setLoading(false);
-        }
-      }
-    };
-
-    loadHistoryData();
-
-    // Cleanup function to prevent state updates after unmount
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.id, historyService]);
+  const loading = loadingHistory || loadingSummary;
+  const refreshing = refreshingHistory;
 
   const handleRefresh = async () => {
-    if (!user) return;
-
-    try {
-      setRefreshing(true);
-
-      const [historyData, summaryData] = await Promise.all([
-        historyService.getCombinedHistory(user.id, { limit: 100 }),
-        historyService.getHistorySummary(user.id)
-      ]);
-
-      setActivities(historyData.activities);
-      setTransactions(historyData.transactions);
-      setQueueChanges(historyData.queue_changes);
-      setMilestones(historyData.milestones);
-      setSummary(summaryData);
-
-      toast.success("History refreshed");
-    } catch (error: any) {
-      console.error('Error refreshing history:', error);
-      await logError(`Error refreshing history: ${error.message}`, user.id);
-      toast.error("Failed to refresh history");
-    } finally {
-      setRefreshing(false);
-    }
+    toast.info("Refreshing history...");
+    await refreshHistory();
+    toast.success("History refreshed");
   };
 
   const handleSearch = async () => {
     if (!user || !searchTerm.trim()) return;
 
     try {
-      setSearching(true);
-
-      const results = await historyService.searchHistory(user.id, searchTerm, { limit: 50 });
-      setActivities(results.activities);
-      setTransactions(results.transactions);
+      const results = await searchMutation.mutateAsync({
+        userId: user.id,
+        searchTerm,
+        limit: 50
+      });
 
       if (results.activities.length === 0 && results.transactions.length === 0) {
         toast.info("No results found for your search");
       }
     } catch (error: any) {
       console.error('Error searching history:', error);
-      await logError(`Error searching history: ${error.message}`, user.id);
       toast.error("Search failed");
-    } finally {
-      setSearching(false);
     }
   };
 
@@ -342,15 +272,15 @@ const HistoryNew = () => {
           </div>
           <Button
             onClick={handleSearch}
-            disabled={searching || !searchTerm.trim()}
+            disabled={searchMutation.isPending || !searchTerm.trim()}
             className="px-6"
           >
-            {searching ? (
+            {searchMutation.isPending ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
               <Search className="w-4 h-4 mr-2" />
             )}
-            {searching ? "Searching..." : "Search"}
+            {searchMutation.isPending ? "Searching..." : "Search"}
           </Button>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
             <SelectTrigger className="w-full sm:w-40 bg-background/50">

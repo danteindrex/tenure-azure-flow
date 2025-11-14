@@ -8,6 +8,7 @@ import { logger } from './config/logger';
 import { pool } from '../drizzle/db';
 import subscriptionRoutes from './routes/subscription.routes';
 import webhookRoutes from './routes/webhook.routes';
+import billingRoutes from './routes/billing.routes';
 
 const app: Application = express();
 
@@ -56,6 +57,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Apply rate limiting only to subscription routes
 app.use('/api/subscriptions', limiter, subscriptionRoutes);
+app.use('/api/billing', limiter, billingRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

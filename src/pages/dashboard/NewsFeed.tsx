@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,82 +15,36 @@ import {
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { toast } from "sonner";
-
-interface NewsPost {
-  id: number;
-  title: string;
-  content: any; // JSONB content
-  publish_date: string;
-  status: 'Draft' | 'Published' | 'Scheduled' | 'Archived';
-  priority: 'Low' | 'Normal' | 'High' | 'Urgent';
-  created_at: string;
-  updated_at: string;
-}
-
-interface FundStats {
-  totalRevenue: number;
-  totalMembers: number;
-  potentialWinners: number;
-  nextPayoutDate: string;
-}
+import { useNewsFeed, NewsPost } from "@/hooks/useNewsFeed";
+import { useStatistics } from "@/hooks/useStatistics";
+import { useQueryClient } from "@tanstack/react-query";
 
 const NewsFeed = () => {
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [newsPosts, setNewsPosts] = useState<NewsPost[]>([]);
-  const [fundStats, setFundStats] = useState<FundStats>({
-    totalRevenue: 0,
-    totalMembers: 0,
-    potentialWinners: 0,
-    nextPayoutDate: 'TBD'
-  });
-
-
+  const queryClient = useQueryClient();
   const { data: session } = useSession();
   const user = session?.user;
 
-  // Load news feed data
-  const loadNewsFeedData = async () => {
-    try {
-      setLoading(true);
+  // React Query hooks - replaces manual fetching
+  const { data: newsResponse, isLoading: isLoadingNews, isFetching: isFetchingNews } = useNewsFeed();
+  const { data: statsResponse, isLoading: isLoadingStats } = useStatistics();
 
-      // Fetch published news posts
-      const response = await fetch('/api/newsfeed/posts');
-      if (response.ok) {
-        const data = await response.json();
-        setNewsPosts(data.posts || []);
-      } else {
-        console.error('Error fetching news posts:', response.statusText);
-      }
-
-      // Calculate fund statistics - placeholder values for now
-      // TODO: Create API endpoint for fund statistics
-      setFundStats({
-        totalRevenue: 0,
-        totalMembers: 0,
-        potentialWinners: 0,
-        nextPayoutDate: 'March 15, 2025'
-      });
-
-    } catch (error) {
-      console.error('Error loading news feed data:', error);
-      toast.error('Failed to load news feed');
-    } finally {
-      setLoading(false);
-    }
+  const newsPosts = newsResponse?.posts || [];
+  const fundStats = {
+    totalRevenue: statsResponse?.data?.totalRevenue || 0,
+    totalMembers: statsResponse?.data?.totalMembers || 0,
+    potentialWinners: statsResponse?.data?.potentialWinners || 0,
+    nextPayoutDate: 'March 15, 2025'
   };
 
-  // Refresh news feed
-  const refreshNewsFeed = async () => {
-    setRefreshing(true);
-    await loadNewsFeedData();
-    setRefreshing(false);
+  const loading = isLoadingNews || isLoadingStats;
+  const refreshing = isFetchingNews;
+
+  // Manual refresh function
+  const handleRefresh = async () => {
+    toast.info('Refreshing news feed...');
+    await queryClient.invalidateQueries({ queryKey: ['newsfeed'] });
     toast.success('News feed refreshed');
   };
-
-  useEffect(() => {
-    loadNewsFeedData();
-  }, []);
 
   // Get priority badge color
   const getPriorityBadge = (priority: string) => {
@@ -179,8 +132,8 @@ const NewsFeed = () => {
           <h1 className="text-2xl font-bold">News & Updates</h1>
           <p className="text-muted-foreground">Latest announcements and fund progress</p>
         </div>
-        <Button 
-          onClick={refreshNewsFeed} 
+        <Button
+          onClick={handleRefresh}
           disabled={refreshing}
           variant="outline"
           size="sm"

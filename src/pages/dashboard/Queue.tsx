@@ -1,14 +1,13 @@
-import { useState, useEffect } from "react";
-import { useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useSession } from "@/lib/auth-client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  Users, 
-  Search, 
+import {
+  Users,
+  Search,
   Crown,
   Clock,
   TrendingUp,
@@ -22,107 +21,68 @@ import {
 } from "lucide-react";
 
 import { toast } from "sonner";
-// Queue service moved to API endpoints - using fetch calls instead
 import { QueueMember } from "@/lib/types";
+import { useQueueData } from "@/hooks/useQueueData";
+import { useStatistics } from "@/hooks/useStatistics";
 
 const Queue = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [queueData, setQueueData] = useState<QueueMember[]>([]);
-  const [statistics, setStatistics] = useState({
-    totalMembers: 0,
-    activeMembers: 0,
-    eligibleMembers: 0,
-    totalRevenue: 0,
-    potentialWinners: 0,
-    payoutThreshold: 500000,
-    receivedPayouts: 0
-  });
-  const [refreshing, setRefreshing] = useState(false);
-    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Queue service moved to API endpoints - using fetch calls instead
   const { data: session } = useSession();
   const user = session?.user;
 
-  // Load queue data from microservice
-  const loadQueueData = async () => {
-    if (!user) {
-      console.log('No user authenticated, skipping queue data load');
-      return;
-    }
+  // React Query hooks - replaces manual fetching
+  const { data: queueResponse, isLoading: isLoadingQueue, isFetching: isFetchingQueue, refreshQueue } = useQueueData();
+  const { data: statsResponse, isLoading: isLoadingStats } = useStatistics();
 
-    try {
-      setLoading(true);
+  // Compute derived data from React Query results using useMemo
+  const { queueData, statistics, currentUserMember } = useMemo(() => {
+    const rawQueue = queueResponse?.data?.queue || [];
+    const rawStats = statsResponse?.data || {};
 
-      const response = await fetch('/api/queue', {
-        credentials: 'include'
-      });
+    // Map view fields to component expected fields
+    const mappedQueue = rawQueue.map((member: any) => ({
+      id: member.user_id,
+      position: member.queue_position,
+      name: member.user_id,
+      email: '',
+      continuousTenure: 0,
+      totalPaid: 0,
+      status: 'active',
+      eligible: true,
+      lastPaymentDate: null,
+      joinDate: null,
+      hasReceivedPayout: false
+    }));
 
-      if (!response.ok) {
-        console.error('API response not ok:', response.status, response.statusText);
-        throw new Error('Failed to load queue data');
-      }
+    const stats = {
+      totalMembers: rawStats.totalMembers || 0,
+      activeMembers: rawStats.activeMembers || 0,
+      eligibleMembers: rawStats.eligibleMembers || 0,
+      totalRevenue: rawStats.totalRevenue || 0,
+      potentialWinners: rawStats.potentialWinners || 0,
+      payoutThreshold: 500000,
+      receivedPayouts: rawStats.receivedPayouts || 0
+    };
 
-      const result = await response.json();
-      
-      // Handle both direct response and nested data structure
-      const data = result.data || result;
+    const currentUser = mappedQueue.find((member: QueueMember) =>
+      member.id && user?.id && member.id.toString() === user.id
+    );
 
-      console.log('🎯 Frontend received data:', result);
-      console.log('📦 data.queue length:', (data.queue || []).length);
-      console.log('📦 data.queue:', data.queue);
+    return {
+      queueData: mappedQueue,
+      statistics: stats,
+      currentUserMember: currentUser
+    };
+  }, [queueResponse, statsResponse, user?.id]);
 
-      // Map view fields to component expected fields
-      // Only user_id and queue_position are returned for privacy
-      const mappedQueue = (data.queue || []).map((member: any) => ({
-        id: member.user_id,
-        position: member.queue_position,
-        name: member.user_id, // Show user_id instead of name for privacy
-        email: '',
-        continuousTenure: 0,
-        totalPaid: 0,
-        status: 'active', // Don't show inactive status
-        eligible: true,
-        lastPaymentDate: null,
-        joinDate: null,
-        hasReceivedPayout: false
-      }));
-
-      console.log('✅ Mapped queue length:', mappedQueue.length);
-      console.log('✅ Mapped queue:', mappedQueue);
-
-      setQueueData(mappedQueue);
-      setStatistics(data.statistics || {});
-
-    } catch (error) {
-      console.error('Error loading queue data:', error);
-      toast.error('Failed to load queue data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Refresh queue data
-  const refreshQueueData = async () => {
-    setRefreshing(true);
-    await loadQueueData();
-    setRefreshing(false);
+  // Manual refresh function
+  const handleRefresh = async () => {
+    toast.info('Refreshing queue data...');
+    await refreshQueue();
     toast.success('Queue data refreshed');
   };
 
-  useEffect(() => {
-    if (user) {
-      loadQueueData();
-    }
-  }, [user]);
-
-  // Find current user in queue
-  const currentUserMember = queueData.find(member => 
-    member.id && user?.id && member.id.toString() === user.id
-  );
-
-  // Use statistics from microservice
   const { activeMembers, eligibleMembers, totalRevenue, potentialWinners } = statistics;
   const nextPayoutDate = "March 15, 2025"; // This could be calculated based on business rules
   const winnersCount = potentialWinners;
@@ -158,7 +118,7 @@ const Queue = () => {
     }
   };
 
-  if (loading) {
+  if (isLoadingQueue || isLoadingStats) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center py-12">
@@ -223,13 +183,13 @@ const Queue = () => {
           <h1 className="text-2xl font-bold">Tenure Queue</h1>
           <p className="text-muted-foreground">Track member positions and progress in the tenure queue</p>
         </div>
-        <Button 
-          onClick={refreshQueueData} 
-          disabled={refreshing}
+        <Button
+          onClick={handleRefresh}
+          disabled={isFetchingQueue}
           variant="outline"
           size="sm"
         >
-          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-4 h-4 mr-2 ${isFetchingQueue ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
       </div>

@@ -7,14 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { User, Mail, Phone, MapPin, Calendar, Shield, Edit3, Save, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { authClient, useSession } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
 import { logProfileUpdate, logError } from "@/lib/audit";
+import { useProfileData, ProfileData } from "@/hooks/useProfileData";
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [profileData, setProfileData] = useState({
+  const [profileData, setProfileData] = useState<ProfileData>({
     fullName: "",
     email: "",
     phoneCountryCode: "+1",
@@ -28,7 +27,7 @@ const Profile = () => {
     status: "Active",
     bio: "",
   });
-  const [originalData, setOriginalData] = useState({
+  const [originalData, setOriginalData] = useState<ProfileData>({
     fullName: "",
     email: "",
     phoneCountryCode: "+1",
@@ -42,125 +41,43 @@ const Profile = () => {
     status: "",
     bio: "",
   });
-  
+
   const { data: session, isPending } = useSession();
   const user = session?.user;
 
-  // Load user profile data
+  // React Query hook - replaces manual fetching
+  const {
+    data: fetchedProfile,
+    isLoading: loading,
+    updateProfileAsync,
+    isUpdating: saving
+  } = useProfileData(user?.id, user?.name, user?.email, user?.createdAt);
+
+  // Sync fetched data to local state
   useEffect(() => {
-    const loadProfile = async () => {
-      if (!user || isPending) return;
-
-      try {
-        setLoading(true);
-
-        // Fetch full profile from API (includes phone + address)
-        const response = await fetch('/api/profiles/me', {
-          method: 'GET',
-          credentials: 'include'
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to load profile');
-        }
-
-        const result = await response.json();
-
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to load profile data');
-        }
-
-        const { email, profile, phone, address } = result.data;
-
-        // Build full name from profile
-        const fullName = profile?.firstName && profile?.lastName
-          ? `${profile.firstName} ${profile.lastName}`
-          : user.name || '';
-
-        const userIdDisplay = `USR-${String(user.id).slice(-6)}`;
-        const joinDate = user.createdAt
-          ? new Date(user.createdAt).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })
-          : '';
-
-        const userData = {
-          fullName,
-          email: email || user.email || '',
-          phoneCountryCode: phone?.countryCode || '+1',
-          phoneNumber: phone?.number || '',
-          streetAddress: address?.streetAddress || '',
-          city: address?.city || '',
-          state: address?.state || '',
-          zipCode: address?.postalCode || '',
-          userId: userIdDisplay,
-          joinDate,
-          status: 'Active',
-          bio: '', // TODO: Add bio field to user_profiles table if needed
-        };
-
-        setProfileData(userData);
-        setOriginalData(userData);
-      } catch (error) {
-        console.error('Error loading profile:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        await logError(`Error loading profile: ${errorMessage}`, user.id);
-        toast.error("Failed to load profile data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProfile();
-  }, [user, isPending]);
+    if (fetchedProfile) {
+      setProfileData(fetchedProfile);
+      setOriginalData(fetchedProfile);
+    }
+  }, [fetchedProfile]);
 
   const handleSave = async () => {
     if (!user) return;
 
     try {
-      setSaving(true);
-
-      // Update user profile with Better Auth (name only)
-      const result = await authClient.updateUser({
-        name: profileData.fullName
-      });
-
-      if (result.error) {
-        throw new Error(result.error.message || result.error.code || 'Failed to update profile');
-      }
-
-      // Update additional profile data (phone, address) via upsert endpoint
-      const fullPhone = `${profileData.phoneCountryCode}${profileData.phoneNumber}`;
-      const profileUpdateResult = await fetch("/api/profiles/upsert", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: profileData.email,
-          phone: fullPhone,
-          street_address: profileData.streetAddress,
-          city: profileData.city,
-          state: profileData.state,
-          zip_code: profileData.zipCode,
-        }),
-      });
-
-      if (!profileUpdateResult.ok) {
-        const errorData = await profileUpdateResult.json();
-        throw new Error(errorData.error || "Failed to update profile details.");
-      }
-
       // Log profile update
       const changes = Object.keys(profileData).filter(key =>
-        originalData[key] !== profileData[key]
+        originalData[key as keyof ProfileData] !== profileData[key as keyof ProfileData]
       ).reduce((acc, key) => {
         acc[key] = {
-          from: originalData[key],
-          to: profileData[key]
+          from: originalData[key as keyof ProfileData],
+          to: profileData[key as keyof ProfileData]
         };
         return acc;
-      }, {});
+      }, {} as Record<string, any>);
+
+      // Use React Query mutation
+      await updateProfileAsync(profileData);
 
       if (Object.keys(changes).length > 0) {
         await logProfileUpdate(user.id, changes);
@@ -174,8 +91,6 @@ const Profile = () => {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       await logError(`Error saving profile: ${errorMessage}`, user.id);
       toast.error("Failed to update profile");
-    } finally {
-      setSaving(false);
     }
   };
 

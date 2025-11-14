@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:email": "tsx src/scripts/test-email.ts",
     "migrate": "drizzle-kit push:pg",
     "migrate:generate": "drizzle-kit generate:pg",
     "lint": "eslint src --ext .ts",
