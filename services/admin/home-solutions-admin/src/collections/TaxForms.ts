@@ -189,7 +189,7 @@ export const TaxForms: CollectionConfig = {
       type: 'group',
       label: 'Income Details',
       admin: {
-        condition: (data) => data.form_type?.includes('1099'),
+        condition: (data: any) => data.form_type?.includes('1099'),
       },
       fields: [
         {
@@ -260,7 +260,7 @@ export const TaxForms: CollectionConfig = {
       type: 'group',
       label: 'W-9 Data',
       admin: {
-        condition: (data) => data.form_type === 'w9',
+        condition: (data: any) => data.form_type === 'w9',
       },
       fields: [
         {

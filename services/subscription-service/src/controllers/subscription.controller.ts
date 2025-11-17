@@ -149,14 +149,23 @@ export class SubscriptionController {
    */
   static async getPaymentHistory(req: Request, res: Response): Promise<void> {
     try {
-      const memberId = parseInt(req.params.memberId);
+      const userId = req.params.memberId; // This is actually a userId (UUID string)
 
-      if (isNaN(memberId)) {
-        res.status(400).json({ error: 'Invalid member ID' });
+      // Ensure user can only access their own payment history
+      if (req.user?.id !== userId) {
+        res.status(403).json({
+          error: 'Access denied',
+          message: 'You can only access your own payment history'
+        });
         return;
       }
 
-      const payments = await StripeService.getPaymentHistory(memberId);
+      if (!userId) {
+        res.status(400).json({ error: 'Invalid user ID' });
+        return;
+      }
+
+      const payments = await StripeService.getPaymentHistory(userId);
 
       res.status(200).json({
         success: true,

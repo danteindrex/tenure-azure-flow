@@ -1,13 +1,14 @@
-import type { AdminViewProps } from 'payload'
+'use client'
+
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import React from 'react'
 import PaymentsCenterClient from './PaymentsCenterClient'
 
-export const PaymentsCenterView: React.FC<AdminViewProps> = ({
+export const PaymentsCenterView = ({
   initPageResult,
   params,
   searchParams,
-}) => {
+}: any) => {
   return (
     <DefaultTemplate
       i18n={initPageResult.req.i18n}

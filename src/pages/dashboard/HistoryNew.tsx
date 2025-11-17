@@ -93,6 +93,7 @@ const HistoryNew = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "completed":
+      case "succeeded": // Payment transactions use "succeeded"
         return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Completed</Badge>;
       case "failed":
         return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Failed</Badge>;
@@ -142,18 +143,25 @@ const HistoryNew = () => {
       created_at: activity.created_at,
       isActivity: true
     })),
-    ...transactions.map(transaction => ({
-      id: transaction.id,
-      type: 'transaction',
-      action: `${transaction.transaction_type.charAt(0).toUpperCase() + transaction.transaction_type.slice(1)} Transaction`,
-      description: transaction.description || `$${transaction.amount} ${transaction.currency || 'USD'}`,
-      amount: transaction.amount,
-      status: transaction.status,
-      date: transaction.created_at ? new Date(transaction.created_at).toLocaleDateString() : '',
-      time: transaction.created_at ? new Date(transaction.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-      created_at: transaction.created_at,
-      isTransaction: true
-    }))
+    ...transactions.map(transaction => {
+      const createdDate = transaction.created_at ? new Date(transaction.created_at) : new Date();
+      const monthYear = createdDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+      return {
+        id: transaction.id,
+        type: 'transaction',
+        action: monthYear, // Show month and year instead of "Payment Transaction"
+        description: `${transaction.metadata?.payment_type || 'payment'} • $${transaction.amount.toFixed(2)} ${transaction.currency || 'USD'}`,
+        amount: transaction.amount,
+        status: transaction.status,
+        date: createdDate.toLocaleDateString(),
+        time: createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        created_at: transaction.created_at,
+        provider_invoice_id: transaction.provider_invoice_id,
+        receipt_url: transaction.receipt_url,
+        isTransaction: true
+      };
+    })
   ].sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
 
   const filteredHistory = allHistoryItems.filter(item => {
@@ -328,7 +336,16 @@ const HistoryNew = () => {
             filteredHistory.map((item) => (
               <div
                 key={item.id}
-                className="flex items-start gap-4 p-4 border border-border rounded-lg hover:bg-accent/5 transition-colors"
+                className={`flex items-start gap-4 p-4 border border-border rounded-lg transition-colors ${
+                  'receipt_url' in item && item.receipt_url
+                    ? 'hover:bg-accent/5 cursor-pointer'
+                    : 'hover:bg-accent/5'
+                }`}
+                onClick={() => {
+                  if ('receipt_url' in item && item.receipt_url) {
+                    window.open(item.receipt_url, '_blank', 'noopener,noreferrer');
+                  }
+                }}
               >
                 <div className="p-2 rounded-full bg-background/50">
                   {getActivityIcon(item.type)}
@@ -341,23 +358,33 @@ const HistoryNew = () => {
                         {getStatusIcon(item.status)}
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">{item.description}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="capitalize">{item.type}</span>
-                        {'isActivity' in item && item.isActivity && <span>• Activity</span>}
-                        {'isTransaction' in item && item.isTransaction && <span>• Transaction</span>}
+                      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <span className="capitalize">{item.type}</span>
+                          {'isActivity' in item && item.isActivity && <span>• Activity</span>}
+                          {'isTransaction' in item && item.isTransaction && <span>• Transaction</span>}
+                        </div>
+                        {'provider_invoice_id' in item && item.provider_invoice_id && (
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium">Invoice ID:</span>
+                            <span className="font-mono">{item.provider_invoice_id}</span>
+                          </div>
+                        )}
+                        {'receipt_url' in item && item.receipt_url && (
+                          <a
+                            href={item.receipt_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-500 hover:text-blue-600 underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            View Receipt
+                          </a>
+                        )}
                       </div>
                     </div>
                     <div className="text-right ml-4">
                       <div className="flex items-center gap-2 mb-1">
-                        {item.amount !== null && item.amount !== undefined && (
-                          <p className={`font-bold ${
-                            item.type === 'payment' || ('isTransaction' in item && item.isTransaction)
-                              ? 'text-green-500' 
-                              : 'text-blue-500'
-                          }`}>
-                            {item.type === 'payment' || ('isTransaction' in item && item.isTransaction) ? '+' : ''}${item.amount.toFixed(2)}
-                          </p>
-                        )}
                         {getStatusBadge(item.status)}
                       </div>
                       <p className="text-xs text-muted-foreground">{item.date} at {item.time}</p>

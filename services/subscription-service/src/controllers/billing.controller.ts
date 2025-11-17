@@ -25,7 +25,28 @@ export class BillingController {
         return;
       }
 
-      // Fetch billing schedules from database
+      // First get the most recent active subscription for the user
+      const subscriptionQuery = `
+        SELECT id
+        FROM user_subscriptions
+        WHERE user_id = $1 AND status = 'ACTIVE'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+
+      const subscriptionResult = await pool.query(subscriptionQuery, [userId]);
+
+      if (subscriptionResult.rows.length === 0) {
+        res.status(200).json({
+          success: true,
+          data: { schedules: [] }
+        });
+        return;
+      }
+
+      const subscriptionId = subscriptionResult.rows[0].id;
+
+      // Fetch all billing schedules for this subscription
       const query = `
         SELECT
           ubs.id,
@@ -39,7 +60,7 @@ export class BillingController {
           us.cancel_at_period_end
         FROM user_billing_schedules ubs
         INNER JOIN user_subscriptions us ON ubs.subscription_id = us.id
-        WHERE ubs.user_id = $1 AND ubs.is_active = true
+        WHERE ubs.subscription_id = $1 AND ubs.is_active = true
         ORDER BY
           CASE
             WHEN ubs.billing_cycle = 'MONTHLY' THEN 1
@@ -48,7 +69,7 @@ export class BillingController {
           END
       `;
 
-      const result = await pool.query(query, [userId]);
+      const result = await pool.query(query, [subscriptionId]);
 
       // Calculate days until next billing for each schedule
       const schedules = result.rows.map((row: any) => {

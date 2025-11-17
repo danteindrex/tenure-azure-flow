@@ -299,7 +299,7 @@ export const TransactionMonitoring: CollectionConfig = {
       name: 'sar_filed_at',
       type: 'date',
       admin: {
-        condition: (data) => data.sar_filed === true,
+        condition: (data: any) => data.sar_filed === true,
       },
     },
     {

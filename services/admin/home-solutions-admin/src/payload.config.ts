@@ -31,9 +31,9 @@ import FinancialDashboard from './components/FinancialDashboard'
 import AnalyticsGraphs from './components/AnalyticsGraphs'
 import AdminNavigation from './components/AdminNavigation'
 import ThemeToggle from './components/ThemeToggle'
-import UserManagementView from './pages/UserManagementView'
-import ComplianceCenterView from './pages/ComplianceCenterView'
-import PaymentsCenterView from './pages/PaymentsCenterView'
+import UserManagementView from './views/UserManagementView'
+import ComplianceCenterView from './views/ComplianceCenterView'
+import PaymentsCenterView from './views/PaymentsCenterView'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)

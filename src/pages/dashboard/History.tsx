@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
+import { useSession } from "@/lib/auth-client";
+import { usePaymentHistory } from "@/hooks/usePaymentHistory";
 import {
   History as HistoryIcon,
   Search,
@@ -22,9 +24,11 @@ const History = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
-  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [activityData, setActivityData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { data: session } = useSession();
+  const { data: paymentHistoryData, isLoading: isLoadingPayments } = usePaymentHistory(session?.user?.id);
 
   // Load activity history from API
   useEffect(() => {
@@ -44,7 +48,7 @@ const History = () => {
         const result = await response.json();
 
         if (result.success) {
-          setHistoryData(result.activities || []);
+          setActivityData(result.activities || []);
         } else {
           throw new Error(result.error || 'Failed to load activity history');
         }
@@ -56,7 +60,7 @@ const History = () => {
           variant: "destructive",
         });
         // Set empty array on error
-        setHistoryData([]);
+        setActivityData([]);
       } finally {
         setLoading(false);
       }
@@ -64,6 +68,54 @@ const History = () => {
 
     fetchHistory();
   }, []);
+
+  // Combine activity history with payment transactions
+  const historyData = useMemo(() => {
+    const payments = (paymentHistoryData?.data || []).map((payment: any) => {
+      const paymentDate = new Date(payment.payment_date);
+      const dateStr = paymentDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+      const timeStr = paymentDate.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      return {
+        id: payment.id,
+        type: 'payment',
+        action: payment.payment_type === 'initial' ? 'Joining Fee Payment' :
+                payment.payment_type === 'recurring' ? 'Recurring Payment' :
+                'One-time Payment',
+        description: `Payment of $${parseFloat(payment.amount).toFixed(2)} ${payment.currency}`,
+        details: payment.provider_invoice_id ? `Invoice: ${payment.provider_invoice_id}` : '',
+        status: payment.status,
+        date: dateStr,
+        time: timeStr,
+        amount: parseFloat(payment.amount),
+        metadata: {
+          payment_id: payment.provider_payment_id,
+          invoice_id: payment.provider_invoice_id,
+          receipt_url: payment.receipt_url
+        }
+      };
+    });
+
+    console.log('Payment transactions:', payments);
+    console.log('Activity data:', activityData);
+
+    // Merge and sort by date
+    const combined = [...activityData, ...payments];
+    console.log('Combined history:', combined);
+
+    return combined.sort((a, b) => {
+      const dateA = new Date(a.date + ' ' + (a.time || '00:00'));
+      const dateB = new Date(b.date + ' ' + (b.time || '00:00'));
+      return dateB.getTime() - dateA.getTime();
+    });
+  }, [activityData, paymentHistoryData]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -164,10 +216,15 @@ const History = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Failed</p>
-              <p className="text-2xl font-bold">{historyData.filter(h => h.status === "failed").length}</p>
+              <p className="text-sm text-muted-foreground">Total Amount</p>
+              <p className="text-2xl font-bold">
+                ${historyData
+                  .filter(h => h.type === 'payment' && h.status === 'succeeded')
+                  .reduce((sum, h) => sum + (h.amount || 0), 0)
+                  .toFixed(2)}
+              </p>
             </div>
-            <XCircle className="w-8 h-8 text-red-500" />
+            <DollarSign className="w-8 h-8 text-green-500" />
           </div>
         </Card>
       </div>
@@ -217,7 +274,7 @@ const History = () => {
       {/* History List */}
       <Card className="p-6">
         <div className="space-y-4">
-          {loading ? (
+          {(loading || isLoadingPayments) ? (
             <div className="space-y-4">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="flex items-start gap-4 p-4 border border-border rounded-lg animate-pulse">

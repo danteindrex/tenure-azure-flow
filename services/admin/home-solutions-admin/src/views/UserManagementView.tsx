@@ -1,13 +1,14 @@
-import type { AdminViewProps } from 'payload'
+'use client'
+
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import React from 'react'
-import ComplianceCenterClient from './ComplianceCenterClient'
+import UserManagementClient from './UserManagementClient'
 
-export const ComplianceCenterView: React.FC<AdminViewProps> = ({
+export const UserManagementView = ({
   initPageResult,
   params,
   searchParams,
-}) => {
+}: any) => {
   return (
     <DefaultTemplate
       i18n={initPageResult.req.i18n}
@@ -19,9 +20,9 @@ export const ComplianceCenterView: React.FC<AdminViewProps> = ({
       user={initPageResult.req.user || undefined}
       visibleEntities={initPageResult.visibleEntities}
     >
-      <ComplianceCenterClient />
+      <UserManagementClient />
     </DefaultTemplate>
   )
 }
 
-export default ComplianceCenterView
+export default UserManagementView

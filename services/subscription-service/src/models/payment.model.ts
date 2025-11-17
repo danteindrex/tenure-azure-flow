@@ -43,11 +43,12 @@ export class PaymentModel {
     return result.rows[0];
   }
 
-  static async findByMemberId(memberId: number): Promise<Payment[]> {
+  static async findByMemberId(memberId: number | string): Promise<Payment[]> {
     const query = `
       SELECT * FROM user_payments
       WHERE user_id = $1
       ORDER BY payment_date DESC
+      LIMIT 50
     `;
 
     const result = await pool.query<Payment>(query, [memberId]);

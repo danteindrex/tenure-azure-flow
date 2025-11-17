@@ -9,6 +9,7 @@ import { logError } from "@/lib/audit";
 import { useQueueData } from "@/hooks/useQueueData";
 import { useStatistics } from "@/hooks/useStatistics";
 import { useBillingSchedules } from "@/hooks/useBillingSchedules";
+import { usePaymentHistory } from "@/hooks/usePaymentHistory";
 import { useNewsFeed } from "@/hooks/useNewsFeed";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -32,6 +33,7 @@ const DashboardSimple = () => {
   
   const { data: statsData, isLoading: isLoadingStats } = useStatistics();
   const { data: billingData, isLoading: isLoadingBilling } = useBillingSchedules(user?.id);
+  const { data: paymentHistoryData, isLoading: isLoadingPayments } = usePaymentHistory(user?.id);
   const { data: newsResponse, isLoading: isLoadingNews } = useNewsFeed();
 
   // UI state
@@ -54,7 +56,9 @@ const DashboardSimple = () => {
     billingSchedules,
     paymentAmount,
     daysUntilPayment,
-    daysUntilDraw
+    daysUntilDraw,
+    monthlyPaymentDate,
+    yearlyPaymentDate
   } = useMemo(() => {
     const queue = queueData?.data?.queue || [];
     const allQueue = allQueueData?.data?.queue || [];
@@ -86,16 +90,23 @@ const DashboardSimple = () => {
     // Map queue for display (already filtered by backend to nearest 5)
     const nearestQueueDisplay = queue.map((q: any) => ({
       rank: q.queue_position,
-      name: q.user_id,
+      name: q.user_id === currentUserId ? 'You' : (q.user_id ? `${q.user_id.substring(0, 6)}xxxxx` : 'N/A'),
       tenureMonths: 0,
       status: 'Active',
       isCurrentUser: currentUserId ? q.user_id === currentUserId : false,
     }));
 
     // Get payment info from billing schedules
+    console.log('All billing schedules:', schedules);
     const monthlySchedule = schedules.find((s: any) => s.billingCycle === 'MONTHLY');
+    const yearlySchedule = schedules.find((s: any) => s.billingCycle === 'YEARLY');
+    console.log('Monthly schedule:', monthlySchedule);
+    console.log('Yearly schedule:', yearlySchedule);
     const payment = monthlySchedule?.amount || 0;
     const daysPayment = monthlySchedule?.daysUntil || 0;
+    const monthlyDate = monthlySchedule?.nextBillingDate || null;
+    const yearlyDate = yearlySchedule?.nextBillingDate || null;
+    console.log('Monthly date:', monthlyDate, 'Yearly date:', yearlyDate);
 
     // Calculate days until draw
     let daysDraw = 0;
@@ -127,7 +138,9 @@ const DashboardSimple = () => {
       billingSchedules: schedules,
       paymentAmount: payment,
       daysUntilPayment: daysPayment,
-      daysUntilDraw: daysDraw
+      daysUntilDraw: daysDraw,
+      monthlyPaymentDate: monthlyDate,
+      yearlyPaymentDate: yearlyDate
     };
   }, [queueData, allQueueData, statsData, billingData, user?.id, BUSINESS_LAUNCH_DATE, PRIZE_PER_WINNER]);
 
@@ -238,11 +251,20 @@ const DashboardSimple = () => {
       {/* Welcome Section - Responsive */}
       <div className="text-center py-3 sm:py-4 md:py-6 lg:py-8 relative">
         <h1 className="text-xl xs:text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2 px-2">
-          Welcome to Your Dashboard
+          Welcome, {user?.name || 'Member'}
         </h1>
-        <p className="text-xs sm:text-sm md:text-base text-muted-foreground px-4">
-          {queuePosition ? `Member ID: ${userData.memberId}` : "Complete your membership to get your Member ID"}
-        </p>
+        <div className="space-y-1 px-4">
+          <p className="text-xs sm:text-sm md:text-base text-muted-foreground">
+            {user?.createdAt
+              ? `Member since: ${new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`
+              : "Complete your membership to get started"}
+          </p>
+          {stats.queuePosition > 0 && (
+            <p className="text-xs sm:text-sm md:text-base font-semibold text-purple-600">
+              Queue Position: #{stats.queuePosition} of {stats.totalQueueCount}
+            </p>
+          )}
+        </div>
         {/* Refresh Button */}
         <Button
           variant="outline"
@@ -256,40 +278,56 @@ const DashboardSimple = () => {
         </Button>
       </div>
 
-      {/* Key Stats - 2 columns on mobile, 4 on desktop */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-        {/* Days Until Payment Card */}
+      {/* Key Stats - 3 columns on mobile and desktop (removed queue position) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+        {/* Next Payment Dates Card */}
         <Card className="p-2 sm:p-3 md:p-4 shadow-lg border-0">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm text-muted-foreground truncate">Days Until Payment</p>
-              <p className="text-lg sm:text-xl md:text-2xl font-bold truncate">{stats.daysUntilPayment}</p>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs sm:text-sm text-muted-foreground">Next Payments</p>
+              <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 shrink-0" />
             </div>
-            <Calendar className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-blue-500 shrink-0" />
+            <div className="space-y-1">
+              {monthlyPaymentDate && (
+                <div>
+                  <p className="text-[10px] xs:text-xs text-muted-foreground">Monthly</p>
+                  <p className="text-sm sm:text-base md:text-lg font-bold">
+                    {new Date(monthlyPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </p>
+                </div>
+              )}
+              {yearlyPaymentDate && (
+                <div>
+                  <p className="text-[10px] xs:text-xs text-muted-foreground">Yearly</p>
+                  <p className="text-sm sm:text-base md:text-lg font-bold">
+                    {new Date(yearlyPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </p>
+                </div>
+              )}
+              {!monthlyPaymentDate && !yearlyPaymentDate && (
+                <p className="text-sm text-muted-foreground">No payments due</p>
+              )}
+            </div>
           </div>
         </Card>
 
-        {/* Queue Position Card */}
+        {/* Fund Progress Card */}
         <Card className="p-2 sm:p-3 md:p-4 shadow-lg border-0">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm text-muted-foreground truncate">Queue Position</p>
-              <p className="text-lg sm:text-xl md:text-2xl font-bold truncate">
-                {stats.queuePosition > 0 ? `#${stats.queuePosition} of ${stats.totalQueueCount}` : "Not in queue"}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs sm:text-sm text-muted-foreground">Fund Progress</p>
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 shrink-0" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-baseline gap-1">
+                <p className="text-sm sm:text-base md:text-lg font-bold">${stats.totalRevenue.toLocaleString()}</p>
+                <p className="text-[10px] xs:text-xs text-muted-foreground">/ ${FUND_TARGET.toLocaleString()}</p>
+              </div>
+              <Progress value={Math.min((stats.totalRevenue / FUND_TARGET) * 100, 100)} className="h-1.5" />
+              <p className="text-[10px] xs:text-xs text-muted-foreground">
+                {Math.round((stats.totalRevenue / FUND_TARGET) * 100)}% complete
               </p>
             </div>
-            <Users className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-purple-500 shrink-0" />
-          </div>
-        </Card>
-
-        {/* Total Fund Card */}
-        <Card className="p-2 sm:p-3 md:p-4 shadow-lg border-0">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm text-muted-foreground truncate">Total Fund</p>
-              <p className="text-lg sm:text-xl md:text-2xl font-bold truncate">${stats.totalRevenue.toLocaleString()}</p>
-            </div>
-            <DollarSign className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-green-500 shrink-0" />
           </div>
         </Card>
 
@@ -308,29 +346,6 @@ const DashboardSimple = () => {
         </Card>
       </div>
 
-      {/* Fund Progress - Responsive */}
-      <Card className="p-3 sm:p-4 md:p-6 shadow-lg border-0">
-        <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-3 sm:mb-4 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-accent shrink-0" />
-          <span className="truncate">Fund Progress</span>
-        </h3>
-        <div className="space-y-3 sm:space-y-4">
-          <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-1 xs:gap-2">
-            <span className="text-xs sm:text-sm text-muted-foreground">Current Fund</span>
-            <span className="text-xs sm:text-sm md:text-base font-medium break-all xs:break-normal">
-              ${stats.totalRevenue.toLocaleString()} / ${FUND_TARGET.toLocaleString()}
-            </span>
-          </div>
-          <Progress value={Math.min((stats.totalRevenue / FUND_TARGET) * 100, 100)} className="h-1.5 sm:h-2" />
-          <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground">
-            {Math.round((stats.totalRevenue / FUND_TARGET) * 100)}% complete{' - '}
-            {stats.totalRevenue >= FUND_TARGET
-              ? "Fund target reached!"
-              : `Need $${(FUND_TARGET - stats.totalRevenue).toLocaleString()} more`}
-          </p>
-        </div>
-      </Card>
-      
       {/* Queue Status - Responsive */}
       <Card className="p-3 sm:p-4 md:p-6 shadow-lg border-0">
         <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-3 sm:mb-4 flex flex-col xs:flex-row items-start xs:items-center gap-2">
@@ -412,6 +427,30 @@ const DashboardSimple = () => {
         )}
       </Card>
 
+      <Card className="p-3 sm:p-4 md:p-6 shadow-lg border-0">
+        <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-3 sm:mb-4">Recent News</h3>
+        {isLoadingNews ? (
+          <div className="py-4 text-center text-muted-foreground">Loading...</div>
+        ) : (newsResponse?.posts || []).slice(0,3).length === 0 ? (
+          <div className="py-4 text-center text-muted-foreground">No announcements yet</div>
+        ) : (
+          (newsResponse?.posts || []).slice(0,3).map((post) => (
+            <div key={post.id} className="py-2">
+              <div className="flex items-center justify-between">
+                <p className="font-medium">{post.title}</p>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(post.publish_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground line-clamp-2">{typeof post.content === 'string' ? post.content : (post.content?.text || '')}</p>
+            </div>
+          ))
+        )}
+        <div className="pt-3">
+          <Button variant="outline" size="sm" onClick={() => (window.location.href = '/dashboard/news')}>View All News</Button>
+        </div>
+      </Card>
+
       {/* Quick Actions - Responsive */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
         <Card className="p-3 sm:p-4 md:p-6 shadow-lg border-0">
@@ -432,7 +471,11 @@ const DashboardSimple = () => {
                       ${schedule.amount.toFixed(2)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Due in {schedule.daysUntil} days
+                      {new Date(schedule.nextBillingDate).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
                     </p>
                   </div>
                 ))}
@@ -507,30 +550,6 @@ const DashboardSimple = () => {
           </div>
         </Card>
       </div>
-
-      <Card className="p-3 sm:p-4 md:p-6 shadow-lg border-0">
-        <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-3 sm:mb-4">Recent News</h3>
-        {isLoadingNews ? (
-          <div className="py-4 text-center text-muted-foreground">Loading...</div>
-        ) : (newsResponse?.posts || []).slice(0,3).length === 0 ? (
-          <div className="py-4 text-center text-muted-foreground">No announcements yet</div>
-        ) : (
-          (newsResponse?.posts || []).slice(0,3).map((post) => (
-            <div key={post.id} className="py-2">
-              <div className="flex items-center justify-between">
-                <p className="font-medium">{post.title}</p>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(post.publish_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground line-clamp-2">{typeof post.content === 'string' ? post.content : (post.content?.text || '')}</p>
-            </div>
-          ))
-        )}
-        <div className="pt-3">
-          <Button variant="outline" size="sm" onClick={() => (window.location.href = '/dashboard/news')}>View All News</Button>
-        </div>
-      </Card>
 
       {/* Cancel Subscription Warning Modal */}
       {showCancelModal && (

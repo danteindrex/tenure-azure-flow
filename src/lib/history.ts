@@ -27,6 +27,8 @@ export interface TransactionHistory {
   description: string;
   payment_method?: string;
   provider_transaction_id?: string;
+  provider_invoice_id?: string;
+  receipt_url?: string;
   metadata?: any;
   created_at: string;
   updated_at?: string;
@@ -34,7 +36,7 @@ export interface TransactionHistory {
 
 export interface PaymentHistory {
   id: string;
-  amount: number;
+  amount: number | string; // Can be string from database (decimal type)
   currency: string;
   status: string;
   payment_type: string;
@@ -114,19 +116,32 @@ class HistoryService {
   // Payment History - Using API endpoint
   async getPaymentHistory(userId: string, limit: number = 50, offset: number = 0): Promise<PaymentHistory[]> {
     try {
-      const response = await fetch(`/api/history/payments?userId=${userId}&limit=${limit}&offset=${offset}`, {
+      console.log('Fetching payment history for user:', userId);
+      const response = await fetch(`/api/payments/history/${userId}`, {
         method: 'GET',
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
+      console.log('Payment history API response status:', response.status);
+
       if (!response.ok) {
-        throw new Error('Failed to fetch payment history');
+        const errorText = await response.text();
+        console.error('Payment history API error:', response.status, errorText);
+
+        // Return empty array instead of throwing to allow the UI to still render
+        console.warn('Returning empty payment history due to API error');
+        return [];
       }
 
       const data = await response.json();
-      return data.payments || [];
+      console.log('Payment history API response:', data);
+      return data.data || [];
     } catch (error) {
       console.error('Error getting payment history:', error);
+      // Return empty array on error so UI can still render
       return [];
     }
   }
@@ -170,7 +185,10 @@ class HistoryService {
         };
       }
 
-      const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const totalPaid = payments.reduce((sum, payment) => {
+        const amount = typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount;
+        return sum + amount;
+      }, 0);
       const totalPayments = payments.length;
       const averagePayment = totalPaid / totalPayments;
 
@@ -201,22 +219,38 @@ class HistoryService {
   // Transaction History - Placeholder implementation
   async getTransactionHistory(userId: string, limit: number = 50, offset: number = 0): Promise<TransactionHistory[]> {
     try {
-      // For now, return payment history as transaction history
-      const payments = await this.getPaymentHistory(userId, limit, offset);
-      
-      return payments.map(payment => ({
+      // Fetch payment history directly from API
+      const response = await fetch(`/api/payments/history/${userId}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        console.error('Failed to fetch payment history for transactions');
+        return [];
+      }
+
+      const data = await response.json();
+      const payments = data.data || [];
+
+      return payments.map((payment: any) => ({
         id: payment.id,
         user_id: userId,
         transaction_type: 'payment' as const,
-        amount: payment.amount,
+        amount: typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount,
         currency: payment.currency,
         status: payment.status,
         description: `${payment.payment_type} payment`,
         payment_method: undefined,
         provider_transaction_id: payment.provider_payment_id,
+        provider_invoice_id: payment.provider_invoice_id,
+        receipt_url: payment.receipt_url,
         metadata: {
           is_first_payment: payment.is_first_payment,
-          receipt_url: payment.receipt_url
+          payment_type: payment.payment_type
         },
         created_at: payment.payment_date,
         updated_at: payment.payment_date
@@ -255,7 +289,7 @@ class HistoryService {
     }
   }
 
-  // Combined History - Placeholder implementation
+  // Combined History - Fetches payment transactions
   async getCombinedHistory(userId: string, options: { limit?: number } = {}): Promise<{
     activities: UserActivityHistory[];
     transactions: TransactionHistory[];
@@ -263,11 +297,16 @@ class HistoryService {
     milestones: MilestoneHistory[];
   }> {
     try {
-      // TODO: Implement with proper database queries
       console.log('Getting combined history:', { userId, options });
+
+      // Fetch payment transactions
+      const transactions = await this.getTransactionHistory(userId, options.limit || 50);
+
+      console.log('Fetched transactions:', transactions);
+
       return {
         activities: [],
-        transactions: [],
+        transactions: transactions,
         queue_changes: [],
         milestones: []
       };
@@ -282,17 +321,24 @@ class HistoryService {
     }
   }
 
-  // History Summary - Placeholder implementation
+  // History Summary - Fetches payment statistics
   async getHistorySummary(userId: string): Promise<HistorySummary> {
     try {
-      // TODO: Implement with proper database queries
       console.log('Getting history summary:', { userId });
+
+      // Get payment statistics
+      const stats = await this.getPaymentStatistics(userId);
+      const transactions = await this.getTransactionHistory(userId, 1000);
+
+      const completedTransactions = transactions.filter(t => t.status === 'succeeded');
+      const failedTransactions = transactions.filter(t => t.status === 'failed');
+
       return {
-        total_activities: 0,
-        completed_activities: 0,
-        failed_activities: 0,
-        total_transactions: 0,
-        total_amount: 0,
+        total_activities: transactions.length,
+        completed_activities: completedTransactions.length,
+        failed_activities: failedTransactions.length,
+        total_transactions: stats.totalPayments,
+        total_amount: stats.totalPaid,
         recent_activities: []
       };
     } catch (error) {

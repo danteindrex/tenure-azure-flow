@@ -124,6 +124,28 @@ export class StripeService {
     try {
       const userId = session.metadata!.userId; // UUID string, not integer
 
+      // IDEMPOTENCY CHECK: Prevent duplicate subscriptions on webhook retry
+      // Check if we already processed this checkout session
+      const existingSubQuery = `
+        SELECT us.id, us.provider_subscription_id
+        FROM user_subscriptions us
+        INNER JOIN user_payment_methods pm ON pm.user_id = us.user_id
+        WHERE us.user_id = $1
+        AND pm.metadata->>'stripe_customer_id' = $2
+        AND us.created_at > NOW() - INTERVAL '10 minutes'
+        LIMIT 1
+      `;
+      const existingSub = await pool.query(existingSubQuery, [userId, session.customer]);
+
+      if (existingSub.rows.length > 0) {
+        logger.warn(`Subscription already created for checkout session, skipping duplicate`, {
+          userId,
+          checkoutSessionId: session.id,
+          existingSubscriptionId: existingSub.rows[0].provider_subscription_id
+        });
+        return; // Exit early - already processed
+      }
+
       // Get payment intent to retrieve payment method and charge details
       const paymentIntentId = session.payment_intent as string;
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
@@ -319,9 +341,10 @@ export class StripeService {
 
       // Create userMemberships record linked to this subscription
       // Each subscription gets its own membership (queue entry)
+      // Using database defaults for join_date, tenure, verification_status, created_at, updated_at
       const membershipQuery = `
-        INSERT INTO user_memberships (user_id, subscription_id, join_date, tenure, verification_status, created_at, updated_at)
-        VALUES ($1, $2, CURRENT_DATE, '0', 'PENDING', NOW(), NOW())
+        INSERT INTO user_memberships (user_id, subscription_id)
+        VALUES ($1, $2)
         ON CONFLICT (subscription_id) DO UPDATE SET
           updated_at = NOW()
       `;
@@ -961,7 +984,7 @@ export class StripeService {
   /**
    * Get payment history
    */
-  static async getPaymentHistory(userId: number) {
+  static async getPaymentHistory(userId: string) {
     return PaymentModel.findByMemberId(userId);
   }
 

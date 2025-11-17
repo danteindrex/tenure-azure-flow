@@ -266,7 +266,7 @@ export const ReportTemplates: CollectionConfig = {
             { label: 'Sunday', value: '0' },
           ],
           admin: {
-            condition: (data) => data.schedule?.frequency === 'weekly',
+            condition: (data: any) => data.schedule?.frequency === 'weekly',
           },
         },
         {
@@ -275,7 +275,7 @@ export const ReportTemplates: CollectionConfig = {
           min: 1,
           max: 31,
           admin: {
-            condition: (data) => data.schedule?.frequency === 'monthly',
+            condition: (data: any) => data.schedule?.frequency === 'monthly',
           },
         },
         {

@@ -20,12 +20,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Forward request to Tenure Queue microservice
     const queueServiceUrl = process.env.QUEUE_SERVICE_URL || 'http://localhost:3001';
-    const { search, limit, offset } = req.query;
+    const { search, limit, offset, currentPosition } = req.query;
 
     const searchParams = new URLSearchParams();
     if (search) searchParams.append('search', search as string);
     if (limit) searchParams.append('limit', limit as string);
     if (offset) searchParams.append('offset', offset as string);
+    if (currentPosition) searchParams.append('currentPosition', currentPosition as string);
 
     const queryString = searchParams.toString();
     const microserviceUrl = `${queueServiceUrl}/api/queue${queryString ? `?${queryString}` : ''}`;

@@ -363,7 +363,7 @@ export const PayoutManagement: CollectionConfig = {
           name: 'failure_reason',
           type: 'textarea',
           admin: {
-            condition: (data) => data.status === 'failed',
+            condition: (data: any) => data.status === 'failed',
           },
         },
         {
