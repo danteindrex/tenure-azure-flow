@@ -22,8 +22,9 @@ export const useBillingSchedules = (userId: string | undefined) => {
         throw new Error('User ID is required');
       }
 
+      // Use relative URL to call Next.js API route (works in all environments)
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/billing/schedules/${userId}`,
+        `/api/billing/schedules/${userId}`,
         { credentials: 'include' }
       );
 

@@ -5,6 +5,7 @@ import { SubscriptionModel } from '../models/subscription.model';
 import { PaymentModel } from '../models/payment.model';
 import { CreateCheckoutSessionRequest, CreateCheckoutSessionResponse } from '../types';
 import { pool } from '../config/database';
+import { STRIPE_PRICE_IDS, validateStripePriceIds } from '../config/stripe-prices';
 
 const stripe = new Stripe(config.stripe.secretKey, {
   apiVersion: '2025-10-29.clover',
@@ -130,43 +131,30 @@ export class StripeService {
       });
       const paymentMethodId = paymentIntent.payment_method as string;
 
-      // Create mixed interval subscription using API (not Checkout Session)
-      // This is required because Checkout Sessions don't support mixed intervals
-      // First, create or retrieve product and prices
+      // Validate that Stripe price IDs are configured
+      validateStripePriceIds();
 
-      // Create monthly price
-      const monthlyPrice = await stripe.prices.create({
-        currency: config.pricing.currency,
-        unit_amount: Math.round(config.pricing.recurringAmount * 100), // $25
-        recurring: { interval: 'month' },
-        product_data: {
-          name: 'Tenure Monthly Subscription',
-        },
-      });
-
-      // Create annual price
-      const annualPrice = await stripe.prices.create({
-        currency: config.pricing.currency,
-        unit_amount: Math.round(config.pricing.annualAmount * 100), // $300
-        recurring: { interval: 'year' },
-        product_data: {
-          name: 'Tenure Annual Subscription',
-        },
-      });
-
-      // Create subscription with both prices
+      // Create mixed interval subscription using reusable price IDs
+      // IMPORTANT: We use pre-created prices instead of creating new ones for each customer
+      // This prevents cluttering Stripe with duplicate prices and enables proper analytics
       const subscription = await stripe.subscriptions.create({
         customer: session.customer as string,
         items: [
-          { price: monthlyPrice.id },
-          { price: annualPrice.id },
+          { price: STRIPE_PRICE_IDS.MONTHLY },  // Reusable monthly price ID
+          { price: STRIPE_PRICE_IDS.ANNUAL },   // Reusable annual price ID
         ],
         default_payment_method: paymentMethodId,
+        // CRITICAL: Enable flexible billing mode for mixed intervals (REQUIRED for API 2025-06-30.basil+)
+        // This allows monthly and yearly items on the same subscription
+        billing_mode: { type: 'flexible' } as any,
+        collection_method: 'charge_automatically',
         metadata: {
           userId: userId.toString(),
           subscriptionType: 'mixed_interval',
         },
         proration_behavior: 'none',
+        // Expand subscription items to get billing period information
+        expand: ['latest_invoice', 'latest_invoice.payment_intent'],
       });
 
       // Update user status to Active
@@ -337,7 +325,7 @@ export class StripeService {
         ON CONFLICT (subscription_id) DO UPDATE SET
           updated_at = NOW()
       `;
-      await pool.query(membershipQuery, [userId]);
+      await pool.query(membershipQuery, [userId, subscriptionResult.rows[0].id]);
 
       // Get checkout payment details (not subscription invoice - that hasn't been created yet)
       const initialPaymentAmount = config.pricing.initialAmount; // $325
@@ -360,31 +348,59 @@ export class StripeService {
       const pmResult = await pool.query(pmQuery, [paymentMethodId, userId]);
       const dbPaymentMethodId = pmResult.rows.length > 0 ? pmResult.rows[0].id : null;
 
-      // Create initial payment record with checkout session data
-      const paymentQuery = `
-        INSERT INTO user_payments (
-          user_id, subscription_id, payment_method_id, provider_payment_id, provider_invoice_id,
-          provider_charge_id, amount, currency, payment_type, status, is_first_payment, receipt_url, metadata, payment_date
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'initial', 'succeeded', true, $9, $10, NOW())
-        RETURNING id
+      // Create initial payment record with idempotency check
+      // Check if payment already exists (prevents duplicate processing of webhooks)
+      const checkPaymentQuery = `
+        SELECT id FROM user_payments
+        WHERE provider_payment_id = $1
+        LIMIT 1
       `;
+      const existingPayment = await pool.query(checkPaymentQuery, [paymentIntentId]);
 
-      await pool.query(paymentQuery, [
-        userId,
-        subscriptionResult.rows[0].id,
-        dbPaymentMethodId,
-        paymentIntentId,
-        null, // No invoice for checkout session payment
-        null, // No charge ID available
-        initialPaymentAmount,
-        config.pricing.currency,
-        checkoutReceiptUrl,
-        JSON.stringify(initialPaymentMetadata)
-      ]);
+      if (existingPayment.rows.length > 0) {
+        logger.warn(`Payment already recorded for payment_intent: ${paymentIntentId}, skipping duplicate`, {
+          userId,
+          paymentIntentId
+        });
+      } else {
+        // Payment doesn't exist, create it
+        const paymentQuery = `
+          INSERT INTO user_payments (
+            user_id, subscription_id, payment_method_id, provider_payment_id, provider_invoice_id,
+            provider_charge_id, amount, currency, payment_type, status, is_first_payment, receipt_url, metadata, payment_date
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'initial', 'succeeded', true, $9, $10, NOW())
+          RETURNING id
+        `;
 
-      // Note: Queue stats are automatically calculated by active_member_queue_view
-      // No manual updates needed - the view calculates from user_payments table
+        await pool.query(paymentQuery, [
+          userId,
+          subscriptionResult.rows[0].id,
+          dbPaymentMethodId,
+          paymentIntentId,
+          null, // No invoice for checkout session payment
+          null, // No charge ID available
+          initialPaymentAmount,
+          config.pricing.currency,
+          checkoutReceiptUrl,
+          JSON.stringify(initialPaymentMetadata)
+        ]);
+
+        logger.info(`Initial payment recorded for member ${userId}`, {
+          paymentIntentId,
+          amount: initialPaymentAmount
+        });
+      }
+
+      // Refresh the materialized queue view to immediately show user in queue
+      // This ensures real-time updates instead of waiting for scheduled refresh
+      try {
+        await pool.query('SELECT refresh_active_member_queue()');
+        logger.info(`Queue refreshed after payment for user ${userId}`);
+      } catch (refreshError) {
+        // Don't fail the webhook if refresh fails - scheduled refresh will handle it
+        logger.warn('Failed to refresh queue view:', refreshError);
+      }
 
       // Create user agreement records
       const agreementQuery = `
@@ -429,7 +445,14 @@ export class StripeService {
         return;
       }
 
-      const isFirstPayment = invoice.metadata?.isFirstPayment === 'true' || invoice.billing_reason === 'subscription_create';
+      // CRITICAL: Skip processing subscription_create invoices to prevent duplicate payments
+      // The initial payment is already handled by handleCheckoutComplete webhook
+      if (invoice.billing_reason === 'subscription_create') {
+        logger.info(`Skipping subscription_create invoice ${invoice.id} - already handled by checkout.session.completed`);
+        return;
+      }
+
+      const isFirstPayment = invoice.metadata?.isFirstPayment === 'true';
       const amount = invoice.amount_paid / 100; // Convert from cents
 
       // Get payment method details from Stripe
@@ -508,6 +531,19 @@ export class StripeService {
         payment_method: paymentMethodDetails,
         attempt_count: invoice.attempt_count || 1
       };
+
+      // Check if payment already exists (idempotency check)
+      const checkPaymentQuery = `
+        SELECT id FROM user_payments
+        WHERE provider_invoice_id = $1
+        LIMIT 1
+      `;
+      const existingPayment = await pool.query(checkPaymentQuery, [invoice.id]);
+
+      if (existingPayment.rows.length > 0) {
+        logger.warn(`Payment already recorded for invoice: ${invoice.id}, skipping duplicate`);
+        return;
+      }
 
       // Create payment record in user_payments table
       // Note: In Stripe API v2025+, payment_intent and charge are not on Invoice
@@ -614,6 +650,14 @@ export class StripeService {
         totalMonths,
         lifetimeTotal,
       });
+
+      // Refresh the queue to reflect updated payment stats
+      try {
+        await pool.query('SELECT refresh_active_member_queue()');
+        logger.info(`Queue refreshed after recurring payment for user ${dbSubscription.user_id}`);
+      } catch (refreshError) {
+        logger.warn('Failed to refresh queue view:', refreshError);
+      }
     } catch (error) {
       logger.error('Error handling invoice payment succeeded:', error);
       throw error;

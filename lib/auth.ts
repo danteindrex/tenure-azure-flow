@@ -174,8 +174,15 @@ export const auth = betterAuth({
       generateId: () => crypto.randomUUID(), // Generate UUIDs for Better Auth
     },
     useSecureCookies: process.env.NODE_ENV === 'production',
-    // SameSite policy for cookies - set to 'lax' for better compatibility
-    cookieSameSite: 'lax',
+    // SameSite policy for cookies
+    // 'none' required for cross-origin cookie sending (e.g., different Vercel deployments)
+    // 'lax' works for same-domain only (localhost development)
+    cookieSameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    // Trusted origins for CORS (allows cookies from these domains)
+    // Uses ALLOWED_ORIGINS env var (same as microservices)
+    trustedOrigins: process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+      : ['http://localhost:3000'],
     // Cross-origin settings for API
     crossSubDomainCookies: {
       enabled: false

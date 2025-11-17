@@ -409,7 +409,8 @@ const Settings = () => {
                       if (!user) return;
                       try {
                         setOpeningBillingPortal(true);
-                        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/subscriptions/${user.id}/update-payment`, {
+                        // Use relative URL to call Next.js API route (works in all environments)
+                        const response = await fetch(`/api/subscriptions/${user.id}/update-payment`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           credentials: 'include',
