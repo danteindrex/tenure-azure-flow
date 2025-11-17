@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '../../payload.config'
 
-export async function GET(request: NextRequest, { params }: { params: { userId: string } }) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   try {
+    const { userId } = await params
     const payload = await getPayload({ config })
-    const { userId } = params
     
     // Helper function to safely query collections
     const safeQuery = async (queryFn: () => Promise<any>, fallback: any = null) => {

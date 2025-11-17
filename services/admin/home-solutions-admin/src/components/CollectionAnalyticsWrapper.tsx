@@ -52,14 +52,14 @@ const COLLECTION_CONFIGS = {
 }
 
 export const CollectionAnalyticsWrapper: React.FC = () => {
-  // Prevent server-side rendering issues
-  if (typeof window === 'undefined') {
-    return null
-  }
-
+  // Move all hooks to the top - before any conditional logic
   const [currentCollection, setCurrentCollection] = useState<string | null>(null)
 
   useEffect(() => {
+    // Prevent server-side rendering issues
+    if (typeof window === 'undefined') {
+      return
+    }
     const detectCollection = () => {
       const path = window.location.pathname
       const collectionMatch = path.match(/\/admin\/collections\/([^\/]+)/)
@@ -89,6 +89,7 @@ export const CollectionAnalyticsWrapper: React.FC = () => {
   }, [])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
     if (!currentCollection) return
 
     // Add custom action buttons to collection pages

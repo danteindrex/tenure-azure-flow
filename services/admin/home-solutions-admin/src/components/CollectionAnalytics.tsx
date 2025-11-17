@@ -19,15 +19,15 @@ export const CollectionAnalytics: React.FC<CollectionAnalyticsProps> = ({
   collectionSlug,
   collectionName
 }) => {
-  // Prevent server-side rendering issues
-  if (typeof window === 'undefined') {
-    return null
-  }
-
+  // Move all hooks to the top - before any conditional logic
   const [metrics, setMetrics] = useState<CollectionMetrics | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Prevent server-side rendering issues
+    if (typeof window === 'undefined') {
+      return
+    }
     const fetchMetrics = async () => {
       try {
         const response = await fetch(`/api/metrics/collections?collection=${collectionSlug}`)
@@ -67,6 +67,7 @@ export const CollectionAnalytics: React.FC<CollectionAnalyticsProps> = ({
   }, [collectionSlug])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
     if (loading || !metrics) return
 
     const injectAnalytics = () => {

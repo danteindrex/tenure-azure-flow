@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '../../../../payload.config'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const payload = await getPayload({ config })
     
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all memberships
-    const [memberships, queues] = await Promise.all([
+    const [memberships, _queues] = await Promise.all([
       safeQuery(() => payload.find({
         collection: 'user_memberships',
         limit: 1000,
@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
 
     // Process data for time-series charts
     const now = new Date()
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+    const _thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const _ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
 
     // Daily new memberships (last 30 days)
     const dailyNewMembers: Record<string, number> = {}
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     // Weekly aggregations
     const weeklyNewMembers: Record<string, number> = {}
     for (let i = 0; i < 12; i++) {
-      const weekEnd = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000)
+      const _weekEnd = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000)
       const weekKey = `Week ${12 - i}`
       weeklyNewMembers[weekKey] = 0
     }
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
                           membership.join_date ? new Date(membership.join_date) : new Date()
       const dateStr = createdDate.toISOString().split('T')[0]
       
-      if (createdDate >= thirtyDaysAgo && createdDate <= now) {
+      if (createdDate >= _thirtyDaysAgo && createdDate <= now) {
         dailyNewMembers[dateStr] = (dailyNewMembers[dateStr] || 0) + 1
       }
     })

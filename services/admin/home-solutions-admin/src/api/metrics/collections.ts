@@ -97,7 +97,7 @@ async function getCollectionMetrics(payload: any, collectionSlug: string) {
           return acc
         }, {})
       }
-    } catch (e) {
+    } catch (_e) {
       // Collection doesn't have status field
     }
     
