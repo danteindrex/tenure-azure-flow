@@ -9,7 +9,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // Get current user session
     const session = await auth.api.getSession({
-      headers: new Headers(req.headers as any)
+      headers: new Headers({
+        cookie: req.headers.cookie || ''
+      })
     });
 
     if (!session?.user) {
@@ -17,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Forward request to Tenure Queue microservice
-    const queueServiceUrl = process.env.QUEUE_SERVICE_URL || 'http://localhost:3002';
+    const queueServiceUrl = process.env.QUEUE_SERVICE_URL || 'http://localhost:3001';
     const { search, limit, offset } = req.query;
 
     const searchParams = new URLSearchParams();
@@ -35,6 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       headers: {
         'Content-Type': 'application/json',
         'Cookie': cookieHeader,
+        'Authorization': `Bearer ${session.user.id}`,
       },
     });
 

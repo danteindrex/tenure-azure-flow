@@ -50,7 +50,7 @@ const ThemeToggle: React.FC = () => {
     observer.observe(document.body, { childList: true, subtree: true })
     
     return () => observer.disconnect()
-  }, [theme])
+  }, [theme, toggleTheme])
 
   return null // This component doesn't render anything visible
 }

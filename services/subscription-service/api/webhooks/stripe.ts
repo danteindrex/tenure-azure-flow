@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { StripeService } from '../../dist/src/services/stripe.service';
-import { logger } from '../../dist/src/config/logger';
+import { StripeService } from '../../src/services/stripe.service';
+import { logger } from '../../src/config/logger';
 import Stripe from 'stripe';
 
 export const config = {

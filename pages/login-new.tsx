@@ -62,7 +62,10 @@ const LoginNew = () => {
 
             try {
               const result = await authClient.signIn.passkey({
-                autoFill: true
+                autoFill: true,
+                fetchOptions: {
+                  signal: autofillAbortController.current.signal
+                }
               });
 
               // If user selects a passkey from autofill, this resolves
@@ -95,7 +98,7 @@ const LoginNew = () => {
         autofillAbortController.current.abort();
       }
     };
-  }, []);
+  }, [router]);
 
   const handleInputChange = (field: string, value: string | boolean): void => {
     setFormData((prev) => ({ ...prev, [field]: value }));

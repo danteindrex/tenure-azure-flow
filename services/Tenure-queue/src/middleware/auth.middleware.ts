@@ -26,46 +26,49 @@ export async function validateSession(
   next: NextFunction
 ) {
   try {
-    // Get session token from cookie
     const sessionToken = req.cookies['better-auth.session_token'];
+    const authHeader = req.headers.authorization;
 
-    if (!sessionToken) {
-      console.log('❌ No session token in cookies');
-      return res.status(401).json({
-        success: false,
-        error: 'No session token provided'
-      });
+    let userId: string | null = null;
+    let sessionRecord: any = null;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      userId = authHeader.substring(7);
     }
 
-    // Extract token from signed cookie (format: "token.signature")
-    // Better Auth signs the token, we need the part before the dot
-    const token = sessionToken.split('.')[0];
+    if (!userId) {
+      if (!sessionToken) {
+        return res.status(401).json({
+          success: false,
+          error: 'No session token or authorization provided'
+        });
+      }
 
-    // Query session from shared database using Drizzle
-    const sessionRecord = await db.query.session.findFirst({
-      where: (session, { eq }) => eq(session.token, token)
-    });
-
-    if (!sessionRecord) {
-      console.log('❌ Session not found in database');
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid session token'
+      const token = sessionToken.split('.')[0];
+      sessionRecord = await db.query.session.findFirst({
+        where: (session, { eq }) => eq(session.token, token)
       });
+
+      if (!sessionRecord) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid session token'
+        });
+      }
+
+      const expiresAt = new Date(sessionRecord.expiresAt);
+      if (expiresAt < new Date()) {
+        return res.status(401).json({
+          success: false,
+          error: 'Session expired'
+        });
+      }
+
+      userId = sessionRecord.userId;
     }
 
-    // Check if session expired
-    const expiresAt = new Date(sessionRecord.expiresAt);
-    if (expiresAt < new Date()) {
-      return res.status(401).json({
-        success: false,
-        error: 'Session expired'
-      });
-    }
-
-    // Query user by ID
     const user = await db.query.users.findFirst({
-      where: (users, { eq }) => eq(users.id, sessionRecord.userId)
+      where: (users, { eq }) => eq(users.id, userId as string)
     });
 
     if (!user) {

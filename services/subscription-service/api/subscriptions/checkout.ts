@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { SubscriptionController } from '../../dist/src/controllers/subscription.controller';
+import { SubscriptionController } from '../../src/controllers/subscription.controller';
 import cookieParser from 'cookie-parser';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

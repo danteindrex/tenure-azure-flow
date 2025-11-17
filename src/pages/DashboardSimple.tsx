@@ -9,16 +9,30 @@ import { logError } from "@/lib/audit";
 import { useQueueData } from "@/hooks/useQueueData";
 import { useStatistics } from "@/hooks/useStatistics";
 import { useBillingSchedules } from "@/hooks/useBillingSchedules";
+import { useNewsFeed } from "@/hooks/useNewsFeed";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const DashboardSimple = () => {
 
   const { data: session } = useSession();
   const user = session?.user;
 
-  // React Query hooks - replaces manual fetching and state management
-  const { data: queueData, isLoading: isLoadingQueue, isFetching: isFetchingQueue, refreshQueue } = useQueueData();
+  // First, fetch all queue data to find current user's position
+  const { data: allQueueData, isLoading: isLoadingAllQueue } = useQueueData();
+  
+  // Find current user's position from all queue data
+  const currentUserPosition = useMemo(() => {
+    if (!user?.id || !allQueueData?.data?.queue) return null;
+    const userInQueue = allQueueData.data.queue.find((q: any) => q.user_id === user.id);
+    return userInQueue?.queue_position || null;
+  }, [allQueueData, user?.id]);
+
+  // Then fetch nearest 5 users based on current position
+  const { data: queueData, isLoading: isLoadingQueue, isFetching: isFetchingQueue, refreshQueue } = useQueueData(currentUserPosition || undefined);
+  
   const { data: statsData, isLoading: isLoadingStats } = useStatistics();
   const { data: billingData, isLoading: isLoadingBilling } = useBillingSchedules(user?.id);
+  const { data: newsResponse, isLoading: isLoadingNews } = useNewsFeed();
 
   // UI state
   const [updatingPayment, setUpdatingPayment] = useState(false);
@@ -34,7 +48,8 @@ const DashboardSimple = () => {
     queuePosition,
     userDatabaseId,
     currentUserEntry,
-    topQueue,
+    nearestQueue,
+    totalQueueCount,
     totalRevenue,
     billingSchedules,
     paymentAmount,
@@ -42,9 +57,11 @@ const DashboardSimple = () => {
     daysUntilDraw
   } = useMemo(() => {
     const queue = queueData?.data?.queue || [];
+    const allQueue = allQueueData?.data?.queue || [];
     const currentUserId = user?.id || null;
     const revenue = statsData?.data?.totalRevenue || 0;
     const schedules = billingData?.data?.schedules || [];
+    const totalCount = allQueue.length; // Use total from all queue data
 
     // Find current user in queue
     let position: number | null = null;
@@ -66,8 +83,8 @@ const DashboardSimple = () => {
       }
     }
 
-    // Map queue for display
-    const queueDisplay = queue.map((q: any) => ({
+    // Map queue for display (already filtered by backend to nearest 5)
+    const nearestQueueDisplay = queue.map((q: any) => ({
       rank: q.queue_position,
       name: q.user_id,
       tenureMonths: 0,
@@ -104,14 +121,15 @@ const DashboardSimple = () => {
       queuePosition: position,
       userDatabaseId: dbId,
       currentUserEntry: userEntry,
-      topQueue: queueDisplay,
+      nearestQueue: nearestQueueDisplay,
+      totalQueueCount: totalCount,
       totalRevenue: revenue,
       billingSchedules: schedules,
       paymentAmount: payment,
       daysUntilPayment: daysPayment,
       daysUntilDraw: daysDraw
     };
-  }, [queueData, statsData, billingData, user?.id, BUSINESS_LAUNCH_DATE, PRIZE_PER_WINNER]);
+  }, [queueData, allQueueData, statsData, billingData, user?.id, BUSINESS_LAUNCH_DATE, PRIZE_PER_WINNER]);
 
   // Manual refresh function
   const handleRefresh = async () => {
@@ -203,10 +221,11 @@ const DashboardSimple = () => {
   const stats = {
     daysUntilPayment,
     totalRevenue,
-    potentialWinners: Math.min(2, Math.max(topQueue.filter((q) => q.status === 'Active').length, 0)),
+    potentialWinners: Math.min(2, Math.max(nearestQueue.filter((q) => q.status === 'Active').length, 0)),
     daysUntilDraw,
     paymentAmount,
     queuePosition: queuePosition ?? 0,
+    totalQueueCount,
   };
   const fundData = {
     nextDrawDate: `${daysUntilDraw} days`,
@@ -254,7 +273,7 @@ const DashboardSimple = () => {
             <div className="flex-1 min-w-0">
               <p className="text-xs sm:text-sm text-muted-foreground truncate">Queue Position</p>
               <p className="text-lg sm:text-xl md:text-2xl font-bold truncate">
-                {stats.queuePosition > 0 ? `#${stats.queuePosition}` : "Not in queue"}
+                {stats.queuePosition > 0 ? `#${stats.queuePosition} of ${stats.totalQueueCount}` : "Not in queue"}
               </p>
             </div>
             <Users className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-purple-500 shrink-0" />
@@ -319,15 +338,36 @@ const DashboardSimple = () => {
           </div>
           {currentUserEntry && (
             <span className="text-xs sm:text-sm font-medium text-muted-foreground xs:ml-auto">
-              Your position: #{currentUserEntry.rank}
+              Your position: #{currentUserEntry.rank} of {stats.totalQueueCount}
             </span>
           )}
         </h3>
-        <div className="space-y-2 sm:space-y-3">
-          {topQueue.length > 0 ? (
-            <>
-              {/* Show all queue members in scrollable list */}
-              {topQueue.map((member) => (
+        
+        {isLoadingQueue ? (
+          // Skeleton loading structure
+          <div className="space-y-2 sm:space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-card shadow-md">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                  <Skeleton className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </div>
+                <Skeleton className="h-4 w-12 shrink-0" />
+              </div>
+            ))}
+          </div>
+        ) : nearestQueue.length > 0 ? (
+          // Queue display with blur/cut-off effect for items moving out
+          <div className="relative">
+            {/* Top blur overlay */}
+            <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-card to-transparent pointer-events-none z-10" />
+            
+            {/* Queue container with overflow hidden for cut-off effect */}
+            <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
+              {nearestQueue.map((member, index) => (
                 <div
                   key={member.rank}
                   className={`flex items-center justify-between p-2 sm:p-3 rounded-lg transition-all ${
@@ -344,7 +384,6 @@ const DashboardSimple = () => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-sm sm:text-base truncate">{member.name}</p>
-                      {/* <p className="text-xs sm:text-sm text-muted-foreground">{member.tenureMonths} months</p> */}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
@@ -355,43 +394,20 @@ const DashboardSimple = () => {
                   </div>
                 </div>
               ))}
-
-              {/* Show ellipsis if current user is not in top 3 */}
-              {currentUserEntry && !topQueue.slice(0, 3).some(member => member.isCurrentUser) && (
-                <>
-                  <div className="text-center py-1 sm:py-2">
-                    <div className="text-muted-foreground text-sm">•••</div>
-                  </div>
-                  <div
-                    className="flex items-center justify-between p-2 sm:p-3 rounded-lg transition-all bg-accent/10 dark:bg-accent/20 shadow-lg"
-                  >
-                    <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-sm sm:text-base bg-blue-100 text-blue-800 shrink-0">
-                        {currentUserEntry.rank}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm sm:text-base truncate">{currentUserEntry.name}</p>
-                        {/* <p className="text-xs sm:text-sm text-muted-foreground">{currentUserEntry.tenureMonths} months</p> */}
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs sm:text-sm font-medium">{currentUserEntry.status}</p>
-                      <p className="text-[10px] xs:text-xs text-accent font-semibold">You are here</p>
-                    </div>
-                  </div>
-                </>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-6 sm:py-8">
-              <Users className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
-              <p className="text-sm sm:text-base text-muted-foreground px-4">No members in queue yet</p>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-2 px-4">
-                {!currentUserEntry ? "Complete your membership to join the queue" : ""}
-              </p>
             </div>
-          )}
-        </div>
+            
+            {/* Bottom blur overlay */}
+            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-card to-transparent pointer-events-none z-10" />
+          </div>
+        ) : (
+          <div className="text-center py-6 sm:py-8">
+            <Users className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+            <p className="text-sm sm:text-base text-muted-foreground px-4">No members in queue yet</p>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-2 px-4">
+              {!currentUserEntry ? "Complete your membership to join the queue" : ""}
+            </p>
+          </div>
+        )}
       </Card>
 
       {/* Quick Actions - Responsive */}
@@ -489,6 +505,30 @@ const DashboardSimple = () => {
           </div>
         </Card>
       </div>
+
+      <Card className="p-3 sm:p-4 md:p-6 shadow-lg border-0">
+        <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-3 sm:mb-4">Recent News</h3>
+        {isLoadingNews ? (
+          <div className="py-4 text-center text-muted-foreground">Loading...</div>
+        ) : (newsResponse?.posts || []).slice(0,3).length === 0 ? (
+          <div className="py-4 text-center text-muted-foreground">No announcements yet</div>
+        ) : (
+          (newsResponse?.posts || []).slice(0,3).map((post) => (
+            <div key={post.id} className="py-2">
+              <div className="flex items-center justify-between">
+                <p className="font-medium">{post.title}</p>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(post.publish_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground line-clamp-2">{typeof post.content === 'string' ? post.content : (post.content?.text || '')}</p>
+            </div>
+          ))
+        )}
+        <div className="pt-3">
+          <Button variant="outline" size="sm" onClick={() => (window.location.href = '/dashboard/news')}>View All News</Button>
+        </div>
+      </Card>
 
       {/* Cancel Subscription Warning Modal */}
       {showCancelModal && (

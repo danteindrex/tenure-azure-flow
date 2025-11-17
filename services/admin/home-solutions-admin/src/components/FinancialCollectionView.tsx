@@ -8,14 +8,13 @@ interface CollectionData {
   hasPrevPage: boolean
 }
 
-interface FinancialCollectionViewProps {
+interface _FinancialCollectionViewProps {
   collectionSlug: string
   collectionName: string
 }
 
 export const FinancialCollectionView: React.FC = () => {
-  if (typeof window === 'undefined') return null
-
+  // Move all hooks to the top - before any conditional logic
   const [data, setData] = useState<CollectionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -24,6 +23,7 @@ export const FinancialCollectionView: React.FC = () => {
 
   // Detect current collection from URL
   useEffect(() => {
+    if (typeof window === 'undefined') return
     const detectCollection = () => {
       const path = window.location.pathname
       const match = path.match(/\/admin\/collections\/([^\/]+)/)
@@ -59,6 +59,7 @@ export const FinancialCollectionView: React.FC = () => {
   }, [])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
     if (!collectionSlug) return
 
     const fetchData = async () => {

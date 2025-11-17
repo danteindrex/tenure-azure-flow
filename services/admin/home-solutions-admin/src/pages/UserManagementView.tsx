@@ -1,6 +1,5 @@
 import type { AdminViewProps } from 'payload'
 import { DefaultTemplate } from '@payloadcms/next/templates'
-import { Gutter } from '@payloadcms/ui'
 import React from 'react'
 import UserManagementClient from './UserManagementClient'
 

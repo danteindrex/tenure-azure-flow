@@ -4,9 +4,10 @@ import config from '../../payload.config'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
+    const { slug } = await params
     const payload = await getPayload({ config })
     const { searchParams } = new URL(request.url)
     
@@ -14,7 +15,7 @@ export async function GET(
     const limit = parseInt(searchParams.get('limit') || '20')
     
     const result = await payload.find({
-      collection: params.slug,
+      collection: slug as any,
       page,
       limit,
       sort: '-createdAt'
@@ -22,9 +23,10 @@ export async function GET(
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error(`Error fetching ${params.slug}:`, error)
+    const { slug } = await params
+    console.error(`Error fetching ${slug}:`, error)
     return NextResponse.json(
-      { error: `Failed to fetch ${params.slug}` },
+      { error: `Failed to fetch ${slug}` },
       { status: 500 }
     )
   }

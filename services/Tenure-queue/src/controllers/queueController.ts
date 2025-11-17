@@ -11,9 +11,10 @@ class QueueController {
 
   async getQueue(req: Request, res: Response): Promise<void> {
     try {
-      const { search, limit, offset } = req.query;
+      const { search, limit, offset, currentPosition } = req.query;
 
       let queueData = await this.queueModel.getAllQueueMembers();
+      const totalCount = queueData.length;
 
       // Apply search filter if provided
       if (search && typeof search === 'string') {
@@ -28,9 +29,17 @@ class QueueController {
         );
       }
 
-      // Apply pagination if provided
-      const totalCount = queueData.length;
-      if (limit) {
+      // If currentPosition is provided, return only nearest 5 users (2 above, current, 2 below)
+      if (currentPosition) {
+        const currentPos = parseInt(currentPosition as string);
+        const startPos = Math.max(1, currentPos - 2);
+        const endPos = Math.min(totalCount, currentPos + 2);
+        
+        queueData = queueData.filter((member: any) => 
+          member.queue_position >= startPos && member.queue_position <= endPos
+        );
+      } else if (limit) {
+        // Apply pagination if provided and no currentPosition
         const limitNum = parseInt(limit as string);
         const offsetNum = parseInt(offset as string) || 0;
         queueData = queueData.slice(offsetNum, offsetNum + limitNum);
@@ -39,12 +48,16 @@ class QueueController {
       // Only return position and user_id for privacy
       const sanitizedQueue = queueData.map((member: any) => ({
         queue_position: member.queue_position,
-        user_id: member.user_id
+        user_id: member.user_id,
+        id: member.id
       }));
 
       console.log('📊 Returning queue data:');
-      console.log('   Total members before pagination:', totalCount);
-      console.log('   Members after sanitization:', sanitizedQueue.length);
+      console.log('   Total members in queue:', totalCount);
+      console.log('   Members returned:', sanitizedQueue.length);
+      if (currentPosition) {
+        console.log('   Filtered for position:', currentPosition);
+      }
       console.log('   Queue data:', JSON.stringify(sanitizedQueue, null, 2));
 
       const statistics = await this.queueModel.getQueueStatistics();
@@ -56,8 +69,9 @@ class QueueController {
           statistics,
           pagination: {
             total: totalCount,
-            limit: limit ? parseInt(limit as string) : totalCount,
-            offset: offset ? parseInt(offset as string) : 0
+            limit: limit ? parseInt(limit as string) : sanitizedQueue.length,
+            offset: offset ? parseInt(offset as string) : 0,
+            filtered: !!currentPosition
           }
         }
       });

@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '../../payload.config'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const payload = await getPayload({ config })
     
     // Get date ranges
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const _weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const _monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
     // Helper function to safely query collections

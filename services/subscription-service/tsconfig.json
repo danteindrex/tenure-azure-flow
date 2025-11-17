@@ -19,6 +19,6 @@
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/**/*", "drizzle/**/*"],
-  "exclude": ["node_modules", "dist", "api"]
+  "include": ["src/**/*", "api/**/*", "drizzle/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

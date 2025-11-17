@@ -22,8 +22,12 @@ export const useBillingSchedules = (userId: string | undefined) => {
         throw new Error('User ID is required');
       }
 
+      const baseUrl = process.env.NEXT_PUBLIC_SUBSCRIPTION_SERVICE_URL
+        || process.env.NEXT_PUBLIC_API_URL
+        || 'http://localhost:3001';
+
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/billing/schedules/${userId}`,
+        `${baseUrl}/api/billing/schedules/${userId}`,
         { credentials: 'include' }
       );
 

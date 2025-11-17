@@ -56,7 +56,7 @@ export interface DashboardMetrics {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const payload = await getPayload({ config })
     
@@ -117,26 +117,26 @@ export async function GET(request: NextRequest) {
       monthlyPayments,
       dailyPayments,
       successfulPayments,
-      failedPayments
+      _failedPayments
     ] = await Promise.all([
-      payload.find({ collection: 'payment', limit: 0 }),
+      payload.find({ collection: 'payment' as any, limit: 0 }),
       payload.find({
-        collection: 'payment',
+        collection: 'payment' as any,
         where: { createdAt: { greater_than: thisMonth } },
         limit: 0
       }),
       payload.find({
-        collection: 'payment',
+        collection: 'payment' as any,
         where: { createdAt: { greater_than: today } },
         limit: 0
       }),
       payload.find({
-        collection: 'payment',
+        collection: 'payment' as any,
         where: { status: { equals: 'succeeded' } },
         limit: 0
       }),
       payload.find({
-        collection: 'payment',
+        collection: 'payment' as any,
         where: { status: { equals: 'failed' } },
         limit: 0
       })
@@ -158,22 +158,22 @@ export async function GET(request: NextRequest) {
 
     // Queue metrics
     const [queueEntries, eligibleEntries] = await Promise.all([
-      payload.count({ collection: 'queueEntries' }),
+      payload.count({ collection: 'queueEntries' as any }),
       payload.count({
-        collection: 'queueEntries',
+        collection: 'queueEntries' as any,
         where: { status: { equals: 'eligible' } }
       })
     ])
 
     // Subscription metrics
     const [totalSubs, activeSubs, cancelledSubs] = await Promise.all([
-      payload.count({ collection: 'subscription' }),
+      payload.count({ collection: 'subscription' as any }),
       payload.count({
-        collection: 'subscription',
+        collection: 'subscription' as any,
         where: { status: { equals: 'active' } }
       }),
       payload.count({
-        collection: 'subscription',
+        collection: 'subscription' as any,
         where: { status: { equals: 'cancelled' } }
       })
     ])
@@ -181,15 +181,15 @@ export async function GET(request: NextRequest) {
     // KYC and compliance metrics
     const [kycPending, kycVerified, kycRejected] = await Promise.all([
       payload.count({
-        collection: 'kycVerification',
+        collection: 'kycVerification' as any,
         where: { status: { equals: 'pending' } }
       }),
       payload.count({
-        collection: 'kycVerification',
+        collection: 'kycVerification' as any,
         where: { status: { equals: 'verified' } }
       }),
       payload.count({
-        collection: 'kycVerification',
+        collection: 'kycVerification' as any,
         where: { status: { equals: 'rejected' } }
       })
     ])
@@ -197,19 +197,19 @@ export async function GET(request: NextRequest) {
     // Alert metrics
     const [criticalAlerts, warningAlerts, resolvedAlerts, unresolvedAlerts] = await Promise.all([
       payload.count({
-        collection: 'adminAlerts',
+        collection: 'adminAlerts' as any,
         where: { severity: { equals: 'critical' }, status: { not_equals: 'resolved' } }
       }),
       payload.count({
-        collection: 'adminAlerts',
+        collection: 'adminAlerts' as any,
         where: { severity: { equals: 'warning' }, status: { not_equals: 'resolved' } }
       }),
       payload.count({
-        collection: 'adminAlerts',
+        collection: 'adminAlerts' as any,
         where: { status: { equals: 'resolved' } }
       }),
       payload.count({
-        collection: 'adminAlerts',
+        collection: 'adminAlerts' as any,
         where: { status: { not_equals: 'resolved' } }
       })
     ])
