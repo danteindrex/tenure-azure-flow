@@ -39,13 +39,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const subscriptionServiceUrl = (process.env.SUBSCRIPTION_SERVICE_URL || 'http://localhost:3001').replace(/\/$/, '');
     const microserviceUrl = `${subscriptionServiceUrl}/api/subscriptions/${userId}/payments`;
 
-    // Forward cookies from the original request to the microservice
+    // Forward cookies and authorization header to the microservice
     const cookieHeader = req.headers.cookie || '';
 
     const response = await fetch(microserviceUrl, {
       headers: {
         'Content-Type': 'application/json',
         'Cookie': cookieHeader,
+        'Authorization': `Bearer ${session.user.id}`, // Add authorization header
       },
     });
 

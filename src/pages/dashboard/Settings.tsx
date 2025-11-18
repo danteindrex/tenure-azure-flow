@@ -84,12 +84,13 @@ const Settings = () => {
     if (fetchedAppearanceSettings) setAppearanceSettings(fetchedAppearanceSettings);
   }, [fetchedAppearanceSettings]);
 
-  // Sync theme from database with theme context
+  // Sync theme from database with theme context only on initial load
   useEffect(() => {
-    if (userSettings?.theme && userSettings.theme !== currentTheme) {
+    if (userSettings?.theme && !appearanceSettings) {
+      // Only sync from DB on first load, not on every change
       setCurrentTheme(userSettings.theme as 'light' | 'dark' | 'system');
     }
-  }, [userSettings?.theme, currentTheme, setCurrentTheme]);
+  }, [userSettings?.theme, setCurrentTheme, appearanceSettings]);
 
   const handleSave = async () => {
     if (!user) return;

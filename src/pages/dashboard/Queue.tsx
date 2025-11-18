@@ -1,13 +1,11 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useSession } from "@/lib/auth-client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Users,
-  Search,
   Crown,
   Clock,
   TrendingUp,
@@ -26,25 +24,37 @@ import { useQueueData } from "@/hooks/useQueueData";
 import { useStatistics } from "@/hooks/useStatistics";
 
 const Queue = () => {
-  const [searchTerm, setSearchTerm] = useState("");
+  // Removed search functionality as per requirement
 
   const { data: session } = useSession();
   const user = session?.user;
 
-  // React Query hooks - replaces manual fetching
-  const { data: queueResponse, isLoading: isLoadingQueue, isFetching: isFetchingQueue, refreshQueue } = useQueueData();
+  // First, fetch all queue data to find current user's position
+  const { data: allQueueData, isLoading: isLoadingAllQueue } = useQueueData();
+
+  // Find current user's position from all queue data
+  const currentUserPosition = useMemo(() => {
+    if (!user?.id || !allQueueData?.data?.queue) return null;
+    const userInQueue = allQueueData.data.queue.find((q: any) => q.user_id === user.id);
+    return userInQueue?.queue_position || null;
+  }, [allQueueData, user?.id]);
+
+  // Then fetch nearest 5 users based on current position
+  const { data: queueResponse, isLoading: isLoadingQueue, isFetching: isFetchingQueue, refreshQueue } = useQueueData(currentUserPosition || undefined);
   const { data: statsResponse, isLoading: isLoadingStats } = useStatistics();
 
   // Compute derived data from React Query results using useMemo
   const { queueData, statistics, currentUserMember } = useMemo(() => {
     const rawQueue = queueResponse?.data?.queue || [];
+    const allQueue = allQueueData?.data?.queue || [];
     const rawStats = statsResponse?.data || {};
 
-    // Map view fields to component expected fields
+    // Map view fields to component expected fields - mask user IDs like dashboard
     const mappedQueue = rawQueue.map((member: any) => ({
       id: member.user_id,
       position: member.queue_position,
       name: member.user_id,
+      maskedId: member.user_id ? `${member.user_id.substring(0, 6)}xxxxx` : 'N/A', // Mask user ID
       email: '',
       continuousTenure: 0,
       totalPaid: 0,
@@ -57,12 +67,12 @@ const Queue = () => {
     }));
 
     const stats = {
-      totalMembers: (rawStats as any).totalMembers || rawQueue.length || 0,
-      activeMembers: (rawStats as any).activeMembers || rawQueue.length || 0,
-      eligibleMembers: (rawStats as any).eligibleMembers || rawQueue.filter((m: any) => m.eligible).length || 0,
+      totalMembers: (rawStats as any).totalMembers || allQueue.length || 0,
+      activeMembers: (rawStats as any).activeMembers || allQueue.length || 0,
+      eligibleMembers: (rawStats as any).eligibleMembers || allQueue.filter((m: any) => m.eligible).length || 0,
       totalRevenue: (rawStats as any).totalRevenue || 0,
-      potentialWinners: (rawStats as any).potentialWinners || rawQueue.filter((m: any) => m.eligible).length || 0,
-      payoutThreshold: 500000,
+      potentialWinners: (rawStats as any).potentialWinners || allQueue.filter((m: any) => m.eligible).length || 0,
+      payoutThreshold: 100000, // BR-3: $100K payout threshold
       receivedPayouts: (rawStats as any).receivedPayouts || 0
     };
 
@@ -75,7 +85,7 @@ const Queue = () => {
       statistics: stats,
       currentUserMember: currentUser
     };
-  }, [queueResponse, statsResponse, user?.id]);
+  }, [queueResponse, allQueueData, statsResponse, user?.id]);
 
   // Manual refresh function
   const handleRefresh = async () => {
@@ -89,12 +99,7 @@ const Queue = () => {
   const winnersCount = potentialWinners;
   const potentialPayoutPerWinner = totalRevenue > 0 ? totalRevenue / Math.max(winnersCount, 1) : 0;
 
-  // Filter queue data based on search
-  const filteredQueue = queueData.filter(member =>
-    member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.id.toString().includes(searchTerm)
-  );
+  // No filtering - show all queue data as per requirement
 
   // Helper functions
   const formatDate = (dateString: string) => {
@@ -119,7 +124,7 @@ const Queue = () => {
     }
   };
 
-  if (isLoadingQueue || isLoadingStats) {
+  if (isLoadingQueue || isLoadingStats || isLoadingAllQueue) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center py-12">
@@ -300,24 +305,11 @@ const Queue = () => {
         </div>
       </Card>
 
-      {/* Search */}
-      <Card className="p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input
-            placeholder="Search members..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-background/50"
-          />
-        </div>
-      </Card>
-
-      {/* Queue Table - Privacy Mode */}
+      {/* Queue Table - Privacy Mode (Search removed as per requirement) */}
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Users className="w-5 h-5 text-accent" />
-          Queue Members ({filteredQueue.length})
+          Queue Members ({queueData.length})
         </h3>
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table className="w-full">
@@ -329,14 +321,14 @@ const Queue = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredQueue.length === 0 ? (
+              {queueData.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="py-8 text-center text-muted-foreground">
-                    {searchTerm ? 'No members found matching your search.' : 'No queue members found.'}
+                    No queue members found.
                   </td>
                 </tr>
               ) : (
-                filteredQueue.map((member) => {
+                queueData.map((member) => {
                   const isCurrentUser = member.id && user?.id && member.id.toString() === user.id;
                   const isWinner = member.position <= winnersCount;
 
@@ -358,9 +350,9 @@ const Queue = () => {
                       <td className="py-3 px-2">
                         <div>
                           {isCurrentUser ? (
-                            <p className="font-medium text-accent break-all">{member.id} <span className="text-xs">(You)</span></p>
+                            <p className="font-medium text-accent">You</p>
                           ) : (
-                            <p className="font-medium text-muted-foreground text-sm break-all">{member.id}</p>
+                            <p className="font-medium text-muted-foreground text-sm">{(member as any).maskedId || 'N/A'}</p>
                           )}
                         </div>
                       </td>
@@ -376,30 +368,6 @@ const Queue = () => {
             </tbody>
           </table>
         </div>
-        
-        {/* Queue Summary */}
-        {queueData.length > 0 && (
-          <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground">Total in Queue</p>
-                <p className="font-semibold">{queueData.length} members</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Active Subscriptions</p>
-                <p className="font-semibold">{activeMembers} members</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Eligible for Payout</p>
-                <p className="font-semibold">{eligibleMembers} members</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Received Payouts</p>
-                <p className="font-semibold">{statistics.receivedPayouts} members</p>
-              </div>
-            </div>
-          </div>
-        )}
       </Card>
     </div>
   );

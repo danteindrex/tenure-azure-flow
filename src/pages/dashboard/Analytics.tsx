@@ -40,12 +40,12 @@ const Analytics = () => {
     if (!analyticsData) {
       return {
         overview: {
-          totalInvested: 0,
+          totalPaid: 0,
           totalEarned: 0,
           netPosition: 0,
           tenureMonths: 0,
           queuePosition: 0,
-          potentialPayout: 0,
+          potentialPayout: 100000,
         },
         monthlyData: [],
         performance: {
@@ -56,7 +56,7 @@ const Analytics = () => {
         },
         projections: {
           nextPayout: "",
-          estimatedPayout: 0,
+          estimatedPayout: 100000,
           confidence: 0,
         },
       };
@@ -65,25 +65,25 @@ const Analytics = () => {
     const { overview: apiOverview, monthly } = analyticsData;
 
     // Calculate additional metrics
-    const monthsWithPayments = monthly.filter(m => m.invested > 0).length;
+    const monthsWithPayments = monthly.filter((m: any) => m.invested > 0).length;
     const paymentConsistency = Math.round((monthsWithPayments / Math.max(monthly.length, 1)) * 100);
     const queueProgress = apiOverview.queueCount > 0 && apiOverview.queuePosition > 0
       ? Math.round(((apiOverview.queueCount - apiOverview.queuePosition + 1) / apiOverview.queueCount) * 100)
       : 0;
-    const startInvest = monthly[0]?.invested ?? 0;
-    const endInvest = monthly[monthly.length - 1]?.invested ?? 0;
-    const fundGrowth = startInvest > 0 ? Number((((endInvest - startInvest) / startInvest) * 100).toFixed(1)) : 0;
+    const startPaid = monthly[0]?.invested ?? 0;
+    const endPaid = monthly[monthly.length - 1]?.invested ?? 0;
+    const fundGrowth = startPaid > 0 ? Number((((endPaid - startPaid) / startPaid) * 100).toFixed(1)) : 0;
     const riskLevel = paymentConsistency >= 80 ? "Low" : paymentConsistency >= 50 ? "Medium" : "High";
     const confidence = Math.min(100, Math.max(0, Math.round((paymentConsistency + queueProgress) / 2)));
 
     return {
       overview: {
-        totalInvested: apiOverview.investedTotal,
+        totalPaid: apiOverview.investedTotal,
         totalEarned: apiOverview.totalEarned,
         netPosition: apiOverview.netPosition,
         tenureMonths: apiOverview.tenureMonths,
         queuePosition: apiOverview.queuePosition,
-        potentialPayout: apiOverview.potentialPayout,
+        potentialPayout: Math.max(apiOverview.potentialPayout, 100000),
       },
       monthlyData: monthly,
       performance: {
@@ -94,7 +94,7 @@ const Analytics = () => {
       },
       projections: {
         nextPayout: apiOverview.nextPayoutDate,
-        estimatedPayout: apiOverview.potentialPayout,
+        estimatedPayout: Math.max(apiOverview.potentialPayout, 100000),
         confidence,
       },
     };
@@ -144,12 +144,12 @@ const Analytics = () => {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Invested</p>
-              <p className="text-2xl font-bold">${overview.totalInvested.toFixed(2)}</p>
+              <p className="text-sm text-muted-foreground">Total Paid</p>
+              <p className="text-2xl font-bold">${overview.totalPaid.toFixed(2)}</p>
             </div>
             <DollarSign className="w-8 h-8 text-blue-500" />
           </div>
@@ -157,19 +157,10 @@ const Analytics = () => {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Earned</p>
-              <p className="text-2xl font-bold text-green-500">${overview.totalEarned.toFixed(2)}</p>
+              <p className="text-sm text-muted-foreground">Potential Payout</p>
+              <p className="text-2xl font-bold text-green-500">${overview.potentialPayout.toLocaleString()}</p>
             </div>
             <Award className="w-8 h-8 text-green-500" />
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Net Position</p>
-              <p className={`text-2xl font-bold ${overview.netPosition >= 0 ? 'text-green-500' : 'text-red-500'}`}>${overview.netPosition.toFixed(2)}</p>
-            </div>
-            <BarChart3 className="w-8 h-8 text-red-500" />
           </div>
         </Card>
         <Card className="p-4">
@@ -269,42 +260,6 @@ const Analytics = () => {
           </div>
         </Card>
       </div>
-
-      {/* Monthly Breakdown */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-accent" />
-          Monthly Breakdown
-        </h3>
-        <div className="space-y-3">
-          {monthlyData.map((month, index) => (
-            <div key={index} className="flex items-center justify-between p-3 border border-border rounded-lg">
-              <div className="flex items-center gap-4">
-                <div className="w-12 text-sm font-medium">{month.month}</div>
-                <div className="flex items-center gap-4">
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground">Invested</p>
-                    <p className="font-semibold text-red-500">-${month.invested}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground">Earned</p>
-                    <p className="font-semibold text-green-500">+${month.earned}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground">Net</p>
-                    <p className={`font-semibold ${month.net >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                      {month.net >= 0 ? '+' : ''}${month.net}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {getTrendIcon(month.earned)}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
 
       {/* Insights */}
       <Card className="p-6">

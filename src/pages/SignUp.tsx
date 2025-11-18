@@ -1824,7 +1824,7 @@ const SignUp = () => {
                     <Input
                       id="phoneNumber"
                       type="tel"
-                      placeholder={formData.phoneCountryCode === '+256' ? '745315809' : 'Enter phone number'}
+                      placeholder={formData.phoneCountryCode === '+1' ? '(555) 123-4567' : formData.phoneCountryCode === '+256' ? '745315809' : 'Enter phone number'}
                       value={formData.phoneNumber}
                       onChange={(e) => handlePhoneInputChange(e.target.value)}
                       className="flex-1 bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
@@ -1832,6 +1832,9 @@ const SignUp = () => {
                       required
                     />
                   </div>
+                  {formData.phoneCountryCode === '+1' && formData.phoneNumber && getCleanPhoneNumber(formData.phoneNumber).length !== 10 && (
+                    <p className="text-xs text-red-500">US phone numbers must be 10 digits</p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     We'll send you a verification code to confirm your number
                   </p>
@@ -2069,7 +2072,7 @@ const SignUp = () => {
                   <div className="border-t border-border pt-4">
                     <p className="text-sm text-muted-foreground mb-1">Recurring Monthly Membership Fee</p>
                     <p className="text-2xl font-semibold text-foreground">$25</p>
-                    <p className="text-xs text-muted-foreground mt-1">Billed monthly starting month 2</p>
+                    <p className="text-xs text-muted-foreground mt-1">Billed monthly</p>
                   </div>
                 </div>
               </Card>

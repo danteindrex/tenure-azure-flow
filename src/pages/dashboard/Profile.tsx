@@ -14,7 +14,9 @@ import { useProfileData, ProfileData } from "@/hooks/useProfileData";
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData>({
-    fullName: "",
+    firstName: "",
+    middleName: "",
+    lastName: "",
     email: "",
     phoneCountryCode: "+1",
     phoneNumber: "",
@@ -28,7 +30,9 @@ const Profile = () => {
     bio: "",
   });
   const [originalData, setOriginalData] = useState<ProfileData>({
-    fullName: "",
+    firstName: "",
+    middleName: "",
+    lastName: "",
     email: "",
     phoneCountryCode: "+1",
     phoneNumber: "",
@@ -183,7 +187,7 @@ const Profile = () => {
               </div>
               <div>
                 <h3 className="text-xl font-bold">
-                  {profileData.fullName || "No name provided"}
+                  {`${profileData.firstName} ${profileData.middleName ? profileData.middleName + ' ' : ''}${profileData.lastName}`.trim() || "No name provided"}
                 </h3>
                 <p className="text-muted-foreground">
                   {profileData.userId || "Generating user ID..."}
@@ -211,19 +215,43 @@ const Profile = () => {
               <User className="w-5 h-5 text-accent" />
               Personal Information
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  value={profileData.fullName}
-                  onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
-                  disabled={!isEditing}
-                  className="bg-background/50"
-                  placeholder="Enter your full name"
-                />
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    value={profileData.firstName}
+                    onChange={(e) => setProfileData({...profileData, firstName: e.target.value})}
+                    disabled={!isEditing}
+                    className="bg-background/50"
+                    placeholder="First name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="middleName">Middle Name</Label>
+                  <Input
+                    id="middleName"
+                    value={profileData.middleName}
+                    onChange={(e) => setProfileData({...profileData, middleName: e.target.value})}
+                    disabled={!isEditing}
+                    className="bg-background/50"
+                    placeholder="Middle name (optional)"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={profileData.lastName}
+                    onChange={(e) => setProfileData({...profileData, lastName: e.target.value})}
+                    disabled={!isEditing}
+                    className="bg-background/50"
+                    placeholder="Last name"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 md:w-1/2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
@@ -270,12 +298,29 @@ const Profile = () => {
                   <Input
                     id="phone"
                     value={profileData.phoneNumber}
-                    onChange={(e) => setProfileData({...profileData, phoneNumber: e.target.value})}
+                    onChange={(e) => {
+                      let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+                      // Format as US phone: (XXX) XXX-XXXX
+                      if (profileData.phoneCountryCode === '+1' && value.length > 0) {
+                        if (value.length <= 3) {
+                          // Keep as is for 1-3 digits
+                        } else if (value.length <= 6) {
+                          value = `(${value.slice(0, 3)}) ${value.slice(3)}`;
+                        } else {
+                          value = `(${value.slice(0, 3)}) ${value.slice(3, 6)}-${value.slice(6, 10)}`;
+                        }
+                      }
+                      setProfileData({...profileData, phoneNumber: value});
+                    }}
                     disabled={!isEditing}
                     className="flex-1 bg-background/50"
-                    placeholder="Enter phone number"
+                    placeholder={profileData.phoneCountryCode === '+1' ? '(555) 123-4567' : 'Enter phone number'}
+                    maxLength={profileData.phoneCountryCode === '+1' ? 14 : undefined}
                   />
                 </div>
+                {profileData.phoneCountryCode === '+1' && profileData.phoneNumber && profileData.phoneNumber.replace(/\D/g, '').length !== 10 && (
+                  <p className="text-xs text-red-500">US phone numbers must be 10 digits</p>
+                )}
               </div>
             </div>
           </Card>

@@ -29,7 +29,7 @@ export class BillingController {
       const subscriptionQuery = `
         SELECT id
         FROM user_subscriptions
-        WHERE user_id = $1 AND status = 'ACTIVE'
+        WHERE user_id = $1 AND status = 'active'
         ORDER BY created_at DESC
         LIMIT 1
       `;

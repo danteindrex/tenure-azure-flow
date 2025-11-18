@@ -42,8 +42,8 @@ const DashboardSimple = () => {
   const [cancelling, setCancelling] = useState(false);
 
   const BUSINESS_LAUNCH_DATE = process.env.NEXT_PUBLIC_BUSINESS_LAUNCH_DATE || ""; // ISO string fallback
-  const PRIZE_PER_WINNER = 100000; // BR-4
-  const FUND_TARGET = 500000; // Target fund amount for payouts
+  const PRIZE_PER_WINNER = 100000; // BR-4: $100,000 per winner
+  const FUND_TARGET = 100000; // BR-3: Target fund amount for payouts ($100,000)
 
   // Compute derived data from React Query results using useMemo
   const {
@@ -108,24 +108,34 @@ const DashboardSimple = () => {
     const yearlyDate = yearlySchedule?.nextBillingDate || null;
     console.log('Monthly date:', monthlyDate, 'Yearly date:', yearlyDate);
 
-    // Calculate days until draw
+    // Calculate days until draw based on BR-3
+    // Payout is eligible when BOTH conditions are met OR fund reaches $100K before 12 months:
+    // 1. Fund reaches $100,000
+    // 2. 12 months have passed since business launch
+    // Exception: If fund reaches $100K before 12 months, members become eligible immediately
     let daysDraw = 0;
     const launch = BUSINESS_LAUNCH_DATE ? new Date(BUSINESS_LAUNCH_DATE) : null;
+    const fundReached = revenue >= PRIZE_PER_WINNER;
+
     if (launch) {
       const twelveMonths = new Date(launch);
       twelveMonths.setMonth(twelveMonths.getMonth() + 12);
-      if (Date.now() < twelveMonths.getTime()) {
-        daysDraw = Math.max(Math.ceil((twelveMonths.getTime() - Date.now()) / (1000 * 60 * 60 * 24)), 0);
+      const now = Date.now();
+      const monthsPassed = now >= twelveMonths.getTime();
+
+      // If fund reached $100K, members are eligible (admin can pay out)
+      // If 12 months passed, show days remaining = 0 (ready)
+      // If neither, show days until 12 months
+      if (fundReached) {
+        daysDraw = 0; // Ready for admin to pay out
+      } else if (monthsPassed) {
+        daysDraw = 0; // 12 months passed, waiting for fund
+      } else {
+        daysDraw = Math.max(Math.ceil((twelveMonths.getTime() - now) / (1000 * 60 * 60 * 24)), 0);
       }
     } else {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth();
-      const target = new Date(year, month, 15);
-      if (now > target) {
-        target.setMonth(month + 1);
-      }
-      daysDraw = Math.max(Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)), 0);
+      // Fallback if no launch date set
+      daysDraw = fundReached ? 0 : 365; // If fund reached, ready; else wait
     }
 
     return {
@@ -337,8 +347,11 @@ const DashboardSimple = () => {
             <div className="flex-1 min-w-0">
               <p className="text-xs sm:text-sm text-muted-foreground truncate">Next Draw</p>
               <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold break-words">
-                {stats.daysUntilDraw > 0 ? `${stats.daysUntilDraw} days` :
-                 stats.totalRevenue >= PRIZE_PER_WINNER ? "Ready" : "Pending"}
+                {stats.daysUntilDraw > 0
+                  ? `In ${stats.daysUntilDraw} days`
+                  : stats.totalRevenue >= FUND_TARGET
+                    ? "Eligible - Pending Admin"
+                    : "Waiting for Fund"}
               </p>
             </div>
             <Award className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-yellow-500 shrink-0" />
@@ -534,8 +547,11 @@ const DashboardSimple = () => {
             <div>
               <p className="text-xs sm:text-sm text-muted-foreground">Draw Status</p>
               <p className="text-sm sm:text-base text-muted-foreground mt-1">
-                {stats.daysUntilDraw > 0 ? `In: ${stats.daysUntilDraw} days` :
-                 stats.totalRevenue >= PRIZE_PER_WINNER ? "Ready to draw" : "Waiting for fund target"}
+                {stats.daysUntilDraw > 0
+                  ? `In: ${stats.daysUntilDraw} days`
+                  : stats.totalRevenue >= FUND_TARGET
+                    ? "Eligible - Admin will process payout"
+                    : "Waiting for $100K fund target"}
               </p>
             </div>
             <div>

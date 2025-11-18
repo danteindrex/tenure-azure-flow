@@ -3,7 +3,9 @@ import { authClient } from '@/lib/auth-client';
 import { logProfileUpdate, logError } from '@/lib/audit';
 
 export interface ProfileData {
-  fullName: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
   email: string;
   phoneCountryCode: string;
   phoneNumber: string;
@@ -23,6 +25,7 @@ interface ProfileResponse {
     email: string;
     profile: {
       firstName: string;
+      middleName: string;
       lastName: string;
     };
     phone: {
@@ -65,10 +68,6 @@ export const useProfileData = (userId: string | undefined, userName?: string, us
 
       const { email, profile, phone, address } = result.data;
 
-      const fullName = profile?.firstName && profile?.lastName
-        ? `${profile.firstName} ${profile.lastName}`
-        : userName || '';
-
       const userIdDisplay = `USR-${String(userId).slice(-6)}`;
       const joinDate = createdAt
         ? new Date(createdAt).toLocaleDateString('en-US', {
@@ -79,7 +78,9 @@ export const useProfileData = (userId: string | undefined, userName?: string, us
         : '';
 
       return {
-        fullName,
+        firstName: profile?.firstName || '',
+        middleName: profile?.middleName || '',
+        lastName: profile?.lastName || '',
         email: email || userEmail || '',
         phoneCountryCode: phone?.countryCode || '+1',
         phoneNumber: phone?.number || '',
@@ -106,8 +107,9 @@ export const useProfileData = (userId: string | undefined, userName?: string, us
       }
 
       // Update user name with Better Auth
+      const fullName = `${profileData.firstName} ${profileData.middleName ? profileData.middleName + ' ' : ''}${profileData.lastName}`.trim();
       const result = await authClient.updateUser({
-        name: profileData.fullName
+        name: fullName
       });
 
       if (result.error) {
@@ -115,12 +117,17 @@ export const useProfileData = (userId: string | undefined, userName?: string, us
       }
 
       // Update additional profile data via upsert endpoint
-      const fullPhone = `${profileData.phoneCountryCode}${profileData.phoneNumber}`;
+      // Remove formatting from phone number before saving (keep only digits)
+      const cleanPhone = profileData.phoneNumber.replace(/\D/g, '');
+      const fullPhone = `${profileData.phoneCountryCode}${cleanPhone}`;
       const profileUpdateResult = await fetch("/api/profiles/upsert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: profileData.email,
+          first_name: profileData.firstName,
+          middle_name: profileData.middleName,
+          last_name: profileData.lastName,
           phone: fullPhone,
           street_address: profileData.streetAddress,
           city: profileData.city,

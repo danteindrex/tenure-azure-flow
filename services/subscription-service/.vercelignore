@@ -8,3 +8,5 @@ SETUP.md
 docker-compose.yml
 Dockerfile
 .dockerignore
+# DO NOT ignore dist - it's needed for serverless deployment
+# dist/

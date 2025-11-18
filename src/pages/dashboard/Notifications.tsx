@@ -11,7 +11,8 @@ import {
   Info,
   CheckCircle,
   DollarSign,
-  Loader2
+  Loader2,
+  Megaphone
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "@/lib/auth-client";
@@ -23,6 +24,7 @@ import {
   useMarkAllAsRead,
   useDeleteNotification
 } from "@/hooks/useNotificationsData";
+import { useNewsFeed } from "@/hooks/useNewsFeed";
 
 const Notifications = () => {
   const { data: session } = useSession();
@@ -32,13 +34,15 @@ const Notifications = () => {
   const { data: notifications = [], isLoading: loadingNotifications } = useNotifications(user?.id);
   const { data: unreadCount = 0, isLoading: loadingUnread } = useUnreadCount(user?.id);
   const { data: preferences } = useNotificationPreferences(user?.id);
+  const { data: newsResponse, isLoading: loadingNews } = useNewsFeed();
 
   // Mutations
   const markAsReadMutation = useMarkAsRead();
   const markAllAsReadMutation = useMarkAllAsRead();
   const deleteNotificationMutation = useDeleteNotification();
 
-  const loading = loadingNotifications || loadingUnread;
+  const loading = loadingNotifications || loadingUnread || loadingNews;
+  const newsPosts = newsResponse?.posts || [];
 
   // Compute notification counts using useMemo
   const notificationCounts = useMemo(() => ({
@@ -184,6 +188,50 @@ const Notifications = () => {
           </div>
         </Card>
       </div>
+
+      {/* News & Updates Section (merged from News page) */}
+      {newsPosts.length > 0 && (
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Megaphone className="w-5 h-5 text-accent" />
+              News & Updates
+            </h2>
+            <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+              {newsPosts.length} {newsPosts.length === 1 ? 'post' : 'posts'}
+            </Badge>
+          </div>
+          <div className="space-y-3">
+            {newsPosts.slice(0, 3).map((post: any) => (
+              <div
+                key={post.id}
+                className="p-4 rounded-lg bg-accent/5 border border-accent/20 hover:bg-accent/10 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <h3 className="font-semibold mb-1">{post.title}</h3>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {typeof post.content === 'string' ? post.content : (post.content?.text || '')}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {new Date(post.publish_date).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                  {post.priority && (
+                    <Badge variant="secondary" className="shrink-0">
+                      {post.priority}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Notifications List */}
       <div className="space-y-4">

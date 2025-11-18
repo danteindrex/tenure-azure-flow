@@ -100,10 +100,9 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
     { path: "/dashboard", icon: Home, label: "Dashboard", badge: null },
     { path: "/dashboard/profile", icon: User, label: "Profile", badge: null },
     { path: "/dashboard/queue", icon: Users, label: "Home Solutions Queue", badge: "Live" },
-    { path: "/dashboard/news", icon: Megaphone, label: "News & Updates", badge: "New" },
+    { path: "/dashboard/notifications", icon: Bell, label: "Notifications & News", badge: "3" },
     { path: "/dashboard/analytics", icon: BarChart3, label: "Analytics", badge: null },
     { path: "/dashboard/history", icon: History, label: "History", badge: null },
-    { path: "/dashboard/notifications", icon: Bell, label: "Notifications", badge: "3" },
     { path: "/dashboard/settings", icon: Settings, label: "Settings", badge: null },
     { path: "/dashboard/help", icon: HelpCircle, label: "Help & Support", badge: null },
   ];
@@ -190,9 +189,6 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">
                   {userProfile?.name || session?.user?.name || session?.user?.email?.split('@')[0] || 'Member'}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {userProfile?.memberId || `TRP-${new Date().getFullYear()}-${String(session?.user?.id || '000').slice(-3).toUpperCase()}`}
                 </p>
               </div>
             </div>

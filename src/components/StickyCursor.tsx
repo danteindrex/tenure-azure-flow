@@ -31,11 +31,18 @@ export default function StickyCursor({
         const Kursor = kursorModule.default || kursorModule.kursor || window.kursor
 
         if (Kursor) {
-          // Initialize Kursor with configuration
+          // Initialize Kursor with configuration optimized for performance
           new Kursor({
             type: type,
             color: cursorColor,
             removeDefaultCursor: removeDefaultCursor,
+            // Performance optimizations
+            skewing: 0, // Disable skewing for better performance
+            skewingText: 0,
+            skewingIcon: 0,
+            skewingMedia: 0,
+            skewingDelta: 0,
+            skewingDeltaMax: 0,
           })
 
           console.log('Kursor.js initialized successfully with type:', type, 'color:', cursorColor)
