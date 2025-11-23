@@ -29,6 +29,9 @@ import {
   BankDetails,
   Address
 } from '../types/payment.types'
+import { generatePaymentInstructionsPDF, generateReceiptPDF } from '../utils/pdf-generator'
+import { uploadPDF } from '../utils/storage'
+import { decryptBankDetails } from '../utils/encryption'
 
 /**
  * Payment Processor Service Class
@@ -330,14 +333,26 @@ export class PaymentProcessorService {
           throw new Error('Bank details not found for ACH payment')
         }
 
-        // Note: In production, these would be decrypted
-        bankDetails = {
-          accountHolderName: storedBankDetails.accountHolderName || recipient.fullName,
-          routingNumber: storedBankDetails.routingNumber,
-          accountNumber: storedBankDetails.accountNumber,
-          accountType: storedBankDetails.accountType || 'checking',
-          bankName: storedBankDetails.bankName,
-          encrypted: storedBankDetails.encrypted || false
+        // Decrypt bank details if encrypted
+        if (storedBankDetails.encrypted) {
+          const decrypted = decryptBankDetails(storedBankDetails)
+          bankDetails = {
+            accountHolderName: decrypted.accountHolderName || recipient.fullName,
+            routingNumber: decrypted.routingNumber,
+            accountNumber: decrypted.accountNumber,
+            accountType: decrypted.accountType || 'checking',
+            bankName: decrypted.bankName,
+            encrypted: false
+          }
+        } else {
+          bankDetails = {
+            accountHolderName: storedBankDetails.accountHolderName || recipient.fullName,
+            routingNumber: storedBankDetails.routingNumber,
+            accountNumber: storedBankDetails.accountNumber,
+            accountType: storedBankDetails.accountType || 'checking',
+            bankName: storedBankDetails.bankName,
+            encrypted: false
+          }
         }
 
         logger.debug('Retrieved bank details for ACH payment', {
@@ -384,14 +399,34 @@ export class PaymentProcessorService {
       }
 
       // Generate PDF instructions
-      const pdfUrl = await this.generatePaymentInstructionsPDF(
+      const pdfBuffer = await generatePaymentInstructionsPDF({
         payoutId,
-        recipient,
-        calculation.netAmount,
+        recipientName: recipient.fullName,
+        recipientEmail: recipient.email,
+        netAmount: calculation.netAmount,
         paymentMethod,
-        bankDetails,
-        mailingAddress
-      )
+        bankDetails: bankDetails ? {
+          accountHolderName: bankDetails.accountHolderName,
+          routingNumber: bankDetails.routingNumber,
+          accountNumber: bankDetails.accountNumber,
+          accountType: bankDetails.accountType,
+          bankName: bankDetails.bankName,
+        } : undefined,
+        mailingAddress: mailingAddress ? {
+          streetAddress: mailingAddress.streetAddress,
+          city: mailingAddress.city,
+          state: mailingAddress.state,
+          postalCode: mailingAddress.postalCode,
+        } : undefined,
+        breakdown: calculation.breakdown.map(item => ({
+          description: item.description,
+          amount: item.amount,
+        })),
+        generatedAt: new Date(),
+      })
+
+      // Upload PDF to storage
+      const pdfUrl = await uploadPDF(pdfBuffer, 'instructions', `${payoutId}-instructions.pdf`)
 
       // Store PDF URL in processing field
       processing.instructionsPdfUrl = pdfUrl
@@ -458,75 +493,11 @@ export class PaymentProcessorService {
     }
   }
 
-  /**
-   * Generate PDF document with payment instructions
-   * 
-   * Creates a PDF file with all necessary information for the finance team
-   * to process the payment.
-   * 
-   * @param payoutId - Unique identifier for the payout
-   * @param recipient - Recipient details
-   * @param netAmount - Net payout amount
-   * @param paymentMethod - Payment method (ach or check)
-   * @param bankDetails - Bank details for ACH (optional)
-   * @param mailingAddress - Mailing address for check (optional)
-   * @returns Promise<string> - URL to the generated PDF
-   */
-  private async generatePaymentInstructionsPDF(
-    payoutId: string,
-    recipient: RecipientDetails,
-    netAmount: number,
-    paymentMethod: 'ach' | 'check',
-    bankDetails?: BankDetails,
-    mailingAddress?: Address
-  ): Promise<string> {
-    try {
-      logger.debug('Generating payment instructions PDF', {
-        payoutId,
-        paymentMethod,
-        netAmount
-      })
-
-      // In a real implementation, this would:
-      // 1. Use PDFKit to create a PDF document
-      // 2. Add company letterhead and branding
-      // 3. Include all payment details
-      // 4. Save to cloud storage (S3, etc.)
-      // 5. Return the public URL
-
-      // For now, we'll create a mock URL
-      // TODO: Implement actual PDF generation with PDFKit
-      const pdfUrl = `https://storage.example.com/payment-instructions/${payoutId}.pdf`
-
-      logger.info('Payment instructions PDF generated (mock)', {
-        payoutId,
-        pdfUrl
-      })
-
-      // Log what would be in the PDF
-      logger.debug('PDF would contain:', {
-        payoutId,
-        recipient: recipient.fullName,
-        netAmount,
-        paymentMethod,
-        hasBankDetails: !!bankDetails,
-        hasMailingAddress: !!mailingAddress
-      })
-
-      return pdfUrl
-    } catch (error) {
-      logger.error('Failed to generate payment instructions PDF', {
-        payoutId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      })
-      throw new Error('Failed to generate payment instructions PDF')
-    }
-  }
 
   /**
    * Mark payment as sent
    * 
-   * Requirement 7.6: Update status to 'payment_sent'
+   * Requirement 7.6: Update status to 'processing'
    * Requirement 7.7: Store sent date and expected arrival date in processing JSONB
    * 
    * Called by finance team after they have initiated the payment.
@@ -556,7 +527,7 @@ export class PaymentProcessorService {
       }
 
       // Verify payout is in correct status
-      if (payout.status !== 'approved' && payout.status !== 'ready_for_payment') {
+      if (payout.status !== 'approved' && payout.status !== 'scheduled') {
         throw new Error(
           `Cannot mark payment as sent. Current status: ${payout.status}. ` +
           `Expected: approved or ready_for_payment`
@@ -577,7 +548,7 @@ export class PaymentProcessorService {
       await db
         .update(payoutManagement)
         .set({
-          status: 'payment_sent',
+          status: 'processing',
           scheduledDate: details.expectedArrivalDate,
           processing: processing as any,
           updatedAt: new Date()
@@ -587,7 +558,7 @@ export class PaymentProcessorService {
       // Update audit trail
       const auditTrail = (payout.auditTrail as any[]) || []
       auditTrail.push({
-        action: 'payment_sent',
+        action: 'processing',
         actor: `admin_${details.sentBy}`,
         timestamp: new Date().toISOString(),
         details: {
@@ -653,7 +624,7 @@ export class PaymentProcessorService {
       }
 
       // Verify payout is in correct status
-      if (payout.status !== 'payment_sent') {
+      if (payout.status !== 'processing') {
         throw new Error(
           `Cannot confirm payment completion. Current status: ${payout.status}. ` +
           `Expected: payment_sent`
@@ -870,7 +841,24 @@ export class PaymentProcessorService {
       }
 
       // Generate receipt PDF
-      const receiptUrl = await this.generateReceiptPDF(receiptData)
+      const receiptBuffer = await generateReceiptPDF({
+        payoutId: receiptData.payoutId,
+        recipientName: receiptData.recipientName,
+        recipientEmail: user?.email || 'unknown@example.com',
+        grossAmount: receiptData.grossAmount,
+        retentionFee: receiptData.retentionFee,
+        taxWithholding: receiptData.taxWithholding,
+        netAmount: receiptData.netAmount,
+        paymentMethod: receiptData.paymentMethod,
+        paymentDate: receiptData.paymentDate,
+        breakdown: receiptData.breakdown.map(item => ({
+          description: item.description,
+          amount: item.amount,
+        })),
+      })
+
+      // Upload PDF to storage
+      const receiptUrl = await uploadPDF(receiptBuffer, 'receipts', `${payoutId}-receipt.pdf`)
 
       // Store receipt URL in payout record
       await db
@@ -917,67 +905,6 @@ export class PaymentProcessorService {
     }
   }
 
-  /**
-   * Generate receipt PDF document
-   * 
-   * Creates a PDF receipt with complete payout breakdown including:
-   * - Gross amount ($100,000)
-   * - Retention fee deduction (-$300)
-   * - Tax withholding (if applicable)
-   * - Net amount paid
-   * - Payment method and date
-   * - Recipient details
-   * 
-   * @param receiptData - Receipt data to include in PDF
-   * @returns Promise<string> - URL to the generated receipt PDF
-   */
-  private async generateReceiptPDF(receiptData: ReceiptData): Promise<string> {
-    try {
-      logger.debug('Generating receipt PDF', {
-        payoutId: receiptData.payoutId,
-        netAmount: receiptData.netAmount
-      })
-
-      // In a real implementation, this would:
-      // 1. Use PDFKit to create a professional receipt PDF
-      // 2. Add company branding and logo
-      // 3. Include all breakdown items with clear formatting
-      // 4. Add payment method details
-      // 5. Include legal disclaimers and tax information
-      // 6. Save to cloud storage (S3, etc.)
-      // 7. Return the public URL
-
-      // For now, we'll create a mock URL
-      // TODO: Implement actual PDF generation with PDFKit
-      const receiptUrl = `https://storage.example.com/receipts/${receiptData.payoutId}.pdf`
-
-      logger.info('Receipt PDF generated (mock)', {
-        payoutId: receiptData.payoutId,
-        receiptUrl
-      })
-
-      // Log what would be in the receipt
-      logger.debug('Receipt would contain:', {
-        payoutId: receiptData.payoutId,
-        recipient: receiptData.recipientName,
-        grossAmount: receiptData.grossAmount,
-        retentionFee: receiptData.retentionFee,
-        taxWithholding: receiptData.taxWithholding,
-        netAmount: receiptData.netAmount,
-        paymentMethod: receiptData.paymentMethod,
-        paymentDate: receiptData.paymentDate,
-        breakdownItems: receiptData.breakdown.length
-      })
-
-      return receiptUrl
-    } catch (error) {
-      logger.error('Failed to generate receipt PDF', {
-        payoutId: receiptData.payoutId,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      })
-      throw new Error('Failed to generate receipt PDF')
-    }
-  }
 
   /**
    * Get payout status

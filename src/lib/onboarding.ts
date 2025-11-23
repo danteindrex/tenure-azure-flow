@@ -16,12 +16,13 @@ import { userSubscriptions } from '../../drizzle/schema/financial'
 import { user } from '../../drizzle/schema/auth'
 import { eq, and } from 'drizzle-orm'
 
-export type OnboardingStep = 
+export type OnboardingStep =
   | 'email-verification'
-  | 'complete-profile' 
+  | 'complete-profile'
   | 'phone-verification'
   | 'payment'
   | 'dashboard'
+  | 'suspended'
 
 export interface UserOnboardingStatus {
   step: OnboardingStep
@@ -106,7 +107,14 @@ export class OnboardingService {
 
       // Determine current step based on actual database state
       // ONLY users with status 'Active' can access dashboard
-      if (!status.isEmailVerified && !isOAuthUser) {
+      // Users with status 'Suspended' see suspension screen in dashboard
+      if (betterAuthUser.status === 'Suspended') {
+        // Suspended users - redirect to suspension page
+        status.step = 'suspended'
+        status.canAccessDashboard = false
+        status.nextRoute = '/suspended'
+        status.nextStep = 7 // Special state for suspended
+      } else if (!status.isEmailVerified && !isOAuthUser) {
         status.step = 'email-verification'
         status.nextStep = 2
         status.nextRoute = '/signup?step=2'
@@ -129,7 +137,7 @@ export class OnboardingService {
         status.nextRoute = '/dashboard'
         status.nextStep = 6 // Completed
       } else {
-        // All steps completed but status is not Active (e.g., Pending)
+        // All steps completed but status is not Active (e.g., Pending, Inactive)
         // Keep them on payment step until admin approves
         status.step = 'payment'
         status.nextStep = 5

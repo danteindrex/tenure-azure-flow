@@ -7,18 +7,18 @@
 import type { ApprovalDecision } from './approval.types';
 import type { BankDetails } from './payment.types';
 
-export type PayoutStatus = 
-  | 'pending_approval'
-  | 'pending_bank_info'
-  | 'pending_tax_info'
-  | 'approved'
-  | 'ready_for_payment'
-  | 'payment_sent'
-  | 'completed'
-  | 'payment_failed'
-  | 'rejected'
-  | 'cancelled'
-  | 'requires_manual_review';
+/**
+ * Payout Status - MUST match database CHECK constraint
+ * Database constraint: ['pending_approval', 'approved', 'scheduled', 'processing', 'completed', 'failed', 'cancelled']
+ */
+export type PayoutStatus =
+  | 'pending_approval'  // Awaiting admin approvals
+  | 'approved'          // Fully approved, ready for payment processing
+  | 'scheduled'         // Scheduled for future processing
+  | 'processing'        // Payment has been initiated/sent
+  | 'completed'         // Payment received and confirmed
+  | 'failed'            // Payment failed or returned
+  | 'cancelled';        // Payout rejected or cancelled
 
 export interface EligibilitySnapshot {
   totalRevenue: number;

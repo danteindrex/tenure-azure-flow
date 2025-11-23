@@ -1,0 +1,260 @@
+import PDFDocument from 'pdfkit';
+import { logger } from './logger';
+
+export interface PaymentInstructionsPDFData {
+  payoutId: string;
+  recipientName: string;
+  recipientEmail: string;
+  netAmount: number;
+  paymentMethod: 'ach' | 'check';
+  bankDetails?: {
+    accountHolderName: string;
+    routingNumber: string;
+    accountNumber: string;
+    accountType: string;
+    bankName?: string;
+  };
+  mailingAddress?: {
+    streetAddress: string;
+    addressLine2?: string;
+    city: string;
+    state: string;
+    postalCode: string;
+  };
+  breakdown: Array<{
+    description: string;
+    amount: number;
+  }>;
+  generatedAt: Date;
+}
+
+export interface ReceiptPDFData {
+  payoutId: string;
+  recipientName: string;
+  grossAmount: number;
+  retentionFee: number;
+  taxWithholding: number;
+  netAmount: number;
+  paymentMethod: 'ach' | 'check';
+  paymentDate: Date;
+  breakdown: Array<{
+    description: string;
+    amount: number;
+  }>;
+}
+
+/**
+ * Generate payment instructions PDF
+ */
+export async function generatePaymentInstructionsPDF(
+  data: PaymentInstructionsPDFData
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'LETTER', margin: 50 });
+      const chunks: Buffer[] = [];
+
+      // Collect PDF data
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      // Header
+      doc
+        .fontSize(20)
+        .fillColor('#000000')
+        .text('PAYMENT INSTRUCTIONS', { align: 'center' })
+        .moveDown(0.5);
+
+      doc
+        .fontSize(10)
+        .fillColor('#666666')
+        .text(`Document ID: ${data.payoutId}`, { align: 'right' })
+        .text(`Generated: ${data.generatedAt.toLocaleDateString()}`, { align: 'right' })
+        .moveDown(2);
+
+      // Recipient Information
+      doc.fontSize(14).fillColor('#000000').text('RECIPIENT INFORMATION', { underline: true });
+      doc.moveDown(0.5);
+      doc.fontSize(10).fillColor('#333333');
+      doc.text(`Name: ${data.recipientName}`);
+      doc.text(`Email: ${data.recipientEmail}`);
+      doc.moveDown(1.5);
+
+      // Payment Amount Breakdown
+      doc.fontSize(14).fillColor('#000000').text('PAYMENT BREAKDOWN', { underline: true });
+      doc.moveDown(0.5);
+
+      data.breakdown.forEach((item) => {
+        doc.fontSize(10).fillColor('#333333');
+        const sign = item.amount >= 0 ? '+' : '';
+        const color = item.amount >= 0 ? '#008800' : '#cc0000';
+        doc.fillColor(color).text(
+          `${item.description}: ${sign}$${Math.abs(item.amount).toFixed(2)}`,
+          { indent: 20 }
+        );
+      });
+      doc.moveDown(1);
+
+      // Net Amount (highlight)
+      doc
+        .fontSize(18)
+        .fillColor('#008800')
+        .text(`NET AMOUNT TO PAY: $${data.netAmount.toFixed(2)}`, { align: 'center' })
+        .fillColor('#000000')
+        .moveDown(2);
+
+      // Payment Method Details
+      doc.fontSize(14).fillColor('#000000').text('PAYMENT METHOD', { underline: true });
+      doc.moveDown(0.5);
+      doc.fontSize(10).fillColor('#333333');
+
+      if (data.paymentMethod === 'ach' && data.bankDetails) {
+        doc.text('Method: ACH/Wire Transfer');
+        doc.moveDown(0.5);
+        doc.fontSize(12).fillColor('#000000').text('Banking Details:', { underline: true });
+        doc.fontSize(10).fillColor('#333333');
+        doc.text(`Account Holder: ${data.bankDetails.accountHolderName}`, { indent: 20 });
+        if (data.bankDetails.bankName) {
+          doc.text(`Bank Name: ${data.bankDetails.bankName}`, { indent: 20 });
+        }
+        doc.text(`Routing Number: ${data.bankDetails.routingNumber}`, { indent: 20 });
+        doc.text(`Account Number: ****${data.bankDetails.accountNumber.slice(-4)}`, { indent: 20 });
+        doc.text(`Account Type: ${data.bankDetails.accountType}`, { indent: 20 });
+
+        doc.moveDown(1);
+        doc.fontSize(9).fillColor('#cc0000');
+        doc.text('⚠️ CONFIDENTIAL: Full account details available in secure admin portal', { indent: 20 });
+      } else if (data.paymentMethod === 'check' && data.mailingAddress) {
+        doc.text('Method: Check');
+        doc.moveDown(0.5);
+        doc.fontSize(12).fillColor('#000000').text('Mailing Address:', { underline: true });
+        doc.fontSize(10).fillColor('#333333');
+        doc.text(data.mailingAddress.streetAddress, { indent: 20 });
+        if (data.mailingAddress.addressLine2) {
+          doc.text(data.mailingAddress.addressLine2, { indent: 20 });
+        }
+        doc.text(
+          `${data.mailingAddress.city}, ${data.mailingAddress.state} ${data.mailingAddress.postalCode}`,
+          { indent: 20 }
+        );
+      }
+
+      doc.moveDown(3);
+
+      // Footer
+      doc
+        .fontSize(8)
+        .fillColor('#999999')
+        .text(
+          'This document contains confidential financial information. Handle with care.',
+          { align: 'center' }
+        )
+        .text('Generated by Home Solutions Payout Service', { align: 'center' });
+
+      // Finalize PDF
+      doc.end();
+
+      logger.info('Payment instructions PDF generated successfully', {
+        payoutId: data.payoutId,
+        paymentMethod: data.paymentMethod,
+      });
+    } catch (error) {
+      logger.error('Failed to generate payment instructions PDF', {
+        payoutId: data.payoutId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      reject(error);
+    }
+  });
+}
+
+/**
+ * Generate receipt PDF
+ */
+export async function generateReceiptPDF(
+  data: ReceiptPDFData
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'LETTER', margin: 50 });
+      const chunks: Buffer[] = [];
+
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      // Header
+      doc
+        .fontSize(24)
+        .fillColor('#000000')
+        .text('PAYMENT RECEIPT', { align: 'center' })
+        .moveDown(0.5);
+
+      doc
+        .fontSize(10)
+        .fillColor('#666666')
+        .text(`Receipt ID: ${data.payoutId}`, { align: 'right' })
+        .text(`Payment Date: ${data.paymentDate.toLocaleDateString()}`, { align: 'right' })
+        .moveDown(2);
+
+      // Recipient
+      doc.fontSize(14).fillColor('#000000').text('PAID TO', { underline: true });
+      doc.moveDown(0.5);
+      doc.fontSize(12).fillColor('#333333').text(data.recipientName);
+      doc.moveDown(2);
+
+      // Payment Details
+      doc.fontSize(14).fillColor('#000000').text('PAYMENT DETAILS', { underline: true });
+      doc.moveDown(0.5);
+
+      data.breakdown.forEach((item) => {
+        doc.fontSize(11).fillColor('#333333');
+        const sign = item.amount >= 0 ? '+' : '';
+        doc.text(
+          `${item.description.padEnd(40)} ${sign}$${Math.abs(item.amount).toFixed(2)}`,
+          { indent: 20 }
+        );
+      });
+
+      doc.moveDown(1);
+      doc.moveTo(70, doc.y).lineTo(540, doc.y).stroke();
+      doc.moveDown(0.5);
+
+      // Net Amount
+      doc
+        .fontSize(16)
+        .fillColor('#008800')
+        .text(`TOTAL PAID: $${data.netAmount.toFixed(2)}`, { align: 'right' });
+
+      doc.moveDown(2);
+
+      // Payment Method
+      doc.fontSize(10).fillColor('#333333');
+      doc.text(`Payment Method: ${data.paymentMethod === 'ach' ? 'ACH/Wire Transfer' : 'Check'}`);
+
+      doc.moveDown(4);
+
+      // Footer
+      doc
+        .fontSize(8)
+        .fillColor('#999999')
+        .text('This is an official payment receipt from Home Solutions.', { align: 'center' })
+        .text('Please retain this document for your records.', { align: 'center' })
+        .moveDown(1)
+        .text('Home Solutions Payout Service', { align: 'center' });
+
+      doc.end();
+
+      logger.info('Receipt PDF generated successfully', {
+        payoutId: data.payoutId,
+      });
+    } catch (error) {
+      logger.error('Failed to generate receipt PDF', {
+        payoutId: data.payoutId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      reject(error);
+    }
+  });
+}

@@ -32,6 +32,7 @@ import {
   EligibilityCheckResult,
   EligibleMemberSummary
 } from '../types/eligibility.types'
+import { subscriptionAPIService } from './subscription-api.service'
 
 export class EligibilityChecker {
   private config: EligibilityCheckConfig
@@ -59,16 +60,30 @@ export class EligibilityChecker {
 
   /**
    * Get total revenue from successful payments
-   * 
-   * Requirement 1.1: Query user_payments table for total revenue >= $100,000
-   * 
+   *
+   * Requirement 1.1: Query subscription service for total revenue >= $100,000
+   * Falls back to local user_payments table if subscription service is unavailable
+   *
    * @returns Promise<number> - Total revenue from succeeded payments
    */
   async getTotalRevenue(): Promise<number> {
     try {
-      logger.debug('Querying total revenue from user_payments')
+      logger.debug('Fetching total revenue')
 
-      // Query user_payments table for sum of succeeded payments
+      // Try to get revenue from subscription service first
+      const revenueFromService = await subscriptionAPIService.getTotalRevenue()
+
+      if (revenueFromService > 0) {
+        logger.info('Total revenue from subscription service', {
+          totalRevenue: revenueFromService,
+          meetsThreshold: revenueFromService >= this.config.revenueThreshold,
+          threshold: this.config.revenueThreshold
+        })
+        return revenueFromService
+      }
+
+      // Fallback: Query user_payments table for sum of succeeded payments
+      logger.debug('Falling back to local user_payments table')
       const result = await db
         .select({
           totalRevenue: sql<string>`COALESCE(SUM(${userPayments.amount}), 0)`
@@ -78,7 +93,7 @@ export class EligibilityChecker {
 
       const totalRevenue = Number(result[0]?.totalRevenue || 0)
 
-      logger.info('Total revenue calculated', {
+      logger.info('Total revenue calculated from local database', {
         totalRevenue,
         meetsThreshold: totalRevenue >= this.config.revenueThreshold,
         threshold: this.config.revenueThreshold

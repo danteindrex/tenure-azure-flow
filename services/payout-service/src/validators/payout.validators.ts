@@ -102,17 +102,15 @@ export const paymentStatusUpdateSchema = z.object({
   
   status: z.enum([
     'pending_approval',
-    'pending_bank_info',
-    'pending_tax_info',
     'approved',
-    'ready_for_payment',
-    'payment_sent',
+    'scheduled',
+    'processing',
     'completed',
-    'payment_failed',
-    'rejected',
-    'cancelled',
-    'requires_manual_review'
-  ]),
+    'failed',
+    'cancelled'
+  ], {
+    errorMap: () => ({ message: 'Invalid status. Must match database constraint.' })
+  }),
   
   details: z.record(z.any()).optional()
 });

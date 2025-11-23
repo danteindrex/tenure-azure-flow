@@ -97,7 +97,7 @@ const Queue = () => {
   const { activeMembers, eligibleMembers, totalRevenue, potentialWinners } = statistics;
   const nextPayoutDate = "March 15, 2025"; // This could be calculated based on business rules
   const winnersCount = potentialWinners;
-  const potentialPayoutPerWinner = totalRevenue > 0 ? totalRevenue / Math.max(winnersCount, 1) : 0;
+  // const potentialPayoutPerWinner = totalRevenue > 0 ? totalRevenue / Math.max(winnersCount, 1) : 0;
 
   // No filtering - show all queue data as per requirement
 
@@ -214,12 +214,12 @@ const Queue = () => {
             {getRankBadge(currentUserMember.position)}
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="text-center">
               <p className="text-2xl font-bold text-accent">{currentUserMember.position}</p>
               <p className="text-sm text-muted-foreground">Queue Position</p>
             </div>
-            <div className="text-center">
+            {/* <div className="text-center">
               <p className="text-2xl font-bold">{currentUserMember.continuousTenure}</p>
               <p className="text-sm text-muted-foreground">Months Subscribed</p>
             </div>
@@ -230,7 +230,7 @@ const Queue = () => {
             <div className="text-center">
               <p className="text-2xl font-bold text-green-500">{formatCurrency(potentialPayoutPerWinner)}</p>
               <p className="text-sm text-muted-foreground">Potential Payout</p>
-            </div>
+            </div> */}
           </div>
         </Card>
       )}
