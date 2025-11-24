@@ -1,20 +1,57 @@
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Crown, Check } from "lucide-react";
 import { toast } from "sonner";
+import { forgetPassword } from "@/lib/auth-client";
 
 const ResetPassword = () => {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSent(true);
-    toast.success("Password reset link sent to your email!");
+
+    if (!email.trim()) {
+      toast.error("Please enter your email address");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Send OTP via email using Better Auth
+      const { error } = await forgetPassword.emailOtp({
+        email: email.trim(),
+      });
+
+      if (error) {
+        console.error("Password reset error:", error);
+        toast.error(error.message || "Failed to send reset code");
+        return;
+      }
+
+      // Success - show confirmation and prepare to navigate
+      setSent(true);
+      toast.success("Password reset code sent to your email!");
+
+      // Auto-redirect to enter new password page after 2 seconds
+      setTimeout(() => {
+        router.push(`/reset-password/confirm?email=${encodeURIComponent(email.trim())}`);
+      }, 2000);
+
+    } catch (err: any) {
+      console.error("Unexpected error:", err);
+      toast.error(err?.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -56,8 +93,8 @@ const ResetPassword = () => {
                 />
               </div>
 
-              <Button type="submit" className="w-full bg-primary hover:glow-blue-lg" size="lg">
-                Send Reset Link
+              <Button type="submit" className="w-full bg-primary hover:glow-blue-lg" size="lg" disabled={loading}>
+                {loading ? "Sending..." : "Send Reset Code"}
               </Button>
             </form>
 

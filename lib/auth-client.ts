@@ -53,5 +53,11 @@ export const {
   updateUser
 } = authClient
 
+// Export Email OTP methods for password reset
+export const {
+  forgetPassword,
+  emailOtp
+} = authClient
+
 // Export the full client for advanced usage
 export default authClient
