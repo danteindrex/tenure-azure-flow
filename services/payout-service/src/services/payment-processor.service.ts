@@ -14,8 +14,8 @@
  */
 
 import { db } from '../config/database'
-import { payoutManagement, userAddresses } from '../../drizzle/schema'
-import { eq, and } from 'drizzle-orm'
+import { payoutManagement, userAddresses, userMemberships } from '../../drizzle/schema'
+import { eq, and, sql } from 'drizzle-orm'
 import { logger } from '../utils/logger'
 import {
   PayoutCalculation,
@@ -651,6 +651,18 @@ export class PaymentProcessorService {
         })
         .where(eq(payoutManagement.payoutId, payoutId))
 
+      // SYNC: Update member_status to 'Paid' when payout completes
+      // This marks the user as having received their prize
+      await db
+        .update(userMemberships)
+        .set({
+          memberStatus: 'Paid',
+          updatedAt: new Date()
+        })
+        .where(eq(userMemberships.userId, payout.userId))
+
+      logger.info(`Member status set to Paid for user ${payout.userId}`)
+
       // Update audit trail
       const auditTrail = (payout.auditTrail as any[]) || []
       auditTrail.push({
@@ -661,7 +673,8 @@ export class PaymentProcessorService {
           completedDate: details.completedDate.toISOString(),
           confirmationNumber: details.confirmationNumber,
           receiptUrl: details.receiptUrl,
-          notes: details.notes
+          notes: details.notes,
+          memberStatusUpdated: 'Paid'
         }
       })
 

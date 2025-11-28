@@ -297,14 +297,24 @@ export const membershipQueue = pgTable("membership_queue", {
 export const userMemberships = pgTable("user_memberships", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id"),
+	subscriptionId: uuid("subscription_id").unique(), // One membership per subscription
 	joinDate: date("join_date").default(sql`CURRENT_DATE`).notNull(),
 	tenure: numeric().default('0'),
 	verificationStatus: varchar("verification_status", { length: 20 }).default('PENDING'),
-	assignedAdminIdId: integer("assigned_admin_id_id"),
+	memberStatus: varchar("member_status", { length: 20 }).default('inactive'), // Member eligibility status: inactive, active, suspended, cancelled, won, paid
 	notes: text(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
+	index("idx_user_memberships_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	index("idx_user_memberships_subscription_id").using("btree", table.subscriptionId.asc().nullsLast().op("uuid_ops")),
+	index("idx_user_memberships_join_date").using("btree", table.joinDate.asc().nullsLast().op("date_ops")),
+	index("idx_user_memberships_member_status").using("btree", table.memberStatus.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.subscriptionId],
+			foreignColumns: [userSubscriptions.id],
+			name: "user_memberships_subscription_id_fkey"
+		}).onDelete("cascade"),
 	pgPolicy("Users can view their own memberships", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id IN ( SELECT users.id
    FROM users
   WHERE (users.auth_user_id = (auth.uid())::text)))` }),
@@ -1079,3 +1089,222 @@ export const organizationInvitation = pgTable("organization_invitation", {
 		}).onDelete("cascade"),
 	unique("organization_invitation_token_key").on(table.token),
 ]);
+
+// =====================================================
+// STATUS LOOKUP SYSTEM TABLES
+// =====================================================
+
+export const statusCategories = pgTable("status_categories", {
+	id: serial().primaryKey().notNull(),
+	code: varchar({ length: 50 }).unique().notNull(),
+	name: varchar({ length: 100 }).notNull(),
+	description: text(),
+	tableName: varchar("table_name", { length: 100 }),
+	columnName: varchar("column_name", { length: 100 }),
+	isSystem: boolean("is_system").default(false),
+	isActive: boolean("is_active").default(true),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	uniqueIndex("idx_status_categories_code").using("btree", table.code.asc().nullsLast().op("text_ops")),
+]);
+
+export const statusValues = pgTable("status_values", {
+	id: serial().primaryKey().notNull(),
+	categoryId: integer("category_id").notNull(),
+	code: varchar({ length: 50 }).notNull(),
+	displayName: varchar("display_name", { length: 100 }).notNull(),
+	description: text(),
+	color: varchar({ length: 20 }).default('#6B7280'),
+	icon: varchar({ length: 50 }),
+	sortOrder: integer("sort_order").default(0),
+	isDefault: boolean("is_default").default(false),
+	isTerminal: boolean("is_terminal").default(false),
+	isActive: boolean("is_active").default(true),
+	metadata: jsonb().default({}),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	uniqueIndex("idx_status_values_category_code").using("btree", table.categoryId.asc().nullsLast().op("int4_ops"), table.code.asc().nullsLast().op("text_ops")),
+	index("idx_status_values_category").using("btree", table.categoryId.asc().nullsLast().op("int4_ops")),
+	index("idx_status_values_code").using("btree", table.code.asc().nullsLast().op("text_ops")),
+	index("idx_status_values_active").using("btree", table.isActive.asc().nullsLast()),
+	foreignKey({
+			columns: [table.categoryId],
+			foreignColumns: [statusCategories.id],
+			name: "status_values_category_id_fkey"
+		}).onDelete("cascade"),
+]);
+
+export const statusTransitions = pgTable("status_transitions", {
+	id: serial().primaryKey().notNull(),
+	categoryId: integer("category_id").notNull(),
+	fromStatusId: integer("from_status_id"),
+	toStatusId: integer("to_status_id").notNull(),
+	requiresAdmin: boolean("requires_admin").default(false),
+	requiresReason: boolean("requires_reason").default(false),
+	autoTrigger: varchar("auto_trigger", { length: 100 }),
+	isActive: boolean("is_active").default(true),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	index("idx_status_transitions_category").using("btree", table.categoryId.asc().nullsLast().op("int4_ops")),
+	index("idx_status_transitions_from").using("btree", table.fromStatusId.asc().nullsLast().op("int4_ops")),
+	index("idx_status_transitions_to").using("btree", table.toStatusId.asc().nullsLast().op("int4_ops")),
+	uniqueIndex("idx_status_transitions_unique").using("btree",
+		table.categoryId.asc().nullsLast().op("int4_ops"),
+		table.fromStatusId.asc().nullsLast().op("int4_ops"),
+		table.toStatusId.asc().nullsLast().op("int4_ops")
+	),
+	foreignKey({
+			columns: [table.categoryId],
+			foreignColumns: [statusCategories.id],
+			name: "status_transitions_category_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.fromStatusId],
+			foreignColumns: [statusValues.id],
+			name: "status_transitions_from_status_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.toStatusId],
+			foreignColumns: [statusValues.id],
+			name: "status_transitions_to_status_id_fkey"
+		}).onDelete("cascade"),
+]);
+
+export const accessControlRules = pgTable("access_control_rules", {
+	id: serial().primaryKey().notNull(),
+	name: varchar({ length: 100 }).notNull(),
+	description: text(),
+	userStatusIds: integer("user_status_ids").array(),
+	memberStatusIds: integer("member_status_ids").array(),
+	subscriptionStatusIds: integer("subscription_status_ids").array(),
+	kycStatusIds: integer("kyc_status_ids").array(),
+	requiresEmailVerified: boolean("requires_email_verified").default(false),
+	requiresPhoneVerified: boolean("requires_phone_verified").default(false),
+	requiresProfileComplete: boolean("requires_profile_complete").default(false),
+	requiresActiveSubscription: boolean("requires_active_subscription").default(false),
+	conditionLogic: varchar("condition_logic", { length: 10 }).default('all'),
+	priority: integer().default(0),
+	isActive: boolean("is_active").default(true),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	index("idx_access_rules_active").using("btree", table.isActive.asc().nullsLast(), table.priority.asc().nullsLast().op("int4_ops")),
+]);
+
+export const protectedRoutes = pgTable("protected_routes", {
+	id: serial().primaryKey().notNull(),
+	routePattern: varchar("route_pattern", { length: 255 }).notNull().unique(),
+	routeName: varchar("route_name", { length: 100 }),
+	accessRuleId: integer("access_rule_id"),
+	redirectRoute: varchar("redirect_route", { length: 255 }).default('/login'),
+	showErrorMessage: boolean("show_error_message").default(false),
+	errorMessage: text("error_message"),
+	requiresAuth: boolean("requires_auth").default(true),
+	isPublic: boolean("is_public").default(false),
+	stepOrder: integer("step_order"),
+	stepName: varchar("step_name", { length: 50 }),
+	isOnboardingStep: boolean("is_onboarding_step").default(false),
+	checkEmailVerified: boolean("check_email_verified"),
+	checkPhoneVerified: boolean("check_phone_verified"),
+	checkProfileComplete: boolean("check_profile_complete"),
+	checkSubscriptionActive: boolean("check_subscription_active"),
+	checkMemberStatus: varchar("check_member_status", { length: 50 }),
+	priority: integer().default(0),
+	isActive: boolean("is_active").default(true),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	index("idx_protected_routes_pattern").using("btree", table.routePattern.asc().nullsLast().op("text_ops")),
+	index("idx_protected_routes_active").using("btree", table.isActive.asc().nullsLast(), table.priority.asc().nullsLast().op("int4_ops")),
+	index("idx_protected_routes_onboarding").using("btree", table.isOnboardingStep.asc().nullsLast(), table.stepOrder.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.accessRuleId],
+			foreignColumns: [accessControlRules.id],
+			name: "protected_routes_access_rule_id_fkey"
+		}).onDelete("set null"),
+]);
+
+export const featureAccess = pgTable("feature_access", {
+	id: serial().primaryKey().notNull(),
+	featureCode: varchar("feature_code", { length: 100 }).unique().notNull(),
+	featureName: varchar("feature_name", { length: 100 }).notNull(),
+	description: text(),
+	accessRuleId: integer("access_rule_id"),
+	isActive: boolean("is_active").default(true),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	uniqueIndex("idx_feature_access_code").using("btree", table.featureCode.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.accessRuleId],
+			foreignColumns: [accessControlRules.id],
+			name: "feature_access_access_rule_id_fkey"
+		}).onDelete("set null"),
+]);
+
+// =====================================================
+// STATUS CATEGORY CODES (for type safety)
+// =====================================================
+
+export const STATUS_CATEGORIES = {
+	USER_FUNNEL: 'user_funnel',
+	MEMBER_ELIGIBILITY: 'member_eligibility',
+	KYC_STATUS: 'kyc_status',
+	VERIFICATION_STATUS: 'verification_status',
+	SUBSCRIPTION_STATUS: 'subscription_status',
+	PAYMENT_STATUS: 'payment_status',
+	PAYOUT_STATUS: 'payout_status',
+	ADMIN_STATUS: 'admin_status',
+	ADMIN_ROLE: 'admin_role',
+} as const;
+
+export const USER_FUNNEL_STATUS = {
+	PENDING: 'Pending',
+	ONBOARDED: 'Onboarded',
+} as const;
+
+export const MEMBER_ELIGIBILITY_STATUS = {
+	INACTIVE: 'Inactive',
+	ACTIVE: 'Active',
+	SUSPENDED: 'Suspended',
+	CANCELLED: 'Cancelled',
+	WON: 'Won',
+	PAID: 'Paid',
+} as const;
+
+export const KYC_STATUS = {
+	PENDING: 'pending',
+	IN_REVIEW: 'in_review',
+	VERIFIED: 'verified',
+	REJECTED: 'rejected',
+	EXPIRED: 'expired',
+} as const;
+
+export const SUBSCRIPTION_STATUS = {
+	ACTIVE: 'active',
+	TRIALING: 'trialing',
+	PAST_DUE: 'past_due',
+	CANCELED: 'canceled',
+	INCOMPLETE: 'incomplete',
+	UNPAID: 'unpaid',
+} as const;
+
+export const PAYMENT_STATUS = {
+	PENDING: 'pending',
+	SUCCEEDED: 'succeeded',
+	FAILED: 'failed',
+	REFUNDED: 'refunded',
+	CANCELED: 'canceled',
+} as const;
+
+export const PAYOUT_STATUS = {
+	PENDING_APPROVAL: 'pending_approval',
+	APPROVED: 'approved',
+	SCHEDULED: 'scheduled',
+	PROCESSING: 'processing',
+	COMPLETED: 'completed',
+	FAILED: 'failed',
+	CANCELLED: 'cancelled',
+} as const;

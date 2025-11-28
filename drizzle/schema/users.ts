@@ -12,7 +12,7 @@
  * - user_memberships: Membership data
  */
 
-import { pgTable, uuid, text, varchar, boolean, timestamp, date, numeric, integer, index, unique } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, varchar, boolean, timestamp, date, numeric, index, unique } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { user } from './auth'
 import { userSubscriptions } from './financial'
@@ -94,14 +94,15 @@ export const userMemberships = pgTable('user_memberships', {
   joinDate: date('join_date').notNull().defaultNow(),
   tenure: numeric('tenure').default('0'),
   verificationStatus: varchar('verification_status', { length: 20 }).default('PENDING'),
-  assignedAdminIdId: integer('assigned_admin_id_id'), // References admin(id)
+  memberStatus: varchar('member_status', { length: 20 }).default('inactive'), // Member eligibility status: inactive, active, suspended, cancelled, won, paid
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
   userIdIdx: index('idx_user_memberships_user_id').on(table.userId),
   subscriptionIdIdx: index('idx_user_memberships_subscription_id').on(table.subscriptionId),
-  joinDateIdx: index('idx_user_memberships_join_date').on(table.joinDate)
+  joinDateIdx: index('idx_user_memberships_join_date').on(table.joinDate),
+  memberStatusIdx: index('idx_user_memberships_member_status').on(table.memberStatus)
 }))
 
 // ============================================================================

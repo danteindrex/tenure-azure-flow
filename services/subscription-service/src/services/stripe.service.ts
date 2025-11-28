@@ -341,14 +341,17 @@ export class StripeService {
 
       // Create userMemberships record linked to this subscription
       // Each subscription gets its own membership (queue entry)
-      // Using database defaults for join_date, tenure, verification_status, created_at, updated_at
+      // Set member_status to 'Active' since payment succeeded
       const membershipQuery = `
-        INSERT INTO user_memberships (user_id, subscription_id)
-        VALUES ($1, $2)
+        INSERT INTO user_memberships (user_id, subscription_id, member_status)
+        VALUES ($1, $2, 'Active')
         ON CONFLICT (subscription_id) DO UPDATE SET
+          member_status = 'Active',
           updated_at = NOW()
       `;
       await pool.query(membershipQuery, [userId, subscriptionResult.rows[0].id]);
+
+      logger.info(`Member status set to Active for user ${userId}`);
 
       // Get checkout payment details (not subscription invoice - that hasn't been created yet)
       const initialPaymentAmount = config.pricing.initialAmount; // $325
@@ -674,6 +677,20 @@ export class StripeService {
         lifetimeTotal,
       });
 
+      // SYNC: Reactivate member_status to 'Active' on successful payment
+      // This handles users who were Suspended and made a successful payment to cure
+      // Only reactivate if currently Suspended (don't override Won/Paid states)
+      await pool.query(
+        `UPDATE user_memberships
+         SET member_status = 'Active',
+             updated_at = NOW()
+         WHERE subscription_id = $1
+         AND member_status = 'Suspended'`,
+        [dbSubscription.id]
+      );
+
+      logger.info(`Member status reactivated to Active for subscription ${dbSubscription.id} (if was Suspended)`);
+
       // Refresh the queue to reflect updated payment stats
       try {
         await pool.query('SELECT refresh_active_member_queue()');
@@ -820,6 +837,25 @@ export class StripeService {
           [dbSubscription.id]
         );
 
+        // SYNC: Update member_status to 'Suspended' on payment failure
+        // This removes user from queue eligibility while in grace period
+        await pool.query(
+          `UPDATE user_memberships
+           SET member_status = 'Suspended',
+               updated_at = NOW()
+           WHERE subscription_id = $1`,
+          [dbSubscription.id]
+        );
+
+        logger.info(`Member status set to Suspended for subscription ${dbSubscription.id}`);
+
+        // Refresh the queue to reflect the status change
+        try {
+          await pool.query('SELECT refresh_active_member_queue()');
+        } catch (refreshError) {
+          logger.warn('Failed to refresh queue view after suspension:', refreshError);
+        }
+
         logger.info(`Subscription ${subscriptionId} paused due to payment failure. User must update payment method.`);
       } catch (cancelError) {
         logger.error('Error pausing subscription after payment failure:', cancelError);
@@ -891,9 +927,24 @@ export class StripeService {
       // Update subscription status
       await SubscriptionModel.cancelSubscription(dbSubscription.id);
 
-      // Note: No need to manually remove from queue - the active_member_queue_view
-      // automatically excludes users with canceled subscriptions
-      logger.info(`User ${dbSubscription.user_id} subscription canceled - will be automatically excluded from queue view`);
+      // SYNC: Update member_status to 'Cancelled' when subscription is deleted
+      // This permanently removes user from queue eligibility
+      await pool.query(
+        `UPDATE user_memberships
+         SET member_status = 'Cancelled',
+             updated_at = NOW()
+         WHERE subscription_id = $1`,
+        [dbSubscription.id]
+      );
+
+      logger.info(`Member status set to Cancelled for subscription ${dbSubscription.id}`);
+
+      // Refresh the queue to reflect the status change
+      try {
+        await pool.query('SELECT refresh_active_member_queue()');
+      } catch (refreshError) {
+        logger.warn('Failed to refresh queue view after cancellation:', refreshError);
+      }
 
       logger.info(`Subscription canceled for member ${dbSubscription.user_id}`);
     } catch (error) {

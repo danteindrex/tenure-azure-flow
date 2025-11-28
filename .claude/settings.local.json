@@ -14,7 +14,8 @@
       "Bash(npm run build:*)",
       "Bash(node:*)",
       "WebSearch",
-      "WebFetch(domain:www.better-auth.com)"
+      "WebFetch(domain:www.better-auth.com)",
+      "Bash(psql:*)"
     ],
     "deny": [],
     "ask": []

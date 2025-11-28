@@ -50,6 +50,8 @@
     "services/frontend/**/*",
     "services/subscription-service/**/*",
     "services/Tenure-queue/**/*",
+    "services/kyc-service/**/*",
+    "services/payout-service/**/*",
     "tests/**/*",
     "**/*.test.ts",
     "**/*.test.tsx",

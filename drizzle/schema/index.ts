@@ -14,6 +14,7 @@
  * - audit.ts: Audit logs (system_audit_logs, user_audit_logs)
  * - organizations.ts: Organization management (organization, organization_member, organization_invitation)
  * - admin.ts: Admin users and Payload CMS tables (admin, admin_sessions, admin_alerts, payload_*)
+ * - content.ts: Content tables (newsfeedposts)
  */
 
 // ============================================================================
@@ -109,3 +110,52 @@ export {
   payloadLockedDocuments,
   payloadLockedDocumentsRels
 } from './admin'
+
+// ============================================================================
+// CONTENT TABLES
+// ============================================================================
+export {
+  newsfeedPosts,
+  type NewsfeedPost,
+  type NewsfeedPostInsert
+} from './content'
+
+// ============================================================================
+// STATUS LOOKUP SYSTEM TABLES
+// ============================================================================
+export {
+  statusCategories,
+  statusValues,
+  statusTransitions,
+  accessControlRules,
+  protectedRoutes,
+  featureAccess,
+  // Relations
+  statusCategoriesRelations,
+  statusValuesRelations,
+  statusTransitionsRelations,
+  accessControlRulesRelations,
+  protectedRoutesRelations,
+  featureAccessRelations,
+  // Types
+  type StatusCategory,
+  type NewStatusCategory,
+  type StatusValue,
+  type NewStatusValue,
+  type StatusTransition,
+  type NewStatusTransition,
+  type AccessControlRule,
+  type NewAccessControlRule,
+  type ProtectedRoute,
+  type NewProtectedRoute,
+  type FeatureAccess,
+  type NewFeatureAccess,
+  // Constants
+  STATUS_CATEGORIES,
+  USER_FUNNEL_STATUS,
+  MEMBER_ELIGIBILITY_STATUS,
+  KYC_STATUS,
+  SUBSCRIPTION_STATUS,
+  PAYMENT_STATUS,
+  PAYOUT_STATUS,
+} from './status-system'

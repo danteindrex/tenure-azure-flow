@@ -297,14 +297,24 @@ export const membershipQueue = pgTable("membership_queue", {
 export const userMemberships = pgTable("user_memberships", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id"),
+	subscriptionId: uuid("subscription_id").unique(), // One membership per subscription
 	joinDate: date("join_date").default(sql`CURRENT_DATE`).notNull(),
 	tenure: numeric().default('0'),
 	verificationStatus: varchar("verification_status", { length: 20 }).default('PENDING'),
-	assignedAdminIdId: integer("assigned_admin_id_id"),
+	memberStatus: varchar("member_status", { length: 20 }).default('inactive'), // Member eligibility status: inactive, active, suspended, cancelled, won, paid
 	notes: text(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
+	index("idx_user_memberships_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	index("idx_user_memberships_subscription_id").using("btree", table.subscriptionId.asc().nullsLast().op("uuid_ops")),
+	index("idx_user_memberships_join_date").using("btree", table.joinDate.asc().nullsLast().op("date_ops")),
+	index("idx_user_memberships_member_status").using("btree", table.memberStatus.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.subscriptionId],
+			foreignColumns: [userSubscriptions.id],
+			name: "user_memberships_subscription_id_fkey"
+		}).onDelete("cascade"),
 	pgPolicy("Users can view their own memberships", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id IN ( SELECT users.id
    FROM users
   WHERE (users.auth_user_id = (auth.uid())::text)))` }),

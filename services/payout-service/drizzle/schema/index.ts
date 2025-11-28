@@ -109,3 +109,28 @@ export {
   payloadLockedDocuments,
   payloadLockedDocumentsRels
 } from './admin'
+
+// ============================================================================
+// STATUS LOOKUP SYSTEM TABLES
+// ============================================================================
+export {
+  statusCategories,
+  statusValues,
+  statusTransitions,
+  accessControlRules,
+  protectedRoutes,
+  featureAccess,
+  statusCategoriesRelations,
+  statusValuesRelations,
+  statusTransitionsRelations,
+  accessControlRulesRelations,
+  protectedRoutesRelations,
+  featureAccessRelations,
+  STATUS_CATEGORIES,
+  USER_FUNNEL_STATUS,
+  MEMBER_ELIGIBILITY_STATUS,
+  KYC_STATUS,
+  SUBSCRIPTION_STATUS,
+  PAYMENT_STATUS,
+  PAYOUT_STATUS,
+} from './status-system'

@@ -195,7 +195,7 @@ const SignUp = () => {
           if (data.success && data.status) {
             if (data.status.canAccessDashboard) {
               // Payment processed! Webhook completed successfully
-              console.log('✅ Payment confirmed by webhook! Redirecting to dashboard...');
+              console.log('Payment confirmed ! Redirecting to dashboard...');
 
               // Clean up polling
               if (pollingIntervalRef.current) {

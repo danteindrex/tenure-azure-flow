@@ -87,16 +87,19 @@ export const userAddresses = pgTable('user_addresses', {
 export const userMemberships = pgTable('user_memberships', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').unique().references(() => user.id, { onDelete: 'cascade' }),
+  subscriptionId: uuid('subscription_id').unique(), // One membership per subscription
   joinDate: date('join_date').notNull().defaultNow(),
   tenure: numeric('tenure').default('0'),
   verificationStatus: varchar('verification_status', { length: 20 }).default('PENDING'),
-  assignedAdminIdId: integer('assigned_admin_id_id'), // References admin(id)
+  memberStatus: varchar('member_status', { length: 20 }).default('inactive'), // Member eligibility status: inactive, active, suspended, cancelled, won, paid
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
   userIdIdx: index('idx_user_memberships_user_id').on(table.userId),
-  joinDateIdx: index('idx_user_memberships_join_date').on(table.joinDate)
+  subscriptionIdIdx: index('idx_user_memberships_subscription_id').on(table.subscriptionId),
+  joinDateIdx: index('idx_user_memberships_join_date').on(table.joinDate),
+  memberStatusIdx: index('idx_user_memberships_member_status').on(table.memberStatus)
 }))
 
 // ============================================================================

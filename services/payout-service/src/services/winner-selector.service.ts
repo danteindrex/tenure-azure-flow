@@ -381,6 +381,17 @@ export class WinnerSelector {
               })
               .returning({ id: payoutManagement.id, payoutId: payoutManagement.payoutId })
 
+            // SYNC: Update member_status to 'Won' when payout is created
+            // This locks the user's queue entry and marks them as winner
+            await tx.execute(sql`
+              UPDATE user_memberships
+              SET member_status = 'Won',
+                  updated_at = NOW()
+              WHERE user_id = ${winner.userId}::uuid
+            `)
+
+            logger.info(`Member status set to Won for user ${winner.userId}`)
+
             payoutIds.push(payout.payoutId)
 
             logger.info('Payout record created', {
