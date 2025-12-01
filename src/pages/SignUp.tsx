@@ -971,8 +971,14 @@ const SignUp = () => {
       return;
     }
 
-    if (!formData.streetAddress || !formData.city || !formData.state || !formData.zipCode) {
+    if (!formData.streetAddress || !formData.city || !formData.zipCode || !formData.country) {
       toast.error("Please complete all required address fields");
+      return;
+    }
+
+    // State is only required if states are available for the selected country
+    if (stateOptions.length > 0 && !formData.state) {
+      toast.error("Please select a state/region");
       return;
     }
 
@@ -1852,53 +1858,63 @@ const SignUp = () => {
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="city" className="text-foreground">
-                      City <ValidationAsterisk isValid={fieldValidation.city.isValid} touched={fieldValidation.city.touched} />
-                    </Label>
-                    <Input
-                      id="city"
-                      placeholder="New York"
-                      value={formData.city}
-                      onChange={(e) => handleInputChange("city", e.target.value)}
-                      className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
-                      required
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="city" className="text-foreground">
+                    City <ValidationAsterisk isValid={fieldValidation.city.isValid} touched={fieldValidation.city.touched} />
+                  </Label>
+                  <Input
+                    id="city"
+                    placeholder="City"
+                    value={formData.city}
+                    onChange={(e) => handleInputChange("city", e.target.value)}
+                    className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
+                    required
+                  />
+                </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="state" className="text-foreground">
-                      {formData.country === 'US' ? 'State' : 'State/Province/Region'} <span className="text-muted-foreground">*</span>
+                      State/Region {stateOptions.length > 0 && <span className="text-muted-foreground">*</span>}
                     </Label>
-                    <Select
-                      value={formData.state}
-                      onValueChange={(value) => handleInputChange("state", value)}
-                    >
-                      <SelectTrigger className="bg-input border-border focus:border-accent">
-                        <SelectValue placeholder={formData.country === 'US' ? 'Select state' : 'Select region'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {statesLoading ? (
-                          <SelectItem value="loading" disabled>Loading...</SelectItem>
-                        ) : (
-                          stateOptions.map((state) => (
-                            <SelectItem key={state.value} value={state.value}>
-                              {state.label}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                    {stateOptions.length > 0 ? (
+                      <Select
+                        value={formData.state}
+                        onValueChange={(value) => handleInputChange("state", value)}
+                      >
+                        <SelectTrigger className="bg-input border-border focus:border-accent">
+                          <SelectValue placeholder="Select state/region" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statesLoading ? (
+                            <SelectItem value="loading" disabled>Loading...</SelectItem>
+                          ) : (
+                            stateOptions.map((state) => (
+                              <SelectItem key={state.value} value={state.value}>
+                                {state.label}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="state"
+                        placeholder="State/Region (optional)"
+                        value={formData.state}
+                        onChange={(e) => handleInputChange("state", e.target.value)}
+                        className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
+                      />
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="zipCode" className="text-foreground">
-                      {formData.country === 'US' ? 'ZIP Code' : 'Postal Code'} <ValidationAsterisk isValid={fieldValidation.zipCode.isValid} touched={fieldValidation.zipCode.touched} />
+                      Postal Code <ValidationAsterisk isValid={fieldValidation.zipCode.isValid} touched={fieldValidation.zipCode.touched} />
                     </Label>
                     <Input
                       id="zipCode"
-                      placeholder={formData.country === 'US' ? '10001' : 'Postal code'}
+                      placeholder="Postal code"
                       value={formData.zipCode}
                       onChange={(e) => handleInputChange("zipCode", e.target.value)}
                       className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
@@ -1922,7 +1938,7 @@ const SignUp = () => {
 
               <Button
                 onClick={handleStep3Submit}
-                disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.country || !formData.state || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
+                disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.country || (stateOptions.length > 0 && !formData.state) || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
                 className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transition-all duration-200 px-8 py-2"
               >
                 {loading ? (
