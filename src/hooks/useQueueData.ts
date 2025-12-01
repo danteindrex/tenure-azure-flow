@@ -4,6 +4,8 @@ interface QueueMember {
   user_id: string;
   queue_position: number;
   id?: number;
+  member_status?: string;
+  is_eligible?: boolean;
 }
 
 interface QueueResponse {

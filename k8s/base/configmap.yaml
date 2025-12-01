@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenure-config
+  namespace: tenure
+data:
+  NODE_ENV: "production"
+  UI_PORT: "3000"
+  SUBSCRIPTION_SERVICE_PORT: "3001"
+  KYC_SERVICE_PORT: "3002"
+  QUEUE_SERVICE_PORT: "3003"
+  PAYOUT_SERVICE_PORT: "3004"
+
+  # Internal service URLs (for inter-service communication)
+  SUBSCRIPTION_SERVICE_URL: "http://subscription-service:3001"
+  KYC_SERVICE_URL: "http://kyc-service:3002"
+  QUEUE_SERVICE_URL: "http://queue-service:3003"
+  PAYOUT_SERVICE_URL: "http://payout-service:3004"
+
+  # CORS origins (update based on your domain)
+  ALLOWED_ORIGINS: "https://your-domain.com,http://localhost:3000"

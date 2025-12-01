@@ -11,7 +11,7 @@ import { Crown, Check, ChevronRight, ChevronLeft, Loader2, Mail, Phone, Fingerpr
 import { toast } from "sonner";
 import { authClient, useSession, signUp, updateUser, signIn, signOut } from "@/lib/auth-client";
 import { logPageVisit, logSignup, logError } from "@/lib/audit";
-import { COUNTRY_DIAL_CODES } from "@/lib/countryDialCodes";
+import { useDialCodes, useStateOptions, useCountries } from "@/hooks/useGeoData";
 import baseLogger from "@/lib/baseLogger";
 import { useTheme } from "@/contexts/ThemeContext";
 import { TermsModal } from "@/components/TermsModal";
@@ -477,59 +477,10 @@ const SignUp = () => {
     return <span className={colorClass}>*</span>;
   };
 
-  // US States data
-  const usStates = [
-    { value: "AL", label: "Alabama" },
-    { value: "AK", label: "Alaska" },
-    { value: "AZ", label: "Arizona" },
-    { value: "AR", label: "Arkansas" },
-    { value: "CA", label: "California" },
-    { value: "CO", label: "Colorado" },
-    { value: "CT", label: "Connecticut" },
-    { value: "DE", label: "Delaware" },
-    { value: "FL", label: "Florida" },
-    { value: "GA", label: "Georgia" },
-    { value: "HI", label: "Hawaii" },
-    { value: "ID", label: "Idaho" },
-    { value: "IL", label: "Illinois" },
-    { value: "IN", label: "Indiana" },
-    { value: "IA", label: "Iowa" },
-    { value: "KS", label: "Kansas" },
-    { value: "KY", label: "Kentucky" },
-    { value: "LA", label: "Louisiana" },
-    { value: "ME", label: "Maine" },
-    { value: "MD", label: "Maryland" },
-    { value: "MA", label: "Massachusetts" },
-    { value: "MI", label: "Michigan" },
-    { value: "MN", label: "Minnesota" },
-    { value: "MS", label: "Mississippi" },
-    { value: "MO", label: "Missouri" },
-    { value: "MT", label: "Montana" },
-    { value: "NE", label: "Nebraska" },
-    { value: "NV", label: "Nevada" },
-    { value: "NH", label: "New Hampshire" },
-    { value: "NJ", label: "New Jersey" },
-    { value: "NM", label: "New Mexico" },
-    { value: "NY", label: "New York" },
-    { value: "NC", label: "North Carolina" },
-    { value: "ND", label: "North Dakota" },
-    { value: "OH", label: "Ohio" },
-    { value: "OK", label: "Oklahoma" },
-    { value: "OR", label: "Oregon" },
-    { value: "PA", label: "Pennsylvania" },
-    { value: "RI", label: "Rhode Island" },
-    { value: "SC", label: "South Carolina" },
-    { value: "SD", label: "South Dakota" },
-    { value: "TN", label: "Tennessee" },
-    { value: "TX", label: "Texas" },
-    { value: "UT", label: "Utah" },
-    { value: "VT", label: "Vermont" },
-    { value: "VA", label: "Virginia" },
-    { value: "WA", label: "Washington" },
-    { value: "WV", label: "West Virginia" },
-    { value: "WI", label: "Wisconsin" },
-    { value: "WY", label: "Wyoming" },
-  ];
+  // Dynamic geographic data from APIs (REST Countries + CountryStateCity)
+  const { dialCodes, isLoading: dialCodesLoading } = useDialCodes();
+  const { data: countries, isLoading: countriesLoading } = useCountries();
+  const { options: stateOptions, isLoading: statesLoading } = useStateOptions(formData.country);
 
   const handleInputChange = (field: string, value: string | boolean): void => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -1814,11 +1765,15 @@ const SignUp = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {COUNTRY_DIAL_CODES.map((dialCode) => (
-                          <SelectItem key={dialCode} value={dialCode}>
-                            {dialCode}
-                          </SelectItem>
-                        ))}
+                        {dialCodesLoading ? (
+                          <SelectItem value="loading" disabled>Loading...</SelectItem>
+                        ) : (
+                          dialCodes.map((item) => (
+                            <SelectItem key={`${item.code}-${item.dialCode}`} value={item.dialCode}>
+                              {item.flag} {item.dialCode}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <Input
@@ -1870,6 +1825,33 @@ const SignUp = () => {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="country" className="text-foreground">Country <span className="text-muted-foreground">*</span></Label>
+                  <Select
+                    value={formData.country}
+                    onValueChange={(value) => {
+                      handleInputChange("country", value);
+                      // Clear state when country changes since states are country-specific
+                      setFormData(prev => ({ ...prev, state: "" }));
+                    }}
+                  >
+                    <SelectTrigger className="bg-input border-border focus:border-accent">
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {countriesLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : (
+                        countries?.map((country) => (
+                          <SelectItem key={country.code} value={country.code}>
+                            {country.flag} {country.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="city" className="text-foreground">
@@ -1886,31 +1868,37 @@ const SignUp = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="state" className="text-foreground">State <span className="text-muted-foreground">*</span></Label>
+                    <Label htmlFor="state" className="text-foreground">
+                      {formData.country === 'US' ? 'State' : 'State/Province/Region'} <span className="text-muted-foreground">*</span>
+                    </Label>
                     <Select
                       value={formData.state}
                       onValueChange={(value) => handleInputChange("state", value)}
                     >
                       <SelectTrigger className="bg-input border-border focus:border-accent">
-                        <SelectValue placeholder="Select state" />
+                        <SelectValue placeholder={formData.country === 'US' ? 'Select state' : 'Select region'} />
                       </SelectTrigger>
                       <SelectContent>
-                        {usStates.map((state) => (
-                          <SelectItem key={state.value} value={state.value}>
-                            {state.label}
-                          </SelectItem>
-                        ))}
+                        {statesLoading ? (
+                          <SelectItem value="loading" disabled>Loading...</SelectItem>
+                        ) : (
+                          stateOptions.map((state) => (
+                            <SelectItem key={state.value} value={state.value}>
+                              {state.label}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="zipCode" className="text-foreground">
-                      ZIP Code <ValidationAsterisk isValid={fieldValidation.zipCode.isValid} touched={fieldValidation.zipCode.touched} />
+                      {formData.country === 'US' ? 'ZIP Code' : 'Postal Code'} <ValidationAsterisk isValid={fieldValidation.zipCode.isValid} touched={fieldValidation.zipCode.touched} />
                     </Label>
                     <Input
                       id="zipCode"
-                      placeholder="10001"
+                      placeholder={formData.country === 'US' ? '10001' : 'Postal code'}
                       value={formData.zipCode}
                       onChange={(e) => handleInputChange("zipCode", e.target.value)}
                       className="bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors"
@@ -1934,7 +1922,7 @@ const SignUp = () => {
 
               <Button
                 onClick={handleStep3Submit}
-                disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.state || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
+                disabled={loading || !formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.phoneNumber || !validatePhoneNumber(formData.phoneNumber) || !formData.streetAddress || !formData.city || !formData.country || !formData.state || !formData.zipCode || (dateValidation && !dateValidation.isValid)}
                 className="bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transition-all duration-200 px-8 py-2"
               >
                 {loading ? (

@@ -45,11 +45,13 @@ class QueueController {
         queueData = queueData.slice(offsetNum, offsetNum + limitNum);
       }
 
-      // Only return position and user_id for privacy
+      // Return position, user_id, and member_status for display
       const sanitizedQueue = queueData.map((member: any) => ({
         queue_position: member.queue_position,
         user_id: member.user_id,
-        id: member.id
+        id: member.id,
+        member_status: member.member_status || 'Active',
+        is_eligible: member.is_eligible || false
       }));
 
       console.log('📊 Returning queue data:');

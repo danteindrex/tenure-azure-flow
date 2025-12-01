@@ -12,8 +12,9 @@ COPY tsconfig.json ./
 # Install dependencies
 RUN npm ci
 
-# Copy source code
+# Copy source code and drizzle folder
 COPY src ./src
+COPY drizzle ./drizzle
 
 # Build TypeScript
 RUN npm run build

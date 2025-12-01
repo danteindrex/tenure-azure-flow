@@ -11,6 +11,7 @@ import { useStatistics } from "@/hooks/useStatistics";
 import { useBillingSchedules } from "@/hooks/useBillingSchedules";
 import { usePaymentHistory } from "@/hooks/usePaymentHistory";
 import { useNewsFeed } from "@/hooks/useNewsFeed";
+import { useStatusValues, getStatusColor, getStatusDisplayName } from "@/hooks/useStatusValues";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const DashboardSimple = () => {
@@ -35,6 +36,10 @@ const DashboardSimple = () => {
   const { data: billingData, isLoading: isLoadingBilling } = useBillingSchedules(user?.id);
   const { data: paymentHistoryData, isLoading: isLoadingPayments } = usePaymentHistory(user?.id);
   const { data: newsResponse, isLoading: isLoadingNews } = useNewsFeed();
+
+  // Fetch status values with colors from database
+  const { data: statusValuesData } = useStatusValues('member_eligibility');
+  const statusMap = statusValuesData?.data?.statusMap;
 
   // UI state
   const [updatingPayment, setUpdatingPayment] = useState(false);
@@ -81,7 +86,7 @@ const DashboardSimple = () => {
           rank: mine.queue_position,
           name: 'You',
           tenureMonths: 0,
-          status: 'Active',
+          status: mine.member_status || 'Active', // Use actual status from DB
           isCurrentUser: true
         };
       }
@@ -92,7 +97,7 @@ const DashboardSimple = () => {
       rank: q.queue_position,
       name: q.user_id === currentUserId ? 'You' : (q.user_id ? `${q.user_id.substring(0, 6)}xxxxx` : 'N/A'),
       tenureMonths: 0,
-      status: 'Active',
+      status: q.member_status || 'Active', // Use actual status from DB
       isCurrentUser: currentUserId ? q.user_id === currentUserId : false,
     }));
 
@@ -417,9 +422,17 @@ const DashboardSimple = () => {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-xs sm:text-sm font-medium">{member.status}</p>
+                    <span
+                      className="inline-flex px-2 py-0.5 text-xs sm:text-sm font-medium rounded-full"
+                      style={{
+                        backgroundColor: `${getStatusColor(statusMap, member.status)}20`,
+                        color: getStatusColor(statusMap, member.status)
+                      }}
+                    >
+                      {getStatusDisplayName(statusMap, member.status)}
+                    </span>
                     {member.isCurrentUser && (
-                      <p className="text-[10px] xs:text-xs text-accent font-semibold">You are here</p>
+                      <p className="text-[10px] xs:text-xs text-accent font-semibold mt-1">You are here</p>
                     )}
                   </div>
                 </div>

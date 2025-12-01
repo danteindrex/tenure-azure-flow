@@ -1,0 +1,65 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tenure-ingress
+  namespace: tenure
+  labels:
+    app.kubernetes.io/name: tenure-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Uncomment for cert-manager
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  # Uncomment and configure TLS for production
+  # tls:
+  #   - hosts:
+  #       - your-domain.com
+  #       - api.your-domain.com
+  #     secretName: tenure-tls
+  rules:
+    # Main UI
+    - host: your-domain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ui
+                port:
+                  number: 3000
+
+    # API subdomain routing
+    - host: api.your-domain.com
+      http:
+        paths:
+          - path: /subscription
+            pathType: Prefix
+            backend:
+              service:
+                name: subscription-service
+                port:
+                  number: 3001
+          - path: /kyc
+            pathType: Prefix
+            backend:
+              service:
+                name: kyc-service
+                port:
+                  number: 3002
+          - path: /queue
+            pathType: Prefix
+            backend:
+              service:
+                name: queue-service
+                port:
+                  number: 3003
+          - path: /payout
+            pathType: Prefix
+            backend:
+              service:
+                name: payout-service
+                port:
+                  number: 3004

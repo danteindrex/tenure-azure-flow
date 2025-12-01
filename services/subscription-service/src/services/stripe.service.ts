@@ -6,6 +6,7 @@ import { PaymentModel } from '../models/payment.model';
 import { CreateCheckoutSessionRequest, CreateCheckoutSessionResponse } from '../types';
 import { pool } from '../config/database';
 import { STRIPE_PRICE_IDS, validateStripePriceIds } from '../config/stripe-prices';
+import { emailService } from './email.service';
 
 const stripe = new Stripe(config.stripe.secretKey, {
   apiVersion: '2025-10-29.clover',
@@ -445,6 +446,31 @@ export class StripeService {
         annualRecurring: config.pricing.annualAmount,
         currency: config.pricing.currency
       });
+
+      // Send welcome email after successful first payment
+      try {
+        // Get user name for personalized email
+        const userNameQuery = `
+          SELECT u.name, p.first_name, p.last_name, u.email
+          FROM users u
+          LEFT JOIN user_profiles p ON u.id = p.user_id
+          WHERE u.id = $1
+        `;
+        const userResult = await pool.query(userNameQuery, [userId]);
+        const userData = userResult.rows[0];
+
+        if (userData?.email) {
+          const userName = userData.first_name || userData.name || 'Member';
+          await emailService.sendWelcomeEmail({
+            to: userData.email,
+            name: userName
+          });
+          logger.info(`Welcome email sent to ${userData.email}`);
+        }
+      } catch (emailError) {
+        // Don't fail the webhook if email fails - just log it
+        logger.error('Failed to send welcome email:', emailError);
+      }
     } catch (error) {
       logger.error('Error handling checkout complete:', error);
       throw error;
@@ -815,54 +841,76 @@ export class StripeService {
         nextAttempt: invoice.next_payment_attempt
       });
 
-      // BR-8: Immediate cancellation on first payment failure
-      // Cancel the subscription immediately - user must update payment method to reactivate
-      logger.warn(`Canceling subscription ${subscriptionId} due to payment failure`);
+      // SMART RETRY HANDLING: Let Stripe handle retries (default: 4 attempts over 21-30 days)
+      // Stripe also sends dunning emails automatically (configurable in Dashboard > Billing > Subscriptions)
+      // We only take action based on retry status:
 
-      try {
-        await stripe.subscriptions.update(subscriptionId, {
-          cancel_at_period_end: false, // Cancel immediately
-          pause_collection: {
-            behavior: 'mark_uncollectible' // Mark outstanding invoices as uncollectible
-          }
-        });
+      const isFinalAttempt = invoice.next_payment_attempt === null;
+      const attemptCount = invoice.attempt_count || 1;
 
-        // Update database subscription status
-        await pool.query(
-          `UPDATE user_subscriptions
-           SET status = 'paused',
-               canceled_at = NOW(),
-               updated_at = NOW()
-           WHERE id = $1`,
-          [dbSubscription.id]
-        );
+      if (isFinalAttempt) {
+        // FINAL ATTEMPT FAILED - All Stripe retries exhausted
+        // Now we cancel/suspend the subscription
+        logger.warn(`Final payment attempt failed for subscription ${subscriptionId}. Suspending member.`);
 
-        // SYNC: Update member_status to 'Suspended' on payment failure
-        // This removes user from queue eligibility while in grace period
-        await pool.query(
-          `UPDATE user_memberships
-           SET member_status = 'Suspended',
-               updated_at = NOW()
-           WHERE subscription_id = $1`,
-          [dbSubscription.id]
-        );
-
-        logger.info(`Member status set to Suspended for subscription ${dbSubscription.id}`);
-
-        // Refresh the queue to reflect the status change
         try {
-          await pool.query('SELECT refresh_active_member_queue()');
-        } catch (refreshError) {
-          logger.warn('Failed to refresh queue view after suspension:', refreshError);
-        }
+          // Pause collection rather than cancel - gives user chance to update payment method
+          await stripe.subscriptions.update(subscriptionId, {
+            pause_collection: {
+              behavior: 'mark_uncollectible' // Mark outstanding invoices as uncollectible
+            }
+          });
 
-        logger.info(`Subscription ${subscriptionId} paused due to payment failure. User must update payment method.`);
-      } catch (cancelError) {
-        logger.error('Error pausing subscription after payment failure:', cancelError);
-        // Continue execution - payment failure was already recorded
+          // Update database subscription status
+          await pool.query(
+            `UPDATE user_subscriptions
+             SET status = 'paused',
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [dbSubscription.id]
+          );
+
+          // SYNC: Update member_status to 'Suspended' on final payment failure
+          // This removes user from queue eligibility
+          await pool.query(
+            `UPDATE user_memberships
+             SET member_status = 'Suspended',
+                 updated_at = NOW()
+             WHERE subscription_id = $1`,
+            [dbSubscription.id]
+          );
+
+          logger.info(`Member status set to Suspended for subscription ${dbSubscription.id} after ${attemptCount} failed attempts`);
+
+          // Refresh the queue to reflect the status change
+          try {
+            await pool.query('SELECT refresh_active_member_queue()');
+          } catch (refreshError) {
+            logger.warn('Failed to refresh queue view after suspension:', refreshError);
+          }
+
+          logger.info(`Subscription ${subscriptionId} paused after all retry attempts failed. User must update payment method.`);
+        } catch (cancelError) {
+          logger.error('Error pausing subscription after final payment failure:', cancelError);
+        }
+      } else {
+        // NOT FINAL - Stripe will retry automatically
+        // Just log and let Stripe handle it (Stripe sends dunning emails automatically)
+        const nextAttemptDate = invoice.next_payment_attempt
+          ? new Date(invoice.next_payment_attempt * 1000).toISOString()
+          : 'unknown';
+
+        logger.info(`Payment attempt ${attemptCount} failed for subscription ${subscriptionId}. Stripe will retry on ${nextAttemptDate}. Dunning emails sent by Stripe.`);
+
+        // Optional: Mark member as "at risk" but don't suspend yet
+        // This keeps them in queue but flags the account
       }
 
-      // TODO: Send notification email to user about payment failure and need to update payment method
+      // Note: Stripe handles dunning emails automatically
+      // Configure in Dashboard: Settings > Billing > Subscriptions and emails
+      // - Failed payment notifications
+      // - Reminder emails (up to 4)
+      // - Final warning before action
 
     } catch (error) {
       logger.error('Error handling invoice payment failed:', error);

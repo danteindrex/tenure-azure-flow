@@ -2,6 +2,9 @@ import path from "path";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Enable standalone output for Docker deployments
+  // This creates a minimal production build with all dependencies bundled
+  output: 'standalone',
   // Ensure Next uses this project as the workspace root (fixes multi-lockfile warning)
   outputFileTracingRoot: path.join(process.cwd()),
   reactStrictMode: true,
