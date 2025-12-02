@@ -297,6 +297,79 @@ Thank you for your understanding.
       // Don't throw - notification failures shouldn't block the workflow
     }
   }
+
+  /**
+   * Send membership removed notification
+   *
+   * Notifies a member that their membership has been removed after 12 months post-payout.
+   *
+   * @param payoutId - Unique identifier for the payout
+   * @param userId - ID of the member whose membership was removed
+   * @param details - Details about the removal
+   * @returns Promise<void>
+   */
+  async sendMembershipRemoved(
+    payoutId: string,
+    userId: string,
+    details: {
+      completedDate: Date
+      userEmail?: string
+    }
+  ): Promise<void> {
+    try {
+      logger.info('Sending membership removed notification', {
+        payoutId,
+        userId,
+        completedDate: details.completedDate
+      });
+
+      // Get user email (in production, this would come from database)
+      const userEmail = details.userEmail || `user${userId}@example.com`;
+
+      const subject = `Membership Status Update`;
+      const html = `
+        <h2>Membership Status Update</h2>
+        <p>This email is to inform you that your membership has been removed from the active queue.</p>
+        <p>Your payout was completed on ${details.completedDate.toLocaleDateString()}. As per our terms, memberships are concluded 12 months after receiving a payout.</p>
+        <h3>Want to Rejoin?</h3>
+        <p>You're welcome to rejoin the queue at any time by making a new payment. Your queue position will be calculated based on your new tenure start date.</p>
+        <p>Thank you for being a valued member of Home Solutions!</p>
+      `;
+
+      const text = `
+Membership Status Update
+
+This email is to inform you that your membership has been removed from the active queue.
+
+Your payout was completed on ${details.completedDate.toLocaleDateString()}. As per our terms, memberships are concluded 12 months after receiving a payout.
+
+Want to Rejoin?
+You're welcome to rejoin the queue at any time by making a new payment. Your queue position will be calculated based on your new tenure start date.
+
+Thank you for being a valued member of Home Solutions!
+      `;
+
+      await sendEmail({
+        to: userEmail,
+        subject,
+        html,
+        text,
+      });
+
+      logger.info('Membership removed notification sent', {
+        payoutId,
+        userId,
+        recipient: userEmail,
+      });
+    } catch (error) {
+      logger.error('Failed to send membership removed notification', {
+        payoutId,
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      // Don't throw - notification failures shouldn't block the workflow
+    }
+  }
 }
 
 // Export singleton instance

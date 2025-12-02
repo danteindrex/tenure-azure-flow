@@ -4,6 +4,7 @@ import { db } from '@/drizzle/db';
 import { user, userPayments } from '@/drizzle/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { BUSINESS_RULES } from '@/lib/business-logic';
+import { PAYMENT_STATUS } from '@/lib/status-ids';
 
 /**
  * Payment Status API
@@ -42,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .where(and(
         eq(userPayments.userId, dbUser.id),
         eq(userPayments.paymentType, 'joining_fee'),
-        eq(userPayments.status, 'succeeded')
+        eq(userPayments.paymentStatusId, PAYMENT_STATUS.SUCCEEDED)
       ))
       .limit(1)
       .then(rows => rows[0]);
@@ -53,7 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .where(and(
         eq(userPayments.userId, dbUser.id),
         eq(userPayments.paymentType, 'monthly_fee'),
-        eq(userPayments.status, 'succeeded')
+        eq(userPayments.paymentStatusId, PAYMENT_STATUS.SUCCEEDED)
       ))
       .orderBy(desc(userPayments.paymentDate))
       .limit(1)
@@ -66,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .from(userPayments)
     .where(and(
       eq(userPayments.userId, dbUser.id),
-      eq(userPayments.status, 'succeeded')
+      eq(userPayments.paymentStatusId, PAYMENT_STATUS.SUCCEEDED)
     ));
 
     const totalPaid = Number(totalPaidResult[0]?.total || 0);
@@ -79,7 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .where(and(
       eq(userPayments.userId, dbUser.id),
       eq(userPayments.paymentType, 'monthly_fee'),
-      eq(userPayments.status, 'succeeded')
+      eq(userPayments.paymentStatusId, PAYMENT_STATUS.SUCCEEDED)
     ));
 
     const monthlyPaymentCount = Number(monthlyCountResult[0]?.count || 0);

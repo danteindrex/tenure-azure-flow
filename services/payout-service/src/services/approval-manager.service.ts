@@ -19,6 +19,7 @@ import { eq } from 'drizzle-orm'
 import { logger } from '../utils/logger'
 import { getUserRoles } from '../config/auth'
 import { notificationService } from './notification.service'
+import { PAYOUT_STATUS } from '../config/status-ids'
 import {
   ApprovalWorkflow,
   ApprovalStatus,
@@ -383,11 +384,11 @@ export class ApprovalManagerService {
       })
 
       // Determine new payout status based on workflow status
-      let newPayoutStatus = payout.status
+      let newPayoutStatusId = payout.payoutStatusId
       if (workflow.status === 'approved') {
-        newPayoutStatus = 'approved'
+        newPayoutStatusId = PAYOUT_STATUS.APPROVED
       } else if (workflow.status === 'rejected') {
-        newPayoutStatus = 'rejected'
+        newPayoutStatusId = PAYOUT_STATUS.CANCELLED
       }
 
       // Update payout record
@@ -396,7 +397,7 @@ export class ApprovalManagerService {
         .set({
           approvalWorkflow: workflow as any,
           auditTrail: auditTrail as any,
-          status: newPayoutStatus,
+          payoutStatusId: newPayoutStatusId,
           updatedAt: new Date()
         })
         .where(eq(payoutManagement.payoutId, payoutId))
@@ -405,7 +406,7 @@ export class ApprovalManagerService {
         payoutId,
         adminId,
         workflowStatus: workflow.status,
-        payoutStatus: newPayoutStatus
+        payoutStatusId: newPayoutStatusId
       })
     } catch (error) {
       logger.error('Failed to submit approval decision', {
@@ -488,7 +489,7 @@ export class ApprovalManagerService {
 
       // Check if status needs to be updated
       let statusChanged = false
-      let newPayoutStatus = payout.status
+      let newPayoutStatusId = payout.payoutStatusId
       const auditTrail = (payout.auditTrail as any[]) || []
 
       // Update payout status to 'approved' when complete
@@ -499,7 +500,7 @@ export class ApprovalManagerService {
       ) {
         workflow.status = 'approved'
         workflow.completedAt = new Date()
-        newPayoutStatus = 'approved'
+        newPayoutStatusId = PAYOUT_STATUS.APPROVED
         statusChanged = true
 
         // Add to audit trail
@@ -539,7 +540,7 @@ export class ApprovalManagerService {
       ) {
         workflow.status = 'rejected'
         workflow.completedAt = new Date()
-        newPayoutStatus = 'rejected'
+        newPayoutStatusId = PAYOUT_STATUS.CANCELLED
         statusChanged = true
 
         const rejector = workflow.approvers.find((a) => a.decision === 'rejected')
@@ -580,15 +581,15 @@ export class ApprovalManagerService {
           .set({
             approvalWorkflow: workflow as any,
             auditTrail: auditTrail as any,
-            status: newPayoutStatus,
+            payoutStatusId: newPayoutStatusId,
             updatedAt: new Date()
           })
           .where(eq(payoutManagement.payoutId, payoutId))
 
         logger.info('Payout record updated with new status', {
           payoutId,
-          oldStatus: payout.status,
-          newStatus: newPayoutStatus
+          oldPayoutStatusId: payout.payoutStatusId,
+          newPayoutStatusId: newPayoutStatusId
         })
       }
 
@@ -637,7 +638,7 @@ export class ApprovalManagerService {
       logger.info('Fetching pending approvals')
 
       const pendingPayouts = await db.query.payoutManagement.findMany({
-        where: eq(payoutManagement.status, 'pending_approval')
+        where: eq(payoutManagement.payoutStatusId, PAYOUT_STATUS.PENDING_APPROVAL)
       })
 
       logger.info('Pending approvals retrieved', {

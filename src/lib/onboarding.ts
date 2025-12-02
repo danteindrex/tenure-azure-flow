@@ -3,10 +3,11 @@
  *
  * This file uses the dynamic status lookup system for access control.
  * Status checks are now driven by the database tables:
- * - status_categories
- * - status_values
  * - access_control_rules
  * - protected_routes
+ * - Individual lookup tables (user_funnel_statuses, member_eligibility_statuses, etc.)
+ *
+ * Status columns now use integer FK IDs directly instead of string values.
  *
  * ONLY import in API routes, never in client components.
  */
@@ -18,29 +19,23 @@ import { user } from '../../drizzle/schema/auth'
 import { userMemberships } from '../../drizzle/schema/users'
 import { kycVerification } from '../../drizzle/schema/membership'
 import {
-  statusCategories,
-  statusValues,
   accessControlRules,
   protectedRoutes
 } from '../../drizzle/schema/status-system'
-import { eq, and, inArray, desc, asc, sql, isNotNull } from 'drizzle-orm'
+import { eq, and, desc, asc, isNotNull } from 'drizzle-orm'
 
-// Status codes - these match the database lookup values (Title Case)
-// User Funnel Status: Tracks sign-up progress (only 2 statuses)
-export const USER_STATUS = {
-  PENDING: 'Pending',      // User started signup but hasn't completed PII/consent
-  ONBOARDED: 'Onboarded',  // User completed all PII and consented to agreements
-} as const
+// Import status ID constants from centralized location
+import {
+  USER_STATUS,
+  MEMBER_STATUS,
+  SUBSCRIPTION_STATUS,
+  KYC_STATUS,
+  isSubscriptionActive as checkSubscriptionActive,
+  isMemberActive,
+} from './status-ids'
 
-// Member Eligibility Status: Tracks financial rights/queue status (6 statuses)
-export const MEMBER_STATUS = {
-  INACTIVE: 'Inactive',    // Onboarded but hasn't paid yet (default after onboarding)
-  ACTIVE: 'Active',        // Paid and current on all fees - eligible for queue
-  SUSPENDED: 'Suspended',  // Failed payment, in 30-day grace period - NOT eligible
-  CANCELLED: 'Cancelled',  // Failed to cure payment or manually terminated - permanently removed
-  WON: 'Won',              // Winner identified, payout processing - entry locked
-  PAID: 'Paid',            // Prize successfully received - final state
-} as const
+// Re-export for backward compatibility
+export { USER_STATUS, MEMBER_STATUS } from './status-ids'
 
 export type OnboardingStep =
   | 'email-verification'
@@ -74,11 +69,11 @@ export interface UserOnboardingStatus {
   profileId?: string
   nextRoute: string
   nextStep: number
-  // New fields for dynamic routing
-  userStatus: string | null
-  memberStatus: string | null
-  subscriptionStatus: string | null
-  kycStatus: string | null
+  // Status IDs from lookup tables (integer FKs)
+  userStatusId: number | null
+  memberStatusId: number | null
+  subscriptionStatusId: number | null
+  kycStatusId: number | null
 }
 
 interface AccessRule {
@@ -156,13 +151,23 @@ export class OnboardingService {
       phoneVerified: boolean
       hasProfile: boolean
       hasSubscription: boolean
-      memberStatus: string | null
+      memberStatusId: number | null
     },
     isOAuthUser: boolean
   ): boolean {
     // Check member status first (e.g., Suspended)
+    // checkMemberStatus stores the status name, we need to map it to ID
     if (step.checkMemberStatus !== null) {
-      if (userState.memberStatus === step.checkMemberStatus) {
+      const statusNameToId: Record<string, number> = {
+        'Inactive': MEMBER_STATUS.INACTIVE,
+        'Active': MEMBER_STATUS.ACTIVE,
+        'Suspended': MEMBER_STATUS.SUSPENDED,
+        'Cancelled': MEMBER_STATUS.CANCELLED,
+        'Won': MEMBER_STATUS.WON,
+        'Paid': MEMBER_STATUS.PAID,
+      }
+      const expectedStatusId = statusNameToId[step.checkMemberStatus]
+      if (expectedStatusId && userState.memberStatusId === expectedStatusId) {
         return true // User matches this status, show this step
       }
       return false // User doesn't match this status, skip this step
@@ -203,26 +208,7 @@ export class OnboardingService {
     return false // User has completed all conditions for this step
   }
 
-  /**
-   * Get status value ID from lookup table
-   * Uses case-insensitive comparison since status codes may be stored with different casing
-   */
-  private static async getStatusValueId(categoryCode: string, statusCode: string): Promise<number | null> {
-    const result = await db
-      .select({ id: statusValues.id })
-      .from(statusValues)
-      .innerJoin(statusCategories, eq(statusValues.categoryId, statusCategories.id))
-      .where(
-        and(
-          eq(statusCategories.code, categoryCode),
-          sql`LOWER(${statusValues.code}) = ${statusCode.toLowerCase()}`,
-          eq(statusValues.isActive, true)
-        )
-      )
-      .limit(1)
-
-    return result[0]?.id || null
-  }
+  // Note: getStatusValueId method removed - we now read status IDs directly from FK columns
 
   /**
    * Get route configuration from database
@@ -386,19 +372,21 @@ export class OnboardingService {
         .limit(1)
         .then(rows => rows[0])
 
-      // Get subscription
+      // Get subscription - ORDER BY created_at DESC to get the latest one
       const subscription = await db
         .select()
         .from(userSubscriptions)
         .where(eq(userSubscriptions.userId, userId))
+        .orderBy(desc(userSubscriptions.createdAt))
         .limit(1)
         .then(rows => rows[0])
 
-      // Get membership
+      // Get membership - ORDER BY created_at DESC to get the latest one
       const membership = await db
         .select()
         .from(userMemberships)
         .where(eq(userMemberships.userId, userId))
+        .orderBy(desc(userMemberships.createdAt))
         .limit(1)
         .then(rows => rows[0])
 
@@ -410,27 +398,17 @@ export class OnboardingService {
         .limit(1)
         .then(rows => rows[0])
 
-      // Get status IDs from lookup tables
-      const userStatusId = betterAuthUser.status
-        ? await this.getStatusValueId('user_funnel', betterAuthUser.status)
-        : null
-
-      const memberStatusId = membership?.memberStatus
-        ? await this.getStatusValueId('member_eligibility', membership.memberStatus)
-        : null
-
-      const subscriptionStatusId = subscription?.status
-        ? await this.getStatusValueId('subscription_status', subscription.status)
-        : null
-
-      const kycStatusId = kyc?.status
-        ? await this.getStatusValueId('kyc_status', kyc.status)
-        : null
+      // Status IDs are now read directly from FK columns (no lookup needed)
+      const userStatusId = betterAuthUser.userStatusId || null
+      const memberStatusId = membership?.memberStatusId || null
+      const subscriptionStatusId = subscription?.subscriptionStatusId || null
+      const kycStatusId = kyc?.kycStatusId || null
 
       const isEmailVerified = betterAuthUser.emailVerified || isOAuthUser || false
       const hasProfile = !!profile
       const isPhoneVerified = !!phoneContact
-      const hasActiveSubscription = subscription?.status === 'active' || subscription?.status === 'trialing'
+      // Check active subscription using status ID constants
+      const hasActiveSubscription = checkSubscriptionActive(subscriptionStatusId)
 
       // Build status object
       const status: UserOnboardingStatus = {
@@ -444,10 +422,10 @@ export class OnboardingService {
         profileId: profile?.id,
         nextRoute: '/signup',
         nextStep: 1,
-        userStatus: betterAuthUser.status || null,
-        memberStatus: membership?.memberStatus || null,
-        subscriptionStatus: subscription?.status || null,
-        kycStatus: kyc?.status || null,
+        userStatusId,
+        memberStatusId,
+        subscriptionStatusId,
+        kycStatusId,
       }
 
       // Check dashboard access using dynamic rule
@@ -483,7 +461,7 @@ export class OnboardingService {
         phoneVerified: isPhoneVerified,
         hasProfile,
         hasSubscription: hasActiveSubscription,
-        memberStatus: membership?.memberStatus || null,
+        memberStatusId,
       }
 
       // Find the first step that the user hasn't completed
@@ -548,29 +526,15 @@ export class OnboardingService {
         return { allowed: true, redirectTo: null }
       }
 
-      // Get user's current statuses
+      // Get user's current statuses (status IDs are now directly in the response)
       const status = await this.getUserOnboardingStatus(userId)
 
-      // Get status IDs
-      const userStatusId = status.userStatus
-        ? await this.getStatusValueId('user_funnel', status.userStatus)
-        : null
-      const memberStatusId = status.memberStatus
-        ? await this.getStatusValueId('member_eligibility', status.memberStatus)
-        : null
-      const subscriptionStatusId = status.subscriptionStatus
-        ? await this.getStatusValueId('subscription_status', status.subscriptionStatus)
-        : null
-      const kycStatusId = status.kycStatus
-        ? await this.getStatusValueId('kyc_status', status.kycStatus)
-        : null
-
-      // Check rule
+      // Check rule using status IDs directly
       const allowed = await this.checkAccessRule(routeConfig.rule, {
-        userStatusId,
-        memberStatusId,
-        subscriptionStatusId,
-        kycStatusId,
+        userStatusId: status.userStatusId,
+        memberStatusId: status.memberStatusId,
+        subscriptionStatusId: status.subscriptionStatusId,
+        kycStatusId: status.kycStatusId,
         emailVerified: status.isEmailVerified,
         phoneVerified: status.isPhoneVerified,
         hasProfile: status.hasProfile,

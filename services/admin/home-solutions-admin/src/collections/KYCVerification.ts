@@ -4,7 +4,7 @@ export const KYCVerification: CollectionConfig = {
   slug: 'kyc_verification',
   admin: {
     useAsTitle: 'user_id',
-    defaultColumns: ['user_id', 'status', 'verified_at', 'created_at'],
+    defaultColumns: ['user_id', 'kyc_status_id', 'verified_at', 'created_at'],
     description: 'KYC verification records',
     group: 'Compliance & Security',
   },
@@ -16,16 +16,13 @@ export const KYCVerification: CollectionConfig = {
       label: 'User ID',
     },
     {
-      name: 'status',
-      type: 'select',
+      name: 'kyc_status_id',
+      type: 'number',
       required: true,
-      defaultValue: 'pending',
-      options: [
-        { label: 'Pending', value: 'pending' },
-        { label: 'Approved', value: 'approved' },
-        { label: 'Rejected', value: 'rejected' },
-        { label: 'Under Review', value: 'under_review' },
-      ],
+      defaultValue: 1,
+      admin: {
+        description: 'FK to kyc_statuses: 1=Pending, 2=In Review, 3=Verified, 4=Rejected, 5=Expired',
+      },
     },
     {
       name: 'document_type',

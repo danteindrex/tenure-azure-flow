@@ -79,7 +79,7 @@ export const membershipQueue = pgTable('membership_queue', {
 export const kycVerification = pgTable('kyc_verification', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
-  status: text('status').notNull().default('pending'),
+  kycStatusId: integer('kyc_status_id').notNull().default(1), // References kyc_statuses lookup table
   verificationMethod: text('verification_method'),
   documentType: text('document_type'),
   documentNumber: text('document_number'),
@@ -103,7 +103,7 @@ export const kycVerification = pgTable('kyc_verification', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
   userIdIdx: index('idx_kyc_verification_user_id').on(table.userId),
-  statusIdx: index('idx_kyc_verification_status').on(table.status)
+  statusIdx: index('idx_kyc_verification_kyc_status_id').on(table.kycStatusId)
 }))
 
 // ============================================================================
@@ -116,10 +116,11 @@ export const payoutManagement = pgTable('payout_management', {
   queuePosition: integer('queue_position').notNull(),
   amount: decimal('amount', { precision: 12, scale: 2 }).notNull().default('100000.00'),
   currency: text('currency').default('USD'),
-  status: text('status').notNull().default('pending_approval'),
+  payoutStatusId: integer('payout_status_id').notNull().default(1), // References payout_statuses lookup table
   eligibilityCheck: jsonb('eligibility_check').default({}),
   approvalWorkflow: jsonb('approval_workflow').default([]),
   scheduledDate: timestamp('scheduled_date', { withTimezone: true }),
+  completedDate: timestamp('completed_date', { withTimezone: true }),
   paymentMethod: text('payment_method').notNull().default('ach'),
   bankDetails: jsonb('bank_details'),
   taxWithholding: jsonb('tax_withholding'),
@@ -131,7 +132,7 @@ export const payoutManagement = pgTable('payout_management', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
   userIdIdx: index('idx_payout_management_user_id').on(table.userId),
-  statusIdx: index('idx_payout_management_status').on(table.status)
+  statusIdx: index('idx_payout_management_payout_status_id').on(table.payoutStatusId)
 }))
 
 // ============================================================================

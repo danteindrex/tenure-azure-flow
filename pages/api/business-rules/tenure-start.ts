@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { db } from '@/drizzle/db';
 import { user, userPayments } from '@/drizzle/schema';
 import { eq, and, asc } from 'drizzle-orm';
+import { PAYMENT_STATUS } from '@/lib/status-ids';
 
 /**
  * BR-9: Tenure Start Calculation
@@ -40,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .where(and(
         eq(userPayments.userId, dbUser.id),
         eq(userPayments.paymentType, 'joining_fee'),
-        eq(userPayments.status, 'succeeded')
+        eq(userPayments.paymentStatusId, PAYMENT_STATUS.SUCCEEDED)
       ))
       .orderBy(asc(userPayments.paymentDate))
       .limit(1)

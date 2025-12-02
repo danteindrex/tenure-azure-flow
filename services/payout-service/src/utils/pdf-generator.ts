@@ -31,6 +31,7 @@ export interface PaymentInstructionsPDFData {
 export interface ReceiptPDFData {
   payoutId: string;
   recipientName: string;
+  recipientEmail?: string;
   grossAmount: number;
   retentionFee: number;
   taxWithholding: number;

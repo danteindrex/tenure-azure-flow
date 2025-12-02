@@ -35,6 +35,14 @@ import {
   PayoutCreationResult
 } from '../types/winner.types'
 import { payoutManagement, kycVerification, userSubscriptions } from '../../drizzle/schema'
+import {
+  MEMBER_STATUS,
+  SUBSCRIPTION_STATUS,
+  KYC_STATUS,
+  PAYOUT_STATUS,
+  isSubscriptionActive,
+  isKycVerified,
+} from '../config/status-ids'
 
 export class WinnerSelector {
   /**
@@ -147,11 +155,11 @@ export class WinnerSelector {
       let hasValidBankInfo = false
       let hasValidTaxInfo = false
 
-      // Check KYC verification status
+      // Check KYC verification status using kyc_status_id FK column
       try {
         const kycResult = await db
           .select({
-            status: kycVerification.status,
+            kycStatusId: kycVerification.kycStatusId,
             verifiedAt: kycVerification.verifiedAt
           })
           .from(kycVerification)
@@ -160,12 +168,13 @@ export class WinnerSelector {
 
         if (kycResult.length === 0) {
           errors.push('No KYC verification record found')
-        } else if (kycResult[0].status !== 'verified') {
-          errors.push(`KYC verification status is '${kycResult[0].status}', must be 'verified'`)
+        } else if (!isKycVerified(kycResult[0].kycStatusId)) {
+          errors.push(`KYC verification status ID is '${kycResult[0].kycStatusId}', must be '${KYC_STATUS.VERIFIED}' (verified)`)
         } else {
           kycVerified = true
           logger.debug('KYC verification passed', {
             userId,
+            kycStatusId: kycResult[0].kycStatusId,
             verifiedAt: kycResult[0].verifiedAt
           })
         }
@@ -177,11 +186,11 @@ export class WinnerSelector {
         })
       }
 
-      // Check subscription status
+      // Check subscription status using subscription_status_id FK column
       try {
         const subscriptionResult = await db
           .select({
-            status: userSubscriptions.status,
+            subscriptionStatusId: userSubscriptions.subscriptionStatusId,
             subscriptionId: userSubscriptions.id
           })
           .from(userSubscriptions)
@@ -191,14 +200,14 @@ export class WinnerSelector {
         if (subscriptionResult.length === 0) {
           errors.push('No subscription record found')
         } else {
-          const status = subscriptionResult[0].status
-          if (status !== 'active' && status !== 'trialing') {
-            errors.push(`Subscription status is '${status}', must be 'active' or 'trialing'`)
+          const statusId = subscriptionResult[0].subscriptionStatusId
+          if (!isSubscriptionActive(statusId)) {
+            errors.push(`Subscription status ID is '${statusId}', must be '${SUBSCRIPTION_STATUS.ACTIVE}' (active) or '${SUBSCRIPTION_STATUS.TRIALING}' (trialing)`)
           } else {
             hasActiveSubscription = true
             logger.debug('Subscription validation passed', {
               userId,
-              status,
+              subscriptionStatusId: statusId,
               subscriptionId: subscriptionResult[0].subscriptionId
             })
           }
@@ -364,7 +373,7 @@ export class WinnerSelector {
                 ]
               : []
 
-            // Create payout record
+            // Create payout record with payout_status_id FK column
             const [payout] = await tx
               .insert(payoutManagement)
               .values({
@@ -373,7 +382,7 @@ export class WinnerSelector {
                 queuePosition: winner.queuePosition,
                 amount: '100000.00',
                 currency: 'USD',
-                status: 'pending_approval',
+                payoutStatusId: PAYOUT_STATUS.PENDING_APPROVAL,
                 eligibilityCheck,
                 approvalWorkflow,
                 auditTrail,
@@ -381,16 +390,16 @@ export class WinnerSelector {
               })
               .returning({ id: payoutManagement.id, payoutId: payoutManagement.payoutId })
 
-            // SYNC: Update member_status to 'Won' when payout is created
+            // SYNC: Update member_status_id to WON when payout is created
             // This locks the user's queue entry and marks them as winner
             await tx.execute(sql`
               UPDATE user_memberships
-              SET member_status = 'Won',
+              SET member_status_id = ${MEMBER_STATUS.WON},
                   updated_at = NOW()
               WHERE user_id = ${winner.userId}::uuid
             `)
 
-            logger.info(`Member status set to Won for user ${winner.userId}`)
+            logger.info(`Member status set to Won (ID: ${MEMBER_STATUS.WON}) for user ${winner.userId}`)
 
             payoutIds.push(payout.payoutId)
 

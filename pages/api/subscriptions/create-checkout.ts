@@ -76,9 +76,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!checkoutResponse.ok) {
       const errorData = await checkoutResponse.json().catch(() => ({ message: 'Unknown error' }));
       console.error('❌ Subscription service returned error:', checkoutResponse.status, errorData);
-      return res.status(500).json({
-        error: 'Failed to create checkout session',
-        details: errorData.message || `HTTP ${checkoutResponse.status}`
+
+      // Parse the error message to provide user-friendly feedback
+      const errorMessage = errorData.message || `HTTP ${checkoutResponse.status}`;
+      let userFriendlyError = 'Failed to create checkout session';
+
+      if (errorMessage.includes('DUPLICATE_SUBSCRIPTION')) {
+        userFriendlyError = 'You already have an active subscription. Please refresh the page.';
+      } else if (errorMessage.includes('SUBSCRIPTION_SYNCED')) {
+        userFriendlyError = 'Your existing subscription has been synced. Please refresh the page.';
+      } else if (errorMessage.includes('active subscription')) {
+        userFriendlyError = errorMessage;
+      }
+
+      return res.status(400).json({
+        error: userFriendlyError,
+        details: errorMessage
       });
     }
 

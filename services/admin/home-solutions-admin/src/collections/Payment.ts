@@ -9,7 +9,7 @@ export const Payment: CollectionConfig = {
   slug: 'user_payments',
   admin: {
     useAsTitle: 'payment_type',
-    defaultColumns: ['user_id', 'amount', 'payment_type', 'status', 'payment_date'],
+    defaultColumns: ['user_id', 'amount', 'payment_type', 'payment_status_id', 'payment_date'],
     description: 'Tracks all payment transactions and their status',
     group: 'Financial',
   },
@@ -134,17 +134,13 @@ export const Payment: CollectionConfig = {
       },
     },
     {
-      name: 'status',
-      type: 'select',
+      name: 'payment_status_id',
+      type: 'number',
       required: true,
       label: 'Payment Status',
-      options: [
-        { label: 'Succeeded', value: 'succeeded' },
-        { label: 'Pending', value: 'pending' },
-        { label: 'Failed', value: 'failed' },
-        { label: 'Refunded', value: 'refunded' },
-        { label: 'Canceled', value: 'canceled' },
-      ],
+      admin: {
+        description: 'FK to payment_statuses: 1=Pending, 2=Succeeded, 3=Failed, 4=Refunded, 5=Canceled',
+      },
     },
     {
       name: 'is_first_payment',

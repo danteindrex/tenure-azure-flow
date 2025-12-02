@@ -1,10 +1,42 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { db } from '@/drizzle/db';
-import { statusCategories, statusValues } from '@/drizzle/schema';
-import { eq } from 'drizzle-orm';
+import { pool as getPool } from '@/drizzle/db';
 
 /**
- * API endpoint to fetch status values with colors from the database
+ * Lookup table mapping for each category
+ * Each category maps to its corresponding database table
+ */
+const LOOKUP_TABLES: Record<string, string> = {
+  member_eligibility: 'member_eligibility_statuses',
+  subscription: 'subscription_statuses',
+  payment: 'payment_statuses',
+  kyc: 'kyc_statuses',
+  payout: 'payout_statuses',
+  verification: 'verification_statuses',
+  user_funnel: 'user_funnel_statuses',
+  post: 'post_statuses',
+  admin: 'admin_statuses',
+  admin_alert: 'admin_alert_statuses',
+  dispute: 'dispute_statuses',
+  tax_form: 'tax_form_statuses',
+  queue_entry: 'queue_entry_statuses',
+  billing_schedule: 'billing_schedule_statuses',
+  transaction: 'transaction_statuses',
+  transaction_monitoring: 'transaction_monitoring_statuses',
+  audit_log: 'audit_log_statuses',
+  signup_session: 'signup_session_statuses',
+};
+
+interface StatusValue {
+  id: number;
+  name: string;
+  color: string;
+  sortOrder: number;
+  isActive: boolean;
+  categoryCode: string;
+}
+
+/**
+ * API endpoint to fetch status values with colors from lookup tables
  * Returns status display info for dynamic UI rendering
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -15,37 +47,65 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { category } = req.query;
 
-    // Build query - optionally filter by category
-    const query = db
-      .select({
-        id: statusValues.id,
-        code: statusValues.code,
-        displayName: statusValues.displayName,
-        color: statusValues.color,
-        categoryCode: statusCategories.code,
-        categoryName: statusCategories.name,
-        sortOrder: statusValues.sortOrder,
-        isDefault: statusValues.isDefault,
-        isTerminal: statusValues.isTerminal,
-      })
-      .from(statusValues)
-      .innerJoin(statusCategories, eq(statusValues.categoryId, statusCategories.id))
-      .where(eq(statusValues.isActive, true));
+    let results: StatusValue[] = [];
 
-    const results = await query;
-
-    // Filter by category if provided
-    let filteredResults = results;
     if (category && typeof category === 'string') {
-      filteredResults = results.filter(r => r.categoryCode === category);
+      // Fetch from specific category table
+      const tableName = LOOKUP_TABLES[category];
+      if (!tableName) {
+        return res.status(400).json({
+          success: false,
+          error: `Unknown category: ${category}. Valid categories: ${Object.keys(LOOKUP_TABLES).join(', ')}`,
+        });
+      }
+
+      const query = `
+        SELECT id, name, color, sort_order, is_active
+        FROM ${tableName}
+        WHERE is_active = true
+        ORDER BY sort_order, id
+      `;
+      const result = await getPool().query(query);
+      results = result.rows.map(row => ({
+        id: row.id,
+        name: row.name,
+        color: row.color || '#6B7280',
+        sortOrder: row.sort_order,
+        isActive: row.is_active,
+        categoryCode: category,
+      }));
+    } else {
+      // Fetch from all lookup tables
+      for (const [categoryCode, tableName] of Object.entries(LOOKUP_TABLES)) {
+        try {
+          const query = `
+            SELECT id, name, color, sort_order, is_active
+            FROM ${tableName}
+            WHERE is_active = true
+            ORDER BY sort_order, id
+          `;
+          const result = await getPool().query(query);
+          results.push(...result.rows.map(row => ({
+            id: row.id,
+            name: row.name,
+            color: row.color || '#6B7280',
+            sortOrder: row.sort_order,
+            isActive: row.is_active,
+            categoryCode,
+          })));
+        } catch {
+          // Table might not exist, skip
+        }
+      }
     }
 
-    // Transform to a map for easy lookup by code
+    // Transform to a map for easy lookup by name within each category
     const statusMap: Record<string, { displayName: string; color: string; categoryCode: string }> = {};
-    filteredResults.forEach(status => {
-      statusMap[status.code] = {
-        displayName: status.displayName,
-        color: status.color || '#6B7280', // Default gray if no color
+    results.forEach(status => {
+      const key = `${status.categoryCode}:${status.id}`;
+      statusMap[key] = {
+        displayName: status.name,
+        color: status.color,
         categoryCode: status.categoryCode,
       };
     });
@@ -56,7 +116,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({
       success: true,
       data: {
-        statuses: filteredResults,
+        statuses: results,
         statusMap,
       },
     });

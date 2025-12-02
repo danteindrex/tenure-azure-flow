@@ -3,6 +3,7 @@ import { db } from '@/drizzle/db';
 import { userPayments, membershipQueue } from '@/drizzle/schema';
 import { eq, sql } from 'drizzle-orm';
 import { BUSINESS_RULES } from '@/lib/business-logic';
+import { PAYMENT_STATUS } from '@/lib/status-ids';
 
 /**
  * Payout Conditions API
@@ -24,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       total: sql<string>`COALESCE(SUM(${userPayments.amount}), 0)`
     })
     .from(userPayments)
-    .where(eq(userPayments.status, 'succeeded'));
+    .where(eq(userPayments.paymentStatusId, PAYMENT_STATUS.SUCCEEDED));
 
     const totalRevenue = Number(totalRevenueResult[0]?.total || 0);
 

@@ -5,6 +5,7 @@ import { db, payoutManagement } from '../config/database';
 import { eq } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
+import { PAYOUT_STATUS } from '../config/status-ids';
 
 export class PaymentController {
   private paymentProcessor: PaymentProcessorService;
@@ -47,7 +48,7 @@ export class PaymentController {
       });
 
       res.json({
-        data: { payoutId, status: 'processing' },
+        data: { payoutId, payoutStatusId: PAYOUT_STATUS.PROCESSING },
         message: 'Payment marked as sent',
         timestamp: new Date().toISOString(),
       });
@@ -74,7 +75,7 @@ export class PaymentController {
       });
 
       res.json({
-        data: { payoutId, status: 'completed', receiptUrl },
+        data: { payoutId, payoutStatusId: PAYOUT_STATUS.COMPLETED, receiptUrl },
         message: 'Payment confirmed',
         timestamp: new Date().toISOString(),
       });

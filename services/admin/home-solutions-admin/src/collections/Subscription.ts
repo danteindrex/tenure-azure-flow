@@ -9,7 +9,7 @@ export const Subscription: CollectionConfig = {
   slug: 'user_subscriptions',
   admin: {
     useAsTitle: 'provider_subscription_id',
-    defaultColumns: ['user_id', 'status', 'current_period_start', 'current_period_end'],
+    defaultColumns: ['user_id', 'subscription_status_id', 'current_period_start', 'current_period_end'],
     description: 'Stores Stripe subscription information for members',
     group: 'Financial',
   },
@@ -68,18 +68,13 @@ export const Subscription: CollectionConfig = {
       },
     },
     {
-      name: 'status',
-      type: 'select',
+      name: 'subscription_status_id',
+      type: 'number',
       required: true,
       label: 'Subscription Status',
-      options: [
-        { label: 'Active', value: 'active' },
-        { label: 'Past Due', value: 'past_due' },
-        { label: 'Canceled', value: 'canceled' },
-        { label: 'Incomplete', value: 'incomplete' },
-        { label: 'Trialing', value: 'trialing' },
-        { label: 'Unpaid', value: 'unpaid' },
-      ],
+      admin: {
+        description: 'FK to subscription_statuses: 1=Active, 2=Trialing, 3=Past Due, 4=Canceled, 5=Incomplete, 6=Unpaid',
+      },
     },
     {
       name: 'current_period_start',

@@ -164,15 +164,20 @@ export const adminSessions = pgTable("admin_sessions", {
 
 export const users = pgTable("users", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	authUserId: text("auth_user_id"),
-	email: varchar({ length: 255 }).notNull(),
+	email: text().notNull(),
 	emailVerified: boolean("email_verified").default(false),
-	status: enumUsersStatus().default('Pending').notNull(),
+	userStatusId: integer("user_status_id").default(1), // References user_funnel_statuses lookup table
+	profileCompleted: boolean("profile_completed").default(false),
+	financialAgreementAccepted: boolean("financial_agreement_accepted").default(false),
+	policyAgreementAccepted: boolean("policy_agreement_accepted").default(false),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	name: text(),
+	image: text(),
+	twoFactorEnabled: boolean("two_factor_enabled").default(false),
 }, (table) => [
-	pgPolicy("Users can view their own data", { as: "permissive", for: "select", to: ["public"], using: sql`(auth_user_id = (auth.uid())::text)` }),
 	pgPolicy("Service can manage users", { as: "permissive", for: "all", to: ["public"] }),
+	unique("users_email_unique").on(table.email),
 ]);
 
 export const signupSessions = pgTable("signup_sessions", {
@@ -299,25 +304,25 @@ export const userMemberships = pgTable("user_memberships", {
 	userId: uuid("user_id"),
 	subscriptionId: uuid("subscription_id").unique(), // One membership per subscription
 	joinDate: date("join_date").default(sql`CURRENT_DATE`).notNull(),
-	tenure: numeric().default('0'),
-	verificationStatus: varchar("verification_status", { length: 20 }).default('PENDING'),
-	memberStatus: varchar("member_status", { length: 20 }).default('inactive'), // Member eligibility status: inactive, active, suspended, cancelled, won, paid
-	notes: text(),
+	// Member eligibility status - references member_eligibility_statuses lookup table
+	// 1 = Inactive, 2 = Active, 3 = Suspended, 4 = Cancelled, 5 = Won, 6 = Paid
+	memberStatusId: integer("member_status_id").default(1),
+	// Verification status - references verification_statuses lookup table
+	// 1 = Pending, 2 = Verified, 3 = Failed, 4 = Skipped
+	verificationStatusId: integer("verification_status_id").default(1),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
 	index("idx_user_memberships_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	index("idx_user_memberships_subscription_id").using("btree", table.subscriptionId.asc().nullsLast().op("uuid_ops")),
 	index("idx_user_memberships_join_date").using("btree", table.joinDate.asc().nullsLast().op("date_ops")),
-	index("idx_user_memberships_member_status").using("btree", table.memberStatus.asc().nullsLast().op("text_ops")),
+	index("idx_user_memberships_member_status_id").using("btree", table.memberStatusId.asc().nullsLast().op("int4_ops")),
 	foreignKey({
 			columns: [table.subscriptionId],
 			foreignColumns: [userSubscriptions.id],
 			name: "user_memberships_subscription_id_fkey"
 		}).onDelete("cascade"),
-	pgPolicy("Users can view their own memberships", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id IN ( SELECT users.id
-   FROM users
-  WHERE (users.auth_user_id = (auth.uid())::text)))` }),
+	pgPolicy("Users can view their own memberships", { as: "permissive", for: "select", to: ["public"] }),
 	pgPolicy("Service can manage memberships", { as: "permissive", for: "all", to: ["public"] }),
 ]);
 
@@ -413,7 +418,9 @@ export const userSubscriptions = pgTable("user_subscriptions", {
 	provider: varchar({ length: 20 }).default('stripe').notNull(),
 	providerSubscriptionId: varchar("provider_subscription_id", { length: 255 }).notNull(),
 	providerCustomerId: varchar("provider_customer_id", { length: 255 }).notNull(),
-	status: varchar({ length: 20 }).notNull(),
+	// Subscription status - references subscription_statuses lookup table
+	// 1 = Active, 2 = Trialing, 3 = Past Due, 4 = Canceled, 5 = Incomplete, 6 = Unpaid
+	subscriptionStatusId: integer("subscription_status_id").notNull().default(1),
 	currentPeriodStart: timestamp("current_period_start", { withTimezone: true, mode: 'string' }).notNull(),
 	currentPeriodEnd: timestamp("current_period_end", { withTimezone: true, mode: 'string' }).notNull(),
 	cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
@@ -422,9 +429,8 @@ export const userSubscriptions = pgTable("user_subscriptions", {
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
-	pgPolicy("Users can view their own subscriptions", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id IN ( SELECT users.id
-   FROM users
-  WHERE (users.auth_user_id = (auth.uid())::text)))` }),
+	index("idx_user_subscriptions_status_id").using("btree", table.subscriptionStatusId.asc().nullsLast().op("int4_ops")),
+	pgPolicy("Users can view their own subscriptions", { as: "permissive", for: "select", to: ["public"] }),
 	pgPolicy("Service can manage subscriptions", { as: "permissive", for: "all", to: ["public"] }),
 ]);
 

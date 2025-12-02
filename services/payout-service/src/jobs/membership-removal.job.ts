@@ -1,8 +1,9 @@
 import cron from 'node-cron';
-import { db, users, payoutManagement } from '../config/database';
+import { db, payoutManagement, userMemberships } from '../config/database';
 import { eq, and, lte } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { notificationService } from '../services/notification.service';
+import { PAYOUT_STATUS, MEMBER_STATUS } from '../config/status-ids';
 
 /**
  * Membership Removal Cron Job
@@ -22,7 +23,7 @@ export function startMembershipRemovalJob() {
 
       const expiredPayouts = await db.query.payoutManagement.findMany({
         where: and(
-          eq(payoutManagement.status, 'completed'),
+          eq(payoutManagement.payoutStatusId, PAYOUT_STATUS.COMPLETED),
           lte(payoutManagement.completedDate, twelveMonthsAgo)
         ),
         with: { user: true },
@@ -37,13 +38,13 @@ export function startMembershipRemovalJob() {
 
       for (const payout of expiredPayouts) {
         try {
-          // Update user status to Inactive
-          await db.update(users)
+          // Update member status to Inactive
+          await db.update(userMemberships)
             .set({
-              status: 'Inactive',
+              memberStatusId: MEMBER_STATUS.INACTIVE,
               updatedAt: new Date(),
             })
-            .where(eq(users.id, payout.userId));
+            .where(eq(userMemberships.userId, payout.userId));
 
           // Update payout record with removal info
           const auditTrail = (payout.auditTrail as any[]) || [];

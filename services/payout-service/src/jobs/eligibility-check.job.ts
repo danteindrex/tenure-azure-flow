@@ -20,7 +20,7 @@ export function startEligibilityCheckJob() {
 
       logger.info('Eligibility check completed', {
         isEligible: result.eligibility.isEligible,
-        currentRevenue: result.eligibility.currentRevenue,
+        totalRevenue: result.eligibility.totalRevenue,
         eligibleMembersCount: result.eligibleMembers.length,
         alertId: result.alertId,
       });

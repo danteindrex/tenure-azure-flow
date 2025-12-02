@@ -7,9 +7,18 @@
  * Created to support the /api/newsfeed/posts endpoint
  */
 
-import { pgTable, uuid, varchar, text, timestamp, index } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, text, timestamp, integer, index } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { user } from './auth'
+
+// Post Status IDs (from post_statuses lookup table)
+// 1 = Draft, 2 = Published, 3 = Scheduled, 4 = Archived
+export const POST_STATUS = {
+  DRAFT: 1,
+  PUBLISHED: 2,
+  SCHEDULED: 3,
+  ARCHIVED: 4,
+} as const
 
 // ============================================================================
 // NEWSFEED POSTS TABLE
@@ -20,15 +29,16 @@ export const newsfeedPosts = pgTable('newsfeedposts', {
   title: varchar('title', { length: 255 }).notNull(),
   content: text('content').notNull(),
   publishDate: timestamp('publish_date', { withTimezone: true }).defaultNow().notNull(),
-  status: varchar('status', { length: 20 }).default('Published').notNull(),
+  // Post status - references post_statuses lookup table
+  // 1 = Draft, 2 = Published, 3 = Scheduled, 4 = Archived
+  postStatusId: integer('post_status_id').notNull().default(2), // Default to Published
   priority: varchar('priority', { length: 20 }).default('medium').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 }, (table) => ({
   userIdIdx: index('idx_newsfeedposts_user_id').on(table.userId),
   publishDateIdx: index('idx_newsfeedposts_publish_date').on(table.publishDate),
-  statusIdx: index('idx_newsfeedposts_status').on(table.status),
-  statusPublishIdx: index('idx_newsfeedposts_status_publish').on(table.status, table.publishDate)
+  statusIdx: index('idx_newsfeedposts_status_id').on(table.postStatusId)
 }))
 
 // Relations

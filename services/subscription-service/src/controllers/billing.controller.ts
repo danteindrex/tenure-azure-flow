@@ -26,10 +26,11 @@ export class BillingController {
       }
 
       // First get the most recent active subscription for the user
+      // subscription_status_id = 1 is Active (from subscription_statuses lookup table)
       const subscriptionQuery = `
         SELECT id
         FROM user_subscriptions
-        WHERE user_id = $1 AND status = 'active'
+        WHERE user_id = $1 AND subscription_status_id = 1
         ORDER BY created_at DESC
         LIMIT 1
       `;
@@ -47,6 +48,7 @@ export class BillingController {
       const subscriptionId = subscriptionResult.rows[0].id;
 
       // Fetch all billing schedules for this subscription
+      // Join with subscription_statuses to get the status name
       const query = `
         SELECT
           ubs.id,
@@ -55,11 +57,12 @@ export class BillingController {
           ubs.amount,
           ubs.currency,
           ubs.is_active,
-          us.status as subscription_status,
+          ss.name as subscription_status,
           us.provider_subscription_id,
           us.cancel_at_period_end
         FROM user_billing_schedules ubs
         INNER JOIN user_subscriptions us ON ubs.subscription_id = us.id
+        INNER JOIN subscription_statuses ss ON us.subscription_status_id = ss.id
         WHERE ubs.subscription_id = $1 AND ubs.is_active = true
         ORDER BY
           CASE

@@ -44,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const userRecord = await db.query.user.findFirst({
       where: eq(user.email, email),
       columns: {
-        authUserId: true,
+        id: true,
         email: true,
         createdAt: true,
       }

@@ -24,6 +24,7 @@ import { db } from '../config/database'
 import { userPayments, adminAlerts, userAuditLogs } from '../config/database'
 import { sql, eq } from 'drizzle-orm'
 import { logger, redactSensitiveData } from '../utils/logger'
+import { PAYMENT_STATUS } from '../config/status-ids'
 import {
   EligibilityResult,
   EligibilityCheckConfig,
@@ -89,7 +90,7 @@ export class EligibilityChecker {
           totalRevenue: sql<string>`COALESCE(SUM(${userPayments.amount}), 0)`
         })
         .from(userPayments)
-        .where(eq(userPayments.status, 'succeeded'))
+        .where(eq(userPayments.paymentStatusId, PAYMENT_STATUS.SUCCEEDED))
 
       const totalRevenue = Number(result[0]?.totalRevenue || 0)
 

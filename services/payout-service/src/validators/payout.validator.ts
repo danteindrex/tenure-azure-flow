@@ -33,13 +33,13 @@ export const ConfirmPaymentSchema = z.object({
  * Creates middleware that validates request body against a Zod schema
  */
 export function validateBody(schema: z.ZodSchema) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     try {
       schema.parse(req.body);
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({
+        res.status(400).json({
           error: {
             code: 'VALIDATION_ERROR',
             message: 'Invalid request data',
@@ -47,6 +47,7 @@ export function validateBody(schema: z.ZodSchema) {
             timestamp: new Date().toISOString(),
           },
         });
+        return;
       }
       next(error);
     }

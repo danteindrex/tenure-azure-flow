@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { db } from '@/drizzle/db';
 import { user, userAuditLogs, userPayments, membershipQueue } from '@/drizzle/schema';
 import { eq, desc, or, and, sql } from 'drizzle-orm';
+import { PAYMENT_STATUS, getPaymentStatusName } from '@/lib/status-ids';
 
 /**
  * Activity History API
@@ -71,7 +72,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ? 'Monthly Payment Processed'
         : 'Payment Processed';
 
-      const description = `${payment.status === 'succeeded' ? 'Successfully processed' : payment.status} payment of $${Number(payment.amount).toFixed(2)}`;
+      const paymentStatusName = getPaymentStatusName(payment.paymentStatusId);
+      const description = `${payment.paymentStatusId === PAYMENT_STATUS.SUCCEEDED ? 'Successfully processed' : paymentStatusName} payment of $${Number(payment.amount).toFixed(2)}`;
+
+      // Map payment status ID to activity status
+      const activityStatus = payment.paymentStatusId === PAYMENT_STATUS.SUCCEEDED ? 'completed'
+        : payment.paymentStatusId === PAYMENT_STATUS.FAILED ? 'failed'
+        : 'pending';
 
       activities.push({
         id: `payment-${payment.id}`,
@@ -79,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         action,
         description,
         amount: Number(payment.amount),
-        status: payment.status,
+        status: activityStatus,
         date: payment.paymentDate.toISOString().split('T')[0],
         time: payment.paymentDate.toTimeString().split(' ')[0].substring(0, 5),
         details: `Payment method: ${payment.provider || 'Unknown'} • Transaction ID: ${payment.providerPaymentId || 'N/A'}`,

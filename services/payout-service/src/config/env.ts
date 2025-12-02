@@ -41,20 +41,26 @@ const envSchema = z.object({
   S3_BUCKET_NAME: z.string().optional(),
 });
 
-try {
-  const parsed = envSchema.parse(process.env);
-  logger.info('Environment variables validated successfully');
-  export const env = parsed;
-} catch (error) {
-  if (error instanceof z.ZodError) {
-    logger.error('Environment validation failed', {
-      errors: error.errors,
-    });
-    console.error('❌ Environment validation failed:');
-    error.errors.forEach((err) => {
-      console.error(`  - ${err.path.join('.')}: ${err.message}`);
-    });
-    process.exit(1);
+type EnvType = z.infer<typeof envSchema>;
+
+function validateEnv(): EnvType {
+  try {
+    const parsed = envSchema.parse(process.env);
+    logger.info('Environment variables validated successfully');
+    return parsed;
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      logger.error('Environment validation failed', {
+        errors: error.errors,
+      });
+      console.error('❌ Environment validation failed:');
+      error.errors.forEach((err) => {
+        console.error(`  - ${err.path.join('.')}: ${err.message}`);
+      });
+      process.exit(1);
+    }
+    throw error;
   }
-  throw error;
 }
+
+export const env = validateEnv();

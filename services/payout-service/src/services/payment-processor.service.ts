@@ -32,6 +32,7 @@ import {
 import { generatePaymentInstructionsPDF, generateReceiptPDF } from '../utils/pdf-generator'
 import { uploadPDF } from '../utils/storage'
 import { decryptBankDetails } from '../utils/encryption'
+import { MEMBER_STATUS, PAYOUT_STATUS } from '../config/status-ids'
 
 /**
  * Payment Processor Service Class
@@ -298,9 +299,9 @@ export class PaymentProcessorService {
         throw new Error(`Payout not found: ${payoutId}`)
       }
 
-      // Verify payout is approved
-      if (payout.status !== 'approved') {
-        throw new Error(`Payout must be approved before generating instructions. Current status: ${payout.status}`)
+      // Verify payout is approved using payout_status_id FK column
+      if (payout.payoutStatusId !== PAYOUT_STATUS.APPROVED) {
+        throw new Error(`Payout must be approved before generating instructions. Current payout_status_id: ${payout.payoutStatusId}`)
       }
 
       // Get calculation from processing field
@@ -418,7 +419,7 @@ export class PaymentProcessorService {
           state: mailingAddress.state,
           postalCode: mailingAddress.postalCode,
         } : undefined,
-        breakdown: calculation.breakdown.map(item => ({
+        breakdown: calculation.breakdown.map((item: { description: string; amount: number }) => ({
           description: item.description,
           amount: item.amount,
         })),
@@ -526,11 +527,11 @@ export class PaymentProcessorService {
         throw new Error(`Payout not found: ${payoutId}`)
       }
 
-      // Verify payout is in correct status
-      if (payout.status !== 'approved' && payout.status !== 'scheduled') {
+      // Verify payout is in correct status using payout_status_id FK column
+      if (payout.payoutStatusId !== PAYOUT_STATUS.APPROVED && payout.payoutStatusId !== PAYOUT_STATUS.SCHEDULED) {
         throw new Error(
-          `Cannot mark payment as sent. Current status: ${payout.status}. ` +
-          `Expected: approved or ready_for_payment`
+          `Cannot mark payment as sent. Current payout_status_id: ${payout.payoutStatusId}. ` +
+          `Expected: ${PAYOUT_STATUS.APPROVED} (approved) or ${PAYOUT_STATUS.SCHEDULED} (scheduled)`
         )
       }
 
@@ -544,11 +545,11 @@ export class PaymentProcessorService {
       processing.sentNotes = details.notes
       processing.sentBy = details.sentBy
 
-      // Update payout record
+      // Update payout record with payout_status_id FK column
       await db
         .update(payoutManagement)
         .set({
-          status: 'processing',
+          payoutStatusId: PAYOUT_STATUS.PROCESSING,
           scheduledDate: details.expectedArrivalDate,
           processing: processing as any,
           updatedAt: new Date()
@@ -623,11 +624,11 @@ export class PaymentProcessorService {
         throw new Error(`Payout not found: ${payoutId}`)
       }
 
-      // Verify payout is in correct status
-      if (payout.status !== 'processing') {
+      // Verify payout is in correct status using payout_status_id FK column
+      if (payout.payoutStatusId !== PAYOUT_STATUS.PROCESSING) {
         throw new Error(
-          `Cannot confirm payment completion. Current status: ${payout.status}. ` +
-          `Expected: payment_sent`
+          `Cannot confirm payment completion. Current payout_status_id: ${payout.payoutStatusId}. ` +
+          `Expected: ${PAYOUT_STATUS.PROCESSING} (processing)`
         )
       }
 
@@ -640,28 +641,28 @@ export class PaymentProcessorService {
       processing.completionNotes = details.notes
       processing.completedBy = details.completedBy
 
-      // Update payout record
+      // Update payout record with payout_status_id FK column
       await db
         .update(payoutManagement)
         .set({
-          status: 'completed',
+          payoutStatusId: PAYOUT_STATUS.COMPLETED,
           receiptUrl: details.receiptUrl,
           processing: processing as any,
           updatedAt: new Date()
         })
         .where(eq(payoutManagement.payoutId, payoutId))
 
-      // SYNC: Update member_status to 'Paid' when payout completes
+      // SYNC: Update member_status_id to PAID when payout completes
       // This marks the user as having received their prize
       await db
         .update(userMemberships)
         .set({
-          memberStatus: 'Paid',
+          memberStatusId: MEMBER_STATUS.PAID,
           updatedAt: new Date()
         })
         .where(eq(userMemberships.userId, payout.userId))
 
-      logger.info(`Member status set to Paid for user ${payout.userId}`)
+      logger.info(`Member status set to Paid (ID: ${MEMBER_STATUS.PAID}) for user ${payout.userId}`)
 
       // Update audit trail
       const auditTrail = (payout.auditTrail as any[]) || []
@@ -742,11 +743,11 @@ export class PaymentProcessorService {
       processing.failureRetryable = error.retryable
       processing.failureDetails = error.details
 
-      // Update payout record
+      // Update payout record with payout_status_id FK column
       await db
         .update(payoutManagement)
         .set({
-          status: 'payment_failed',
+          payoutStatusId: PAYOUT_STATUS.FAILED,
           processing: processing as any,
           updatedAt: new Date()
         })
@@ -818,10 +819,10 @@ export class PaymentProcessorService {
         throw new Error(`Payout not found: ${payoutId}`)
       }
 
-      // Verify payout is completed
-      if (payout.status !== 'completed') {
+      // Verify payout is completed using payout_status_id FK column
+      if (payout.payoutStatusId !== PAYOUT_STATUS.COMPLETED) {
         throw new Error(
-          `Cannot generate receipt for incomplete payout. Current status: ${payout.status}`
+          `Cannot generate receipt for incomplete payout. Current payout_status_id: ${payout.payoutStatusId}`
         )
       }
 
@@ -947,7 +948,7 @@ export class PaymentProcessorService {
       return {
         payoutId: payout.payoutId,
         userId: payout.userId,
-        status: payout.status,
+        payoutStatusId: payout.payoutStatusId,
         amount: parseFloat(payout.amount),
         currency: payout.currency,
         paymentMethod: payout.paymentMethod,

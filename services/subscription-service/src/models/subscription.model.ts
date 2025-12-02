@@ -1,19 +1,20 @@
 import { pool } from '../config/database';
 import { Subscription } from '../types';
+import { SUBSCRIPTION_STATUS, mapStripeSubscriptionStatus } from '../config/status-ids';
 
 export class SubscriptionModel {
   static async create(data: {
     user_id: string;
     provider_subscription_id: string;
     provider_customer_id: string;
-    status: string;
+    subscription_status_id: number;
     current_period_start: Date;
     current_period_end: Date;
   }): Promise<Subscription> {
     const query = `
       INSERT INTO user_subscriptions (
         user_id, provider, provider_subscription_id, provider_customer_id,
-        status, current_period_start, current_period_end
+        subscription_status_id, current_period_start, current_period_end
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
@@ -24,7 +25,7 @@ export class SubscriptionModel {
       'stripe', // Default provider
       data.provider_subscription_id,
       data.provider_customer_id,
-      data.status,
+      data.subscription_status_id,
       data.current_period_start,
       data.current_period_end,
     ];
@@ -100,25 +101,27 @@ export class SubscriptionModel {
   }
 
   static async cancelSubscription(subscriptionId: string): Promise<Subscription> {
+    // Use subscription_status_id FK column: 4 = Canceled
     const query = `
       UPDATE user_subscriptions
-      SET status = 'canceled', canceled_at = NOW(), updated_at = NOW()
-      WHERE id = $1
+      SET subscription_status_id = $1, canceled_at = NOW(), updated_at = NOW()
+      WHERE id = $2
       RETURNING *
     `;
 
-    const result = await pool.query<Subscription>(query, [subscriptionId]);
+    const result = await pool.query<Subscription>(query, [SUBSCRIPTION_STATUS.CANCELED, subscriptionId]);
     return result.rows[0];
   }
 
   static async getActiveSubscriptions(): Promise<Subscription[]> {
+    // Use subscription_status_id FK column: 1 = Active, 2 = Trialing
     const query = `
       SELECT * FROM user_subscriptions
-      WHERE status IN ('active', 'trialing')
+      WHERE subscription_status_id IN ($1, $2)
       ORDER BY created_at DESC
     `;
 
-    const result = await pool.query<Subscription>(query);
+    const result = await pool.query<Subscription>(query, [SUBSCRIPTION_STATUS.ACTIVE, SUBSCRIPTION_STATUS.TRIALING]);
     return result.rows;
   }
 }

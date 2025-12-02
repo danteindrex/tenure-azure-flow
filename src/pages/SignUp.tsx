@@ -16,27 +16,38 @@ import baseLogger from "@/lib/baseLogger";
 import { useTheme } from "@/contexts/ThemeContext";
 import { TermsModal } from "@/components/TermsModal";
 import { PrivacyModal } from "@/components/PrivacyModal";
+import { BeamsBackground } from "@/components/ui/beams-background";
+import { LiquidGlassCard } from "@/components/ui/liquid-glass-card";
 
 const SignUp = () => {
   const navigate = useRouter();
   const { data: session, isPending, refetch: refetchSession } = useSession();
   const { theme, setTheme, actualTheme } = useTheme();
 
-  // Initialize step from URL parameter to prevent flashing
-  const getInitialStep = (): number => {
-    if (typeof window === 'undefined') return 1;
+  // Always initialize to 1 to prevent hydration mismatch (server vs client)
+  // URL step will be synced in useEffect after hydration
+  const [step, setStep] = useState(1); // 1: Email+Password, 2: Email Verification, 3: Personal Info + Address, 4: Phone Verification, 5: Payment
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [isOAuthUser, setIsOAuthUser] = useState(false); // Track if user signed up via OAuth
+
+  // Sync step from URL after hydration to prevent SSR mismatch
+  useEffect(() => {
+    setIsHydrated(true);
     const urlParams = new URLSearchParams(window.location.search);
     const stepParam = urlParams.get('step');
+    const oauthParam = urlParams.get('oauth');
+
+    if (oauthParam) {
+      setIsOAuthUser(true);
+    }
+
     if (stepParam) {
       const stepNumber = parseInt(stepParam, 10);
       if (stepNumber >= 1 && stepNumber <= 5) {
-        return stepNumber;
+        setStep(stepNumber);
       }
     }
-    return 1;
-  };
-
-  const [step, setStep] = useState(getInitialStep()); // 1: Email+Password, 2: Email Verification, 3: Personal Info + Address, 4: Phone Verification, 5: Payment
+  }, []);
   const [isLoadingStep, setIsLoadingStep] = useState(false);
   const [formData, setFormData] = useState({
     // Step 1: Email + Password
@@ -1336,13 +1347,13 @@ const SignUp = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
+    <BeamsBackground intensity="medium" className="min-h-screen flex items-center justify-center p-4">
       {/* Theme Toggle Button */}
       <Button
         variant="ghost"
         size="sm"
         onClick={toggleTheme}
-        className="absolute top-4 right-4 z-20 flex items-center gap-2 hover:bg-accent/10 p-2"
+        className="absolute top-4 right-4 z-20 flex items-center gap-2 hover:bg-white/20 dark:hover:bg-black/20 p-2 text-foreground"
         title={`Switch to ${actualTheme === 'light' ? 'dark' : 'light'} mode`}
       >
         {actualTheme === 'light' ? (
@@ -1355,14 +1366,7 @@ const SignUp = () => {
         </span>
       </Button>
 
-      {/* Animated Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-cyan-500/5 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
-      </div>
-
-      <Card className="w-full max-w-lg p-8 relative z-10 backdrop-blur-xl border border-border shadow-2xl bg-card">
+      <LiquidGlassCard className="w-full max-w-lg" glassSize="lg">
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <div className="flex items-center gap-2">
@@ -1657,12 +1661,12 @@ const SignUp = () => {
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold mb-2 text-foreground">Complete Your Profile</h1>
               <p className="text-muted-foreground">
-                {new URLSearchParams(window.location.search).get('oauth')
+                {isOAuthUser
                   ? "Review and complete your profile information"
                   : "Tell us about yourself and your address"
                 }
               </p>
-              {new URLSearchParams(window.location.search).get('oauth') && session?.user && (
+              {isOAuthUser && session?.user && (
                 <div className="mt-3 space-y-2">
                   <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-900/20 text-green-400 rounded-full text-sm border border-green-700">
                     <Check className="w-4 h-4" />
@@ -2237,12 +2241,12 @@ const SignUp = () => {
             </Button>
           </div>
         )}
-      </Card>
+      </LiquidGlassCard>
 
       {/* Terms and Privacy Modals */}
       <TermsModal open={showTermsModal} onOpenChange={setShowTermsModal} />
       <PrivacyModal open={showPrivacyModal} onOpenChange={setShowPrivacyModal} />
-    </div>
+    </BeamsBackground>
   );
 };
 

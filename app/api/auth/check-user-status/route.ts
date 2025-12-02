@@ -3,6 +3,7 @@ import { db } from "@/drizzle/db";
 import { userMemberships } from "@/drizzle/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { VERIFICATION_STATUS } from "@/lib/status-ids";
 
 export async function GET(request: Request) {
   try {
@@ -18,16 +19,15 @@ export async function GET(request: Request) {
       .limit(1)
       .then(rows => rows[0]);
 
-    // User is considered verified if their membership verification status is 'VERIFIED' or 'APPROVED'
-    const isVerified = membership?.verificationStatus === 'VERIFIED' ||
-                       membership?.verificationStatus === 'APPROVED';
+    // User is considered verified if their membership verification_status_id is VERIFIED (2)
+    const isVerified = membership?.verificationStatusId === VERIFICATION_STATUS.VERIFIED;
 
     return NextResponse.json({
       isVerified,
       userId: session.user.id,
       email: session.user.email,
       emailVerified: session.user.emailVerified || false,
-      verificationStatus: membership?.verificationStatus || 'PENDING'
+      verificationStatusId: membership?.verificationStatusId || VERIFICATION_STATUS.PENDING
     });
 
   } catch (error) {

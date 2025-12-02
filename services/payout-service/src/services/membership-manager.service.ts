@@ -18,6 +18,7 @@ import { payoutManagement } from '../../drizzle/schema'
 import { eq, and, lte, sql } from 'drizzle-orm'
 import { logger } from '../utils/logger'
 import { notificationService } from './notification.service'
+import { PAYOUT_STATUS } from '../config/status-ids'
 
 /**
  * Result of a membership removal operation
@@ -88,7 +89,7 @@ export class MembershipManagerService {
       const payout = await db.query.payoutManagement.findFirst({
         where: and(
           eq(payoutManagement.userId, userId),
-          eq(payoutManagement.status, 'completed')
+          eq(payoutManagement.payoutStatusId, PAYOUT_STATUS.COMPLETED)
         ),
         orderBy: (payoutManagement, { desc }) => [desc(payoutManagement.createdAt)]
       })
@@ -174,7 +175,7 @@ export class MembershipManagerService {
       // Query for all completed payouts
       // We'll filter by removal date in code since it's stored in the processing JSON field
       const payouts = await db.query.payoutManagement.findMany({
-        where: eq(payoutManagement.status, 'completed')
+        where: eq(payoutManagement.payoutStatusId, PAYOUT_STATUS.COMPLETED)
       })
 
       logger.debug('Found completed payouts to check for removal', {
@@ -219,10 +220,10 @@ export class MembershipManagerService {
         const scheduledDate = processing.membership_removal_scheduled
           ? new Date(processing.membership_removal_scheduled)
           : new Date()
-        
+
         return {
           userId: payout.userId,
-          payoutDate: payout.createdAt,
+          payoutDate: payout.createdAt ?? new Date(),
           removalDate: scheduledDate,
           removed: false,
           reason: processing.removal_reason || 'Scheduled removal after payout'
@@ -265,7 +266,7 @@ export class MembershipManagerService {
       const payout = await db.query.payoutManagement.findFirst({
         where: and(
           eq(payoutManagement.userId, userId),
-          eq(payoutManagement.status, 'completed')
+          eq(payoutManagement.payoutStatusId, PAYOUT_STATUS.COMPLETED)
         ),
         orderBy: (payoutManagement, { desc }) => [desc(payoutManagement.createdAt)]
       })
@@ -485,7 +486,7 @@ export class MembershipManagerService {
       const payout = await db.query.payoutManagement.findFirst({
         where: and(
           eq(payoutManagement.userId, userId),
-          eq(payoutManagement.status, 'completed')
+          eq(payoutManagement.payoutStatusId, PAYOUT_STATUS.COMPLETED)
         ),
         orderBy: (payoutManagement, { desc }) => [desc(payoutManagement.createdAt)]
       })
@@ -618,7 +619,7 @@ export class MembershipManagerService {
       const payout = await db.query.payoutManagement.findFirst({
         where: and(
           eq(payoutManagement.userId, userId),
-          eq(payoutManagement.status, 'completed')
+          eq(payoutManagement.payoutStatusId, PAYOUT_STATUS.COMPLETED)
         ),
         orderBy: (payoutManagement, { desc }) => [desc(payoutManagement.createdAt)]
       })
@@ -650,8 +651,8 @@ export class MembershipManagerService {
       const status: MembershipStatus = {
         userId,
         hasReceivedPayout: true,
-        payoutDate: payout.createdAt,
-        scheduledRemovalDate: scheduledRemovalDate || undefined,
+        payoutDate: payout.createdAt ?? undefined,
+        scheduledRemovalDate: scheduledRemovalDate ?? undefined,
         isActive,
         canReactivate
       }

@@ -5,6 +5,7 @@ import { db, payoutManagement } from '../config/database';
 import { eq, desc, and } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
+import { PAYOUT_STATUS } from '../config/status-ids';
 
 export class PayoutController {
   private winnerSelector: WinnerSelector;
@@ -51,13 +52,13 @@ export class PayoutController {
   }
 
   async listPayouts(req: AuthenticatedRequest, res: Response) {
-    const { status, userId, limit = '50', offset = '0' } = req.query;
+    const { statusId, userId, limit = '50', offset = '0' } = req.query;
 
     try {
       let query = db.select().from(payoutManagement);
 
       const conditions = [];
-      if (status) conditions.push(eq(payoutManagement.status, status as string));
+      if (statusId) conditions.push(eq(payoutManagement.payoutStatusId, parseInt(statusId as string)));
       if (userId) conditions.push(eq(payoutManagement.userId, userId as string));
 
       if (conditions.length > 0) {

@@ -4,6 +4,7 @@ import { db } from "@/drizzle/db";
 import { userContacts } from "@/drizzle/schema/users";
 import { user } from "@/drizzle/schema/auth";
 import { eq, and } from "drizzle-orm";
+import { USER_STATUS } from "@/lib/status-ids";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -102,11 +103,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       case 'payment-completed':
-        // Update user status to Active when payment is completed
+        // Update user status to Onboarded when payment is completed
+        // Note: The user_status_id FK column references user_funnel_statuses lookup table
         await db
           .update(user)
           .set({
-            status: 'Active',
+            userStatusId: USER_STATUS.ONBOARDED,
             updatedAt: new Date()
           })
           .where(eq(user.id, currentUserId));

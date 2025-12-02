@@ -9,7 +9,7 @@ export const UserMemberships: CollectionConfig = {
   slug: 'user_memberships',
   admin: {
     useAsTitle: 'user_id',
-    defaultColumns: ['user_id', 'join_date', 'tenure', 'verification_status'],
+    defaultColumns: ['user_id', 'join_date', 'tenure', 'member_status_id', 'verification_status_id'],
     description: 'Membership-specific business data',
     group: 'User Management',
   },
@@ -54,16 +54,22 @@ export const UserMemberships: CollectionConfig = {
       },
     },
     {
-      name: 'verification_status',
-      type: 'select',
-      defaultValue: 'PENDING',
+      name: 'member_status_id',
+      type: 'number',
+      defaultValue: 1,
+      label: 'Member Eligibility Status',
+      admin: {
+        description: 'FK to member_eligibility_statuses: 1=Inactive, 2=Active, 3=Suspended, 4=Cancelled, 5=Won, 6=Paid',
+      },
+    },
+    {
+      name: 'verification_status_id',
+      type: 'number',
+      defaultValue: 1,
       label: 'Verification Status',
-      options: [
-        { label: 'Pending', value: 'PENDING' },
-        { label: 'Verified', value: 'VERIFIED' },
-        { label: 'Failed', value: 'FAILED' },
-        { label: 'Skipped', value: 'SKIPPED' },
-      ],
+      admin: {
+        description: 'FK to verification_statuses: 1=Pending, 2=Verified, 3=Failed, 4=Skipped',
+      },
     },
     {
       name: 'assigned_admin_id',

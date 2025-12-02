@@ -54,7 +54,7 @@ export const userSubscriptions = pgTable('user_subscriptions', {
   provider: varchar('provider', { length: 20 }).notNull().default('stripe'),
   providerSubscriptionId: varchar('provider_subscription_id', { length: 255 }).notNull(),
   providerCustomerId: varchar('provider_customer_id', { length: 255 }).notNull(),
-  status: varchar('status', { length: 20 }).notNull(),
+  subscriptionStatusId: integer('subscription_status_id').notNull().default(1), // References subscription_statuses lookup table
   currentPeriodStart: timestamp('current_period_start', { withTimezone: true }).notNull(),
   currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
   cancelAtPeriodEnd: boolean('cancel_at_period_end').default(false),
@@ -65,7 +65,7 @@ export const userSubscriptions = pgTable('user_subscriptions', {
 }, (table) => ({
   userIdIdx: index('idx_user_subscriptions_user_id').on(table.userId),
   providerIdIdx: index('idx_user_subscriptions_provider_id').on(table.providerSubscriptionId),
-  statusIdx: index('idx_user_subscriptions_status').on(table.status)
+  statusIdx: index('idx_user_subscriptions_subscription_status_id').on(table.subscriptionStatusId)
 }))
 
 // ============================================================================
@@ -84,7 +84,7 @@ export const userPayments = pgTable('user_payments', {
   currency: char('currency', { length: 3 }).default('USD'),
   paymentType: varchar('payment_type', { length: 20 }).notNull(),
   paymentDate: timestamp('payment_date', { withTimezone: true }).notNull(),
-  status: varchar('status', { length: 20 }).notNull(),
+  paymentStatusId: integer('payment_status_id').notNull().default(1), // References payment_statuses lookup table
   isFirstPayment: boolean('is_first_payment').default(false),
   failureReason: text('failure_reason'),
   receiptUrl: text('receipt_url'),
@@ -95,7 +95,7 @@ export const userPayments = pgTable('user_payments', {
   userIdIdx: index('idx_user_payments_user_id').on(table.userId),
   subscriptionIdIdx: index('idx_user_payments_subscription_id').on(table.subscriptionId),
   dateIdx: index('idx_user_payments_date').on(table.paymentDate),
-  statusIdx: index('idx_user_payments_status').on(table.status)
+  statusIdx: index('idx_user_payments_payment_status_id').on(table.paymentStatusId)
 }))
 
 // ============================================================================

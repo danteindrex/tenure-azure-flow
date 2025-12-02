@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/drizzle/db";
 import { user, membershipQueue, userPayments } from "@/drizzle/schema";
 import { eq, gte, and } from "drizzle-orm";
+import { PAYMENT_STATUS } from "@/lib/status-ids";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
@@ -60,7 +61,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         columns: {
           amount: true,
           paymentDate: true,
-          status: true
+          paymentStatusId: true
         },
         orderBy: userPayments.paymentDate
       });
@@ -102,7 +103,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Potential payout: approximate as total revenue of all completed payments / 2
     let totalRevenueAll = 0;
     const allPayments = await db.query.userPayments.findMany({
-      where: eq(userPayments.status, 'succeeded'),
+      where: eq(userPayments.paymentStatusId, PAYMENT_STATUS.SUCCEEDED),
       columns: {
         amount: true
       }

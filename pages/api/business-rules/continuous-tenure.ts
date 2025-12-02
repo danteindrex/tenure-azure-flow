@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { db } from '@/drizzle/db';
 import { membershipQueue, user, userProfiles, userPayments } from '@/drizzle/schema';
 import { eq, asc, and, sql } from 'drizzle-orm';
+import { PAYMENT_STATUS } from '@/lib/status-ids';
 
 /**
  * Continuous Tenure API
@@ -50,7 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .where(and(
             eq(userPayments.userId, member.memberId),
             eq(userPayments.paymentType, 'joining_fee'),
-            eq(userPayments.status, 'succeeded')
+            eq(userPayments.paymentStatusId, PAYMENT_STATUS.SUCCEEDED)
           ))
           .limit(1)
           .then(rows => rows[0]);

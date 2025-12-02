@@ -13,9 +13,9 @@ import billingRoutes from './routes/billing.routes';
 const app: Application = express();
 
 // Trust proxy for serverless environments (Vercel, AWS Lambda)
-// This is required for rate limiting and getting correct client IPs
-// MUST be set before rate limiter is configured
-app.set('trust proxy', true);
+// Set to 1 to trust only the first proxy (the load balancer/edge)
+// This is more secure than 'true' which trusts all proxies
+app.set('trust proxy', 1);
 logger.info('Trust proxy enabled for serverless/proxy environments');
 
 // Rate limiting
@@ -23,9 +23,10 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
   skipFailedRequests: true,
-  // Use a standard key generator that works with trust proxy
   standardHeaders: true,
   legacyHeaders: false,
+  // Disable trust proxy validation since we've set it to a specific value
+  validate: { trustProxy: false },
 });
 
 // Middleware - Security (applied globally)

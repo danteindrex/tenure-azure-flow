@@ -8,7 +8,6 @@ declare global {
       user?: {
         id: string;
         email: string;
-        authUserId: string | null;
       };
       userId?: string;
     }

@@ -12,16 +12,24 @@ import { relations } from "drizzle-orm";
 export const user = pgTable("users", {
   // Your existing columns - use UUID to match your database
   id: uuid("id").primaryKey().defaultRandom(), // UUID to match your existing table
-  authUserId: text("auth_user_id"),
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false),
-  status: text("status").default("Pending"),
+
+  // User status - references user_funnel_statuses lookup table
+  // 1 = Pending, 2 = Onboarded
+  userStatusId: integer("user_status_id").default(1),
+
+  // Onboarding flags (used by trigger to auto-update user_status_id)
+  profileCompleted: boolean("profile_completed").default(false),
+  financialAgreementAccepted: boolean("financial_agreement_accepted").default(false),
+  policyAgreementAccepted: boolean("policy_agreement_accepted").default(false),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  
+
   // Better Auth required fields (add these to your users table)
   name: text("name"), // Add this column to users table
-  image: text("image"), // Add this column to users table  
+  image: text("image"), // Add this column to users table
   twoFactorEnabled: boolean("two_factor_enabled").default(false), // Add this column
 });
 

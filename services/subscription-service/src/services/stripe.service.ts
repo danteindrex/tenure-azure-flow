@@ -7,6 +7,14 @@ import { CreateCheckoutSessionRequest, CreateCheckoutSessionResponse } from '../
 import { pool } from '../config/database';
 import { STRIPE_PRICE_IDS, validateStripePriceIds } from '../config/stripe-prices';
 import { emailService } from './email.service';
+import {
+  USER_STATUS,
+  MEMBER_STATUS,
+  SUBSCRIPTION_STATUS,
+  PAYMENT_STATUS,
+  VERIFICATION_STATUS,
+  mapStripeSubscriptionStatus,
+} from '../config/status-ids';
 
 const stripe = new Stripe(config.stripe.secretKey, {
   apiVersion: '2025-10-29.clover',
@@ -39,8 +47,92 @@ export class StripeService {
 
       const user = userResult.rows[0];
 
-      // Note: Users can have multiple active subscriptions
-      // Each subscription creates its own membership (queue entry)
+      // ============================================
+      // DUPLICATE PAYMENT PREVENTION
+      // ============================================
+
+      // 1. Check for ANY active subscription - users should only have ONE active subscription
+      // Using subscription_status_id FK column: 1=Active, 2=Trialing
+      const activeSubscriptionQuery = `
+        SELECT us.id, us.provider_subscription_id, us.created_at
+        FROM user_subscriptions us
+        WHERE us.user_id = $1
+        AND us.subscription_status_id IN ($2, $3)
+        ORDER BY us.created_at DESC
+        LIMIT 1
+      `;
+      const activeSub = await pool.query(activeSubscriptionQuery, [userId, SUBSCRIPTION_STATUS.ACTIVE, SUBSCRIPTION_STATUS.TRIALING]);
+
+      if (activeSub.rows.length > 0) {
+        logger.warn(`User ${userId} already has an active subscription, preventing duplicate checkout`, {
+          existingSubscriptionId: activeSub.rows[0].provider_subscription_id,
+          createdAt: activeSub.rows[0].created_at
+        });
+        throw new Error('DUPLICATE_SUBSCRIPTION: You already have an active subscription. Please refresh the page.');
+      }
+
+      // 2. Check for recent successful payments (within last 5 minutes)
+      // This catches cases where payment succeeded but subscription creation is still in progress
+      // Using payment_status_id FK column: 2=Succeeded
+      const recentPaymentQuery = `
+        SELECT id, provider_payment_id, created_at
+        FROM user_payments
+        WHERE user_id = $1
+        AND payment_status_id = $2
+        AND payment_type = 'subscription'
+        AND created_at > NOW() - INTERVAL '5 minutes'
+        LIMIT 1
+      `;
+      const recentPayment = await pool.query(recentPaymentQuery, [userId, PAYMENT_STATUS.SUCCEEDED]);
+
+      if (recentPayment.rows.length > 0) {
+        logger.warn(`User ${userId} has a recent successful payment, preventing duplicate checkout`, {
+          paymentId: recentPayment.rows[0].provider_payment_id,
+          createdAt: recentPayment.rows[0].created_at
+        });
+        throw new Error('PAYMENT_PROCESSING: Your payment is being processed. Please wait a moment and refresh the page.');
+      }
+
+      // 3. Check Stripe directly for active subscriptions (in case webhook failed to sync)
+      const existingCustomersCheck = await stripe.customers.list({
+        email: user.email,
+        limit: 1,
+      });
+
+      if (existingCustomersCheck.data.length > 0) {
+        const stripeCustomer = existingCustomersCheck.data[0];
+
+        // Check for active or trialing subscriptions directly in Stripe
+        const stripeSubscriptions = await stripe.subscriptions.list({
+          customer: stripeCustomer.id,
+          status: 'active',
+          limit: 10,
+        });
+
+        const trialingSubscriptions = await stripe.subscriptions.list({
+          customer: stripeCustomer.id,
+          status: 'trialing',
+          limit: 10,
+        });
+
+        const allActiveSubscriptions = [
+          ...stripeSubscriptions.data,
+          ...trialingSubscriptions.data,
+        ];
+
+        if (allActiveSubscriptions.length > 0) {
+          const stripeSub = allActiveSubscriptions[0];
+          logger.info(`Found active subscription in Stripe for user ${userId}, syncing to database`, {
+            stripeSubscriptionId: stripeSub.id,
+            status: stripeSub.status,
+          });
+
+          // Sync the subscription to our database and update membership
+          await this.syncStripeSubscriptionToDatabase(userId, stripeCustomer.id, stripeSub);
+
+          throw new Error('SUBSCRIPTION_SYNCED: You already have an active subscription. Your account has been updated. Please refresh the page.');
+        }
+      }
 
       // Create or retrieve Stripe customer
       let customer: Stripe.Customer;
@@ -180,17 +272,18 @@ export class StripeService {
         expand: ['latest_invoice', 'latest_invoice.payment_intent'],
       });
 
-      // Update user status to Active
+      // Update user status to Onboarded (using user_status_id FK column)
       const updateUserQuery = `
         UPDATE users
-        SET status = 'Active', updated_at = NOW()
-        WHERE id = $1
+        SET user_status_id = $1, updated_at = NOW()
+        WHERE id = $2
       `;
-      await pool.query(updateUserQuery, [userId]);
+      await pool.query(updateUserQuery, [USER_STATUS.ONBOARDED, userId]);
 
       // Also notify the main app about payment completion
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/onboarding/update-progress`, {
+        const appUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        await fetch(`${appUrl}/api/onboarding/update-progress`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -216,7 +309,7 @@ export class StripeService {
       const subscriptionQuery = `
         INSERT INTO user_subscriptions (
           user_id, provider, provider_subscription_id, provider_customer_id,
-          status, current_period_start, current_period_end
+          subscription_status_id, current_period_start, current_period_end
         )
         VALUES ($1, 'stripe', $2, $3, $4, $5, $6)
         RETURNING id
@@ -226,7 +319,7 @@ export class StripeService {
         userId,
         subscription.id,
         subscription.customer,
-        subscription.status,
+        mapStripeSubscriptionStatus(subscription.status),
         new Date(earliestPeriodStart * 1000),
         new Date(latestPeriodEnd * 1000)
       ]);
@@ -342,17 +435,17 @@ export class StripeService {
 
       // Create userMemberships record linked to this subscription
       // Each subscription gets its own membership (queue entry)
-      // Set member_status to 'Active' since payment succeeded
+      // Set member_status_id to ACTIVE (2) since payment succeeded
       const membershipQuery = `
-        INSERT INTO user_memberships (user_id, subscription_id, member_status)
-        VALUES ($1, $2, 'Active')
+        INSERT INTO user_memberships (user_id, subscription_id, member_status_id, verification_status_id)
+        VALUES ($1, $2, $3, $4)
         ON CONFLICT (subscription_id) DO UPDATE SET
-          member_status = 'Active',
+          member_status_id = $3,
           updated_at = NOW()
       `;
-      await pool.query(membershipQuery, [userId, subscriptionResult.rows[0].id]);
+      await pool.query(membershipQuery, [userId, subscriptionResult.rows[0].id, MEMBER_STATUS.ACTIVE, VERIFICATION_STATUS.PENDING]);
 
-      logger.info(`Member status set to Active for user ${userId}`);
+      logger.info(`Member status set to Active (ID: ${MEMBER_STATUS.ACTIVE}) for user ${userId}`);
 
       // Get checkout payment details (not subscription invoice - that hasn't been created yet)
       const initialPaymentAmount = config.pricing.initialAmount; // $325
@@ -390,13 +483,13 @@ export class StripeService {
           paymentIntentId
         });
       } else {
-        // Payment doesn't exist, create it
+        // Payment doesn't exist, create it with payment_status_id FK column
         const paymentQuery = `
           INSERT INTO user_payments (
             user_id, subscription_id, payment_method_id, provider_payment_id, provider_invoice_id,
-            provider_charge_id, amount, currency, payment_type, status, is_first_payment, receipt_url, metadata, payment_date
+            provider_charge_id, amount, currency, payment_type, payment_status_id, is_first_payment, receipt_url, metadata, payment_date
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'initial', 'succeeded', true, $9, $10, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'initial', $9, true, $10, $11, NOW())
           RETURNING id
         `;
 
@@ -409,6 +502,7 @@ export class StripeService {
           null, // No charge ID available
           initialPaymentAmount,
           config.pricing.currency,
+          PAYMENT_STATUS.SUCCEEDED,
           checkoutReceiptUrl,
           JSON.stringify(initialPaymentMetadata)
         ]);
@@ -597,14 +691,14 @@ export class StripeService {
         return;
       }
 
-      // Create payment record in user_payments table
+      // Create payment record in user_payments table with payment_status_id FK column
       // Note: In Stripe API v2025+, payment_intent and charge are not on Invoice
       const paymentQuery = `
         INSERT INTO user_payments (
           user_id, subscription_id, payment_method_id, provider_payment_id, provider_invoice_id,
-          provider_charge_id, amount, currency, payment_type, status, is_first_payment, receipt_url, metadata, payment_date
+          provider_charge_id, amount, currency, payment_type, payment_status_id, is_first_payment, receipt_url, metadata, payment_date
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'succeeded', $10, $11, $12, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
         RETURNING id
       `;
 
@@ -618,12 +712,13 @@ export class StripeService {
         amount,
         invoice.currency,
         isFirstPayment ? 'initial' : 'recurring',
+        PAYMENT_STATUS.SUCCEEDED,
         isFirstPayment,
         invoice.hosted_invoice_url || null,
         JSON.stringify(paymentMetadata)
       ]);
 
-      // Calculate total months subscribed and lifetime total
+      // Calculate total months subscribed and lifetime total using payment_status_id
       const paymentsQuery = `
         SELECT * FROM user_payments
         WHERE user_id = $1
@@ -631,14 +726,14 @@ export class StripeService {
       `;
       const paymentsResult = await pool.query(paymentsQuery, [dbSubscription.user_id]);
       const payments = paymentsResult.rows;
-      const totalMonths = payments.filter((p: any) => p.status === 'succeeded').length;
+      const totalMonths = payments.filter((p: any) => p.payment_status_id === PAYMENT_STATUS.SUCCEEDED).length;
 
       const lifetimeTotalQuery = `
         SELECT COALESCE(SUM(amount), 0) as total
         FROM user_payments
-        WHERE user_id = $1 AND status = 'succeeded'
+        WHERE user_id = $1 AND payment_status_id = $2
       `;
-      const lifetimeTotalResult = await pool.query(lifetimeTotalQuery, [dbSubscription.user_id]);
+      const lifetimeTotalResult = await pool.query(lifetimeTotalQuery, [dbSubscription.user_id, PAYMENT_STATUS.SUCCEEDED]);
       const lifetimeTotal = parseFloat(lifetimeTotalResult.rows[0].total);
 
       // Note: Queue stats are automatically calculated by active_member_queue_view
@@ -703,19 +798,19 @@ export class StripeService {
         lifetimeTotal,
       });
 
-      // SYNC: Reactivate member_status to 'Active' on successful payment
+      // SYNC: Reactivate member_status_id to ACTIVE on successful payment
       // This handles users who were Suspended and made a successful payment to cure
       // Only reactivate if currently Suspended (don't override Won/Paid states)
       await pool.query(
         `UPDATE user_memberships
-         SET member_status = 'Active',
+         SET member_status_id = $1,
              updated_at = NOW()
-         WHERE subscription_id = $1
-         AND member_status = 'Suspended'`,
-        [dbSubscription.id]
+         WHERE subscription_id = $2
+         AND member_status_id = $3`,
+        [MEMBER_STATUS.ACTIVE, dbSubscription.id, MEMBER_STATUS.SUSPENDED]
       );
 
-      logger.info(`Member status reactivated to Active for subscription ${dbSubscription.id} (if was Suspended)`);
+      logger.info(`Member status reactivated to Active (ID: ${MEMBER_STATUS.ACTIVE}) for subscription ${dbSubscription.id} (if was Suspended)`);
 
       // Refresh the queue to reflect updated payment stats
       try {
@@ -806,14 +901,14 @@ export class StripeService {
         failure_details: failureReason
       };
 
-      // Record failed payment attempt
+      // Record failed payment attempt with payment_status_id FK column
       const paymentQuery = `
         INSERT INTO user_payments (
           user_id, subscription_id, payment_method_id, provider_payment_id, provider_invoice_id,
-          provider_charge_id, amount, currency, payment_type, status, is_first_payment,
+          provider_charge_id, amount, currency, payment_type, payment_status_id, is_first_payment,
           failure_reason, metadata, payment_date
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'failed', $10, $11, $12, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
         RETURNING id
       `;
 
@@ -827,6 +922,7 @@ export class StripeService {
         amount,
         invoice.currency,
         isFirstPayment ? 'initial' : 'recurring',
+        PAYMENT_STATUS.FAILED,
         isFirstPayment,
         failureReason,
         JSON.stringify(paymentMetadata)
@@ -861,26 +957,27 @@ export class StripeService {
             }
           });
 
-          // Update database subscription status
+          // Update database subscription status using subscription_status_id FK column
+          // CANCELED (4) for paused state since we don't have a PAUSED status
           await pool.query(
             `UPDATE user_subscriptions
-             SET status = 'paused',
+             SET subscription_status_id = $1,
                  updated_at = NOW()
-             WHERE id = $1`,
-            [dbSubscription.id]
+             WHERE id = $2`,
+            [SUBSCRIPTION_STATUS.CANCELED, dbSubscription.id]
           );
 
-          // SYNC: Update member_status to 'Suspended' on final payment failure
+          // SYNC: Update member_status_id to SUSPENDED on final payment failure
           // This removes user from queue eligibility
           await pool.query(
             `UPDATE user_memberships
-             SET member_status = 'Suspended',
+             SET member_status_id = $1,
                  updated_at = NOW()
-             WHERE subscription_id = $1`,
-            [dbSubscription.id]
+             WHERE subscription_id = $2`,
+            [MEMBER_STATUS.SUSPENDED, dbSubscription.id]
           );
 
-          logger.info(`Member status set to Suspended for subscription ${dbSubscription.id} after ${attemptCount} failed attempts`);
+          logger.info(`Member status set to Suspended (ID: ${MEMBER_STATUS.SUSPENDED}) for subscription ${dbSubscription.id} after ${attemptCount} failed attempts`);
 
           // Refresh the queue to reflect the status change
           try {
@@ -975,17 +1072,17 @@ export class StripeService {
       // Update subscription status
       await SubscriptionModel.cancelSubscription(dbSubscription.id);
 
-      // SYNC: Update member_status to 'Cancelled' when subscription is deleted
+      // SYNC: Update member_status_id to CANCELLED when subscription is deleted
       // This permanently removes user from queue eligibility
       await pool.query(
         `UPDATE user_memberships
-         SET member_status = 'Cancelled',
+         SET member_status_id = $1,
              updated_at = NOW()
-         WHERE subscription_id = $1`,
-        [dbSubscription.id]
+         WHERE subscription_id = $2`,
+        [MEMBER_STATUS.CANCELLED, dbSubscription.id]
       );
 
-      logger.info(`Member status set to Cancelled for subscription ${dbSubscription.id}`);
+      logger.info(`Member status set to Cancelled (ID: ${MEMBER_STATUS.CANCELLED}) for subscription ${dbSubscription.id}`);
 
       // Refresh the queue to reflect the status change
       try {
@@ -1043,7 +1140,8 @@ export class StripeService {
         throw new Error('No subscription found');
       }
 
-      if (dbSubscription.status === 'canceled') {
+      // Check if subscription is canceled using subscription_status_id (4 = Canceled)
+      if (dbSubscription.subscription_status_id === SUBSCRIPTION_STATUS.CANCELED) {
         throw new Error('Cannot reactivate a canceled subscription. Please create a new subscription.');
       }
 
@@ -1130,6 +1228,147 @@ export class StripeService {
       };
     } catch (error) {
       logger.error('Error creating billing portal session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sync a Stripe subscription to the database
+   * Used when we find an active subscription in Stripe that's not in our DB (e.g., webhook failed)
+   */
+  private static async syncStripeSubscriptionToDatabase(
+    userId: string,
+    stripeCustomerId: string,
+    stripeSub: Stripe.Subscription
+  ): Promise<void> {
+    try {
+      logger.info(`Syncing Stripe subscription ${stripeSub.id} to database for user ${userId}`);
+
+      // Get period start/end from subscription items (Stripe API v2025+)
+      const subscriptionItems = stripeSub.items.data;
+      const earliestPeriodStart = Math.min(...subscriptionItems.map(item => item.current_period_start));
+      const latestPeriodEnd = Math.max(...subscriptionItems.map(item => item.current_period_end));
+
+      // Check if subscription already exists in DB (might be with different status)
+      const existingSubQuery = `
+        SELECT id, status FROM user_subscriptions
+        WHERE provider_subscription_id = $1
+        LIMIT 1
+      `;
+      const existingSub = await pool.query(existingSubQuery, [stripeSub.id]);
+
+      let subscriptionId: string;
+
+      if (existingSub.rows.length > 0) {
+        // Update existing subscription to active using subscription_status_id FK column
+        subscriptionId = existingSub.rows[0].id;
+        await pool.query(
+          `UPDATE user_subscriptions
+           SET subscription_status_id = $1,
+               current_period_start = $2,
+               current_period_end = $3,
+               updated_at = NOW()
+           WHERE id = $4`,
+          [
+            mapStripeSubscriptionStatus(stripeSub.status),
+            new Date(earliestPeriodStart * 1000),
+            new Date(latestPeriodEnd * 1000),
+            subscriptionId
+          ]
+        );
+        logger.info(`Updated existing subscription ${subscriptionId} to status ID ${mapStripeSubscriptionStatus(stripeSub.status)}`);
+      } else {
+        // Create new subscription record with subscription_status_id FK column
+        const insertSubQuery = `
+          INSERT INTO user_subscriptions (
+            user_id, provider, provider_subscription_id, provider_customer_id,
+            subscription_status_id, current_period_start, current_period_end,
+            cancel_at_period_end, created_at, updated_at
+          )
+          VALUES ($1, 'stripe', $2, $3, $4, $5, $6, $7, NOW(), NOW())
+          RETURNING id
+        `;
+        const subResult = await pool.query(insertSubQuery, [
+          userId,
+          stripeSub.id,
+          stripeCustomerId,
+          mapStripeSubscriptionStatus(stripeSub.status),
+          new Date(earliestPeriodStart * 1000),
+          new Date(latestPeriodEnd * 1000),
+          stripeSub.cancel_at_period_end || false,
+        ]);
+        subscriptionId = subResult.rows[0].id;
+        logger.info(`Created new subscription record ${subscriptionId} for Stripe sub ${stripeSub.id}`);
+      }
+
+      // Check if user has a membership - update the latest one
+      const membershipQuery = `
+        SELECT id, member_status_id FROM user_memberships
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      const membership = await pool.query(membershipQuery, [userId]);
+
+      if (membership.rows.length > 0) {
+        const membershipId = membership.rows[0].id;
+        const currentStatusId = membership.rows[0].member_status_id;
+
+        // Update membership to Active and link to subscription if not already active/won/paid
+        if (currentStatusId !== MEMBER_STATUS.ACTIVE && currentStatusId !== MEMBER_STATUS.WON && currentStatusId !== MEMBER_STATUS.PAID) {
+          await pool.query(
+            `UPDATE user_memberships
+             SET member_status_id = $1,
+                 subscription_id = $2,
+                 updated_at = NOW()
+             WHERE id = $3`,
+            [MEMBER_STATUS.ACTIVE, subscriptionId, membershipId]
+          );
+          logger.info(`Updated membership ${membershipId} to Active status (ID: ${MEMBER_STATUS.ACTIVE})`);
+        } else {
+          // Just ensure subscription_id is linked
+          await pool.query(
+            `UPDATE user_memberships
+             SET subscription_id = $1,
+                 updated_at = NOW()
+             WHERE id = $2 AND (subscription_id IS NULL OR subscription_id != $1)`,
+            [subscriptionId, membershipId]
+          );
+        }
+      } else {
+        // Create membership record with member_status_id and verification_status_id FK columns
+        const insertMembershipQuery = `
+          INSERT INTO user_memberships (
+            user_id, subscription_id, member_status_id, verification_status_id, join_date, tenure,
+            created_at, updated_at
+          )
+          VALUES ($1, $2, $3, $4, CURRENT_DATE, 0, NOW(), NOW())
+          RETURNING id
+        `;
+        const membershipResult = await pool.query(insertMembershipQuery, [userId, subscriptionId, MEMBER_STATUS.ACTIVE, VERIFICATION_STATUS.PENDING]);
+        logger.info(`Created new membership ${membershipResult.rows[0].id} for user ${userId}`);
+      }
+
+      // Update user status to Onboarded if not already using user_status_id FK column
+      await pool.query(
+        `UPDATE users
+         SET user_status_id = $1,
+             updated_at = NOW()
+         WHERE id = $2 AND user_status_id != $1`,
+        [USER_STATUS.ONBOARDED, userId]
+      );
+
+      // Refresh the queue
+      try {
+        await pool.query('SELECT refresh_active_member_queue()');
+        logger.info(`Queue refreshed after syncing subscription for user ${userId}`);
+      } catch (refreshError) {
+        logger.warn('Failed to refresh queue view after sync:', refreshError);
+      }
+
+      logger.info(`Successfully synced Stripe subscription ${stripeSub.id} for user ${userId}`);
+    } catch (error) {
+      logger.error(`Error syncing Stripe subscription to database:`, error);
       throw error;
     }
   }

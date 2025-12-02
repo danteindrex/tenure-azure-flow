@@ -13,28 +13,10 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Initialize theme from localStorage or default to system preference
-  const getInitialTheme = (): Theme => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('theme') as Theme;
-      if (saved) return saved;
-      // Default to system preference
-      return 'system';
-    }
-    return 'light';
-  };
-
-  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
-  const [actualTheme, setActualTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('theme') as Theme;
-      if (saved === 'dark') return 'dark';
-      if (saved === 'light') return 'light';
-      // For system or no saved theme, get system preference
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    return 'light';
-  });
+  // IMPORTANT: Always initialize with consistent values for SSR/hydration
+  // The actual theme will be loaded from localStorage in useEffect after hydration
+  const [theme, setThemeState] = useState<Theme>('light');
+  const [actualTheme, setActualTheme] = useState<'light' | 'dark'>('light');
 
   // Get system theme preference
   const getSystemTheme = (): 'light' | 'dark' => {
@@ -58,10 +40,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const root = window.document.documentElement;
       root.classList.remove('light', 'dark');
       root.classList.add(newTheme);
-      
+
       // Set theme attributes
       root.setAttribute('data-theme', newTheme);
-      
+
       // Update meta theme-color for mobile browsers
       const metaThemeColor = document.querySelector('meta[name="theme-color"]');
       if (metaThemeColor) {
@@ -70,17 +52,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Load theme from localStorage on mount
+  // Load theme from localStorage AFTER hydration to prevent mismatch
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('theme') as Theme;
-      const initialTheme = savedTheme || 'light';
-      const resolvedTheme = resolveTheme(initialTheme);
-      
-      setThemeState(initialTheme);
-      setActualTheme(resolvedTheme);
-      applyTheme(resolvedTheme);
-    }
+    const savedTheme = localStorage.getItem('theme') as Theme;
+    const initialTheme = savedTheme || 'light';
+    const resolvedTheme = resolveTheme(initialTheme);
+
+    setThemeState(initialTheme);
+    setActualTheme(resolvedTheme);
+    applyTheme(resolvedTheme);
   }, []);
 
   // Listen for system theme changes when theme is set to 'system'
@@ -100,11 +80,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = (newTheme: Theme) => {
     const resolvedTheme = resolveTheme(newTheme);
-    
+
     setThemeState(newTheme);
     setActualTheme(resolvedTheme);
     applyTheme(resolvedTheme);
-    
+
     // Save theme to localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('theme', newTheme);

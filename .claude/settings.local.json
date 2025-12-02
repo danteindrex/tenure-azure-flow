@@ -15,7 +15,8 @@
       "Bash(node:*)",
       "WebSearch",
       "WebFetch(domain:www.better-auth.com)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(npx tsc --noEmit)"
     ],
     "deny": [],
     "ask": []

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { db } from '@/drizzle/db';
 import { user, userProfiles, userContacts, userAddresses, userSubscriptions, userPayments, membershipQueue } from '@/drizzle/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
+import { SUBSCRIPTION_STATUS, PAYMENT_STATUS } from '@/lib/status-ids';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -67,7 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const subscription = await db.select().from(userSubscriptions)
       .where(and(
         eq(userSubscriptions.userId, dbUser.id),
-        eq(userSubscriptions.status, 'active')
+        eq(userSubscriptions.subscriptionStatusId, SUBSCRIPTION_STATUS.ACTIVE)
       ))
       .limit(1)
       .then(rows => rows[0]);
@@ -86,7 +87,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .from(userPayments)
     .where(and(
       eq(userPayments.userId, dbUser.id),
-      eq(userPayments.status, 'succeeded')
+      eq(userPayments.paymentStatusId, PAYMENT_STATUS.SUCCEEDED)
     ));
 
     const totalPaid = Number(totalPaidResult[0]?.total || 0);
@@ -98,7 +99,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .from(userPayments)
     .where(and(
       eq(userPayments.userId, dbUser.id),
-      eq(userPayments.status, 'succeeded')
+      eq(userPayments.paymentStatusId, PAYMENT_STATUS.SUCCEEDED)
     ));
 
     const paymentCount = Number(paymentCountResult[0]?.count || 0);
@@ -110,7 +111,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           id: dbUser.id,
           email: dbUser.email,
           emailVerified: dbUser.emailVerified,
-          status: dbUser.status,
+          userStatusId: dbUser.userStatusId,
           createdAt: dbUser.createdAt
         },
         profile: profile ? {
@@ -144,7 +145,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } : null,
         subscription: subscription ? {
           id: subscription.id,
-          status: subscription.status,
+          subscriptionStatusId: subscription.subscriptionStatusId,
           currentPeriodStart: subscription.currentPeriodStart,
           currentPeriodEnd: subscription.currentPeriodEnd,
           cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
@@ -157,7 +158,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             amount: Number(latestPayment.amount),
             paymentType: latestPayment.paymentType,
             paymentDate: latestPayment.paymentDate,
-            status: latestPayment.status
+            paymentStatusId: latestPayment.paymentStatusId
           } : null,
           totalPaid,
           count: paymentCount

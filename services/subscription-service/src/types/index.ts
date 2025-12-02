@@ -4,7 +4,9 @@ export interface Subscription {
   provider: string;
   provider_subscription_id: string;
   provider_customer_id: string;
-  status: 'active' | 'past_due' | 'canceled' | 'incomplete' | 'trialing' | 'unpaid';
+  // Subscription status - references subscription_statuses lookup table
+  // 1 = Active, 2 = Trialing, 3 = Past Due, 4 = Canceled, 5 = Incomplete, 6 = Unpaid
+  subscription_status_id: number;
   current_period_start: Date;
   current_period_end: Date;
   cancel_at_period_end: boolean;
@@ -54,10 +56,11 @@ export interface Queue {
 
 export interface User {
   id: string;
-  auth_user_id?: string;
   email: string;
   email_verified: boolean;
-  status: 'Active' | 'Inactive' | 'Suspended' | 'Pending';
+  // User status - references user_funnel_statuses lookup table
+  // 1 = Pending, 2 = Onboarded
+  user_status_id: number;
   created_at: Date;
   updated_at: Date;
 }

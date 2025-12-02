@@ -12,7 +12,7 @@
  * - user_memberships: Membership data
  */
 
-import { pgTable, uuid, text, varchar, boolean, timestamp, date, numeric, index, unique } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, varchar, boolean, timestamp, date, integer, index, unique } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { user } from './auth'
 import { userSubscriptions } from './financial'
@@ -92,17 +92,22 @@ export const userMemberships = pgTable('user_memberships', {
   userId: uuid('user_id').references(() => user.id, { onDelete: 'cascade' }), // NO unique constraint - users can have multiple memberships
   subscriptionId: uuid('subscription_id').unique().references(() => userSubscriptions.id, { onDelete: 'cascade' }), // One membership per subscription
   joinDate: date('join_date').notNull().defaultNow(),
-  tenure: numeric('tenure').default('0'),
-  verificationStatus: varchar('verification_status', { length: 20 }).default('PENDING'),
-  memberStatus: varchar('member_status', { length: 20 }).default('inactive'), // Member eligibility status: inactive, active, suspended, cancelled, won, paid
-  notes: text('notes'),
+
+  // Member eligibility status - references member_eligibility_statuses lookup table
+  // 1 = Inactive, 2 = Active, 3 = Suspended, 4 = Cancelled, 5 = Won, 6 = Paid
+  memberStatusId: integer('member_status_id').default(1),
+
+  // Verification status - references verification_statuses lookup table
+  // 1 = Pending, 2 = Verified, 3 = Failed, 4 = Skipped
+  verificationStatusId: integer('verification_status_id').default(1),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 }, (table) => ({
   userIdIdx: index('idx_user_memberships_user_id').on(table.userId),
   subscriptionIdIdx: index('idx_user_memberships_subscription_id').on(table.subscriptionId),
   joinDateIdx: index('idx_user_memberships_join_date').on(table.joinDate),
-  memberStatusIdx: index('idx_user_memberships_member_status').on(table.memberStatus)
+  memberStatusIdx: index('idx_user_memberships_member_status_id').on(table.memberStatusId)
 }))
 
 // ============================================================================

@@ -5,7 +5,7 @@ export const PayoutManagement: CollectionConfig = {
   slug: 'payout_management',
   admin: {
     useAsTitle: 'payout_id',
-    defaultColumns: ['payout_id', 'user_id', 'amount', 'status', 'scheduled_date'],
+    defaultColumns: ['payout_id', 'user_id', 'amount', 'payout_status_id', 'scheduled_date'],
     hidden: !isFeatureEnabled('queue', 'payoutWorkflow'),
     group: 'Queue & Payouts',
   },
@@ -61,22 +61,13 @@ export const PayoutManagement: CollectionConfig = {
       defaultValue: 'USD',
     },
     {
-      name: 'status',
-      type: 'select',
+      name: 'payout_status_id',
+      type: 'number',
       required: true,
-      defaultValue: 'pending_approval',
-      options: [
-        { label: 'Pending Approval', value: 'pending_approval' },
-        { label: 'Approved', value: 'approved' },
-        { label: 'Scheduled', value: 'scheduled' },
-        { label: 'Processing', value: 'processing' },
-        { label: 'Completed', value: 'completed' },
-        { label: 'Failed', value: 'failed' },
-        { label: 'Canceled', value: 'canceled' },
-        { label: 'On Hold', value: 'on_hold' },
-      ],
+      defaultValue: 1,
       admin: {
         position: 'sidebar',
+        description: 'FK to payout_statuses: 1=Pending Approval, 2=Approved, 3=Scheduled, 4=Processing, 5=Completed, 6=Failed, 7=Cancelled',
       },
     },
     {

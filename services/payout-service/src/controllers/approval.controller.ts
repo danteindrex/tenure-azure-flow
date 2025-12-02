@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { AppError } from '../middleware/error-handler';
 import { logger } from '../utils/logger';
 import { notificationService } from '../services/notification.service';
+import { PAYOUT_STATUS } from '../config/status-ids';
 
 export class ApprovalController {
   async approvePayout(req: AuthenticatedRequest, res: Response) {
@@ -22,8 +23,8 @@ export class ApprovalController {
       });
 
       if (!payout) throw new AppError(404, 'PAYOUT_NOT_FOUND', 'Payout not found');
-      if (payout.status !== 'pending_approval') {
-        throw new AppError(400, 'INVALID_STATUS', `Cannot approve payout with status: ${payout.status}`);
+      if (payout.payoutStatusId !== PAYOUT_STATUS.PENDING_APPROVAL) {
+        throw new AppError(400, 'INVALID_STATUS', `Cannot approve payout with status ID: ${payout.payoutStatusId}`);
       }
 
       const approvalWorkflow = (payout.approvalWorkflow as any) || {
@@ -46,7 +47,7 @@ export class ApprovalController {
       approvalWorkflow.currentApprovals = approvalWorkflow.approvers.length;
 
       const isFullyApproved = approvalWorkflow.currentApprovals >= approvalWorkflow.requiredApprovals;
-      const newStatus = isFullyApproved ? 'approved' : 'pending_approval';
+      const newPayoutStatusId = isFullyApproved ? PAYOUT_STATUS.APPROVED : PAYOUT_STATUS.PENDING_APPROVAL;
       approvalWorkflow.status = isFullyApproved ? 'approved' : 'pending';
 
       const auditTrail = (payout.auditTrail as any[]) || [];
@@ -64,7 +65,7 @@ export class ApprovalController {
       });
 
       await db.update(payoutManagement).set({
-        status: newStatus,
+        payoutStatusId: newPayoutStatusId,
         approvalWorkflow: approvalWorkflow as any,
         auditTrail: auditTrail as any,
         updatedAt: new Date(),
@@ -82,7 +83,7 @@ export class ApprovalController {
       res.json({
         data: {
           payoutId,
-          status: newStatus,
+          payoutStatusId: newPayoutStatusId,
           currentApprovals: approvalWorkflow.currentApprovals,
           requiredApprovals: approvalWorkflow.requiredApprovals,
           fullyApproved: isFullyApproved,
@@ -111,8 +112,8 @@ export class ApprovalController {
       });
 
       if (!payout) throw new AppError(404, 'PAYOUT_NOT_FOUND', 'Payout not found');
-      if (payout.status !== 'pending_approval') {
-        throw new AppError(400, 'INVALID_STATUS', `Cannot reject payout with status: ${payout.status}`);
+      if (payout.payoutStatusId !== PAYOUT_STATUS.PENDING_APPROVAL) {
+        throw new AppError(400, 'INVALID_STATUS', `Cannot reject payout with status ID: ${payout.payoutStatusId}`);
       }
 
       const approvalWorkflow = (payout.approvalWorkflow as any) || {};
@@ -128,7 +129,7 @@ export class ApprovalController {
       });
 
       await db.update(payoutManagement).set({
-        status: 'cancelled',
+        payoutStatusId: PAYOUT_STATUS.CANCELLED,
         approvalWorkflow: approvalWorkflow as any,
         auditTrail: auditTrail as any,
         updatedAt: new Date(),
@@ -141,7 +142,7 @@ export class ApprovalController {
       });
 
       res.json({
-        data: { payoutId, status: 'cancelled' },
+        data: { payoutId, payoutStatusId: PAYOUT_STATUS.CANCELLED },
         message: 'Payout rejected',
         timestamp: new Date().toISOString(),
       });

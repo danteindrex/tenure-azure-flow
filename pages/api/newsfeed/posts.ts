@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { auth } from "@/lib/auth";
 import { db } from "@/drizzle/db";
-import { newsfeedPosts } from "@/drizzle/schema/content";
+import { newsfeedPosts, POST_STATUS } from "@/drizzle/schema/content";
 import { eq, lte, desc, and } from "drizzle-orm";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -21,12 +21,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const offset = (page - 1) * limit;
 
     // Query newsfeed posts using Drizzle ORM
+    // Filter by post_status_id = 2 (Published)
     const posts = await db.select({
       id: newsfeedPosts.id,
       title: newsfeedPosts.title,
       content: newsfeedPosts.content,
       publish_date: newsfeedPosts.publishDate,
-      status: newsfeedPosts.status,
+      post_status_id: newsfeedPosts.postStatusId,
       priority: newsfeedPosts.priority,
       created_at: newsfeedPosts.createdAt,
       updated_at: newsfeedPosts.updatedAt,
@@ -34,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .from(newsfeedPosts)
       .where(
         and(
-          eq(newsfeedPosts.status, 'Published'),
+          eq(newsfeedPosts.postStatusId, POST_STATUS.PUBLISHED),
           lte(newsfeedPosts.publishDate, new Date())
         )
       )

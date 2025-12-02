@@ -267,7 +267,68 @@ export type FeatureAccess = typeof featureAccess.$inferSelect
 export type NewFeatureAccess = typeof featureAccess.$inferInsert
 
 // =====================================================
-// STATUS CATEGORY CODES (for type safety)
+// STATUS ID CONSTANTS
+// =====================================================
+// These are now defined in src/lib/status-ids.ts
+// Re-export them here for backward compatibility
+export {
+  USER_STATUS,
+  MEMBER_STATUS,
+  SUBSCRIPTION_STATUS,
+  PAYMENT_STATUS,
+  KYC_STATUS,
+  PAYOUT_STATUS,
+  VERIFICATION_STATUS,
+  ADMIN_STATUS,
+  QUEUE_ENTRY_STATUS,
+  BILLING_SCHEDULE_STATUS,
+  DISPUTE_STATUS,
+  TRANSACTION_STATUS,
+  ADMIN_ALERT_STATUS,
+  TAX_FORM_STATUS,
+  POST_STATUS,
+  AUDIT_LOG_STATUS,
+  SIGNUP_SESSION_STATUS,
+  TRANSACTION_MONITORING_STATUS,
+  // Helper functions
+  isUserOnboarded,
+  isMemberActive,
+  isMemberEligibleForQueue,
+  hasMemberWonOrPaid,
+  isSubscriptionActive,
+  isPaymentSuccessful,
+  isKycVerified,
+  isPayoutCompleted,
+  // Stripe mapping functions
+  mapStripeSubscriptionStatus,
+  mapStripePaymentStatus,
+  // Types
+  type UserStatusId,
+  type MemberStatusId,
+  type SubscriptionStatusId,
+  type PaymentStatusId,
+  type KycStatusId,
+  type PayoutStatusId,
+  type VerificationStatusId,
+  type AdminStatusId,
+  type QueueEntryStatusId,
+  type BillingScheduleStatusId,
+  type DisputeStatusId,
+  type TransactionStatusId,
+  type AdminAlertStatusId,
+  type TaxFormStatusId,
+  type PostStatusId,
+  type AuditLogStatusId,
+  type SignupSessionStatusId,
+  type TransactionMonitoringStatusId,
+} from '../../src/lib/status-ids'
+
+// Legacy aliases for backward compatibility (deprecated - use new names)
+export { USER_STATUS as USER_FUNNEL_STATUS } from '../../src/lib/status-ids'
+export { MEMBER_STATUS as MEMBER_ELIGIBILITY_STATUS } from '../../src/lib/status-ids'
+
+// =====================================================
+// STATUS CATEGORY CODES (for lookup tables)
 // =====================================================
 
 export const STATUS_CATEGORIES = {
@@ -283,56 +344,3 @@ export const STATUS_CATEGORIES = {
 } as const
 
 export type StatusCategoryCode = typeof STATUS_CATEGORIES[keyof typeof STATUS_CATEGORIES]
-
-// =====================================================
-// STATUS CODES (for type safety in code)
-// =====================================================
-
-export const USER_FUNNEL_STATUS = {
-  PENDING: 'Pending',
-  ONBOARDED: 'Onboarded',
-} as const
-
-export const MEMBER_ELIGIBILITY_STATUS = {
-  INACTIVE: 'Inactive',
-  ACTIVE: 'Active',
-  SUSPENDED: 'Suspended',
-  CANCELLED: 'Cancelled',
-  WON: 'Won',
-  PAID: 'Paid',
-} as const
-
-export const KYC_STATUS = {
-  PENDING: 'pending',
-  IN_REVIEW: 'in_review',
-  VERIFIED: 'verified',
-  REJECTED: 'rejected',
-  EXPIRED: 'expired',
-} as const
-
-export const SUBSCRIPTION_STATUS = {
-  ACTIVE: 'active',
-  TRIALING: 'trialing',
-  PAST_DUE: 'past_due',
-  CANCELED: 'canceled',
-  INCOMPLETE: 'incomplete',
-  UNPAID: 'unpaid',
-} as const
-
-export const PAYMENT_STATUS = {
-  PENDING: 'pending',
-  SUCCEEDED: 'succeeded',
-  FAILED: 'failed',
-  REFUNDED: 'refunded',
-  CANCELED: 'canceled',
-} as const
-
-export const PAYOUT_STATUS = {
-  PENDING_APPROVAL: 'pending_approval',
-  APPROVED: 'approved',
-  SCHEDULED: 'scheduled',
-  PROCESSING: 'processing',
-  COMPLETED: 'completed',
-  FAILED: 'failed',
-  CANCELLED: 'cancelled',
-} as const
