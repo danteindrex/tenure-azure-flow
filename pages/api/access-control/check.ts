@@ -22,8 +22,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { auth } from '@/lib/auth'
 import { db } from '@/drizzle/db'
-import { protectedRoutes, accessControlRules, statusValues, statusCategories } from '@/drizzle/schema'
-import { eq, and, sql, desc } from 'drizzle-orm'
+import { protectedRoutes, accessControlRules } from '@/drizzle/schema'
+import { eq, sql, desc } from 'drizzle-orm'
 
 interface AccessCheckResponse {
   allowed: boolean
@@ -33,24 +33,25 @@ interface AccessCheckResponse {
 }
 
 interface UserStatuses {
-  userFunnelStatus: string | null
-  memberStatus: string | null
-  subscriptionStatus: string | null
-  kycStatus: string | null
+  userFunnelStatusId: number | null
+  memberStatusId: number | null
+  subscriptionStatusId: number | null
+  kycStatus: string | null  // kyc_verification.status still uses string for now
   emailVerified: boolean
   phoneVerified: boolean
   hasProfile: boolean
 }
 
 /**
- * Get user's current statuses from database
+ * Get user's current status IDs from database
+ * Uses integer FK columns that reference lookup tables
  */
 async function getUserStatuses(userId: string): Promise<UserStatuses> {
   const result = await db.execute(sql`
     SELECT
-      u.status as user_funnel_status,
-      um.member_status,
-      us.status as subscription_status,
+      u.user_status_id,
+      um.member_status_id,
+      us.subscription_status_id,
       kv.status as kyc_status,
       u.email_verified,
       EXISTS(
@@ -62,7 +63,7 @@ async function getUserStatuses(userId: string): Promise<UserStatuses> {
       EXISTS(SELECT 1 FROM user_profiles up WHERE up.user_id = u.id) as has_profile
     FROM users u
     LEFT JOIN user_memberships um ON um.user_id = u.id
-    LEFT JOIN user_subscriptions us ON us.user_id = u.id AND us.status = 'active'
+    LEFT JOIN user_subscriptions us ON us.user_id = u.id AND us.subscription_status_id IN (1, 2)
     LEFT JOIN kyc_verification kv ON kv.user_id = u.id
     WHERE u.id = ${userId}
     LIMIT 1
@@ -71,9 +72,9 @@ async function getUserStatuses(userId: string): Promise<UserStatuses> {
   const row = result.rows[0] as any
 
   return {
-    userFunnelStatus: row?.user_funnel_status || null,
-    memberStatus: row?.member_status || null,
-    subscriptionStatus: row?.subscription_status || null,
+    userFunnelStatusId: row?.user_status_id || null,
+    memberStatusId: row?.member_status_id || null,
+    subscriptionStatusId: row?.subscription_status_id || null,
     kycStatus: row?.kyc_status || null,
     emailVerified: row?.email_verified || false,
     phoneVerified: row?.phone_verified || false,
@@ -82,23 +83,14 @@ async function getUserStatuses(userId: string): Promise<UserStatuses> {
 }
 
 /**
- * Get status ID from lookup table
+ * Get KYC status ID from lookup table by name
+ * KYC statuses: 1=Pending, 2=In Review, 3=Verified, 4=Rejected, 5=Expired
  */
-async function getStatusId(categoryCode: string, statusCode: string): Promise<number | null> {
-  const result = await db
-    .select({ id: statusValues.id })
-    .from(statusValues)
-    .innerJoin(statusCategories, eq(statusValues.categoryId, statusCategories.id))
-    .where(
-      and(
-        eq(statusCategories.code, categoryCode),
-        eq(statusValues.code, statusCode),
-        eq(statusValues.isActive, true)
-      )
-    )
-    .limit(1)
-
-  return result[0]?.id || null
+async function getKycStatusId(statusName: string): Promise<number | null> {
+  const result = await db.execute(sql`
+    SELECT id FROM kyc_statuses WHERE LOWER(name) = LOWER(${statusName}) LIMIT 1
+  `)
+  return (result.rows[0] as any)?.id || null
 }
 
 /**
@@ -210,36 +202,37 @@ export default async function handler(
     }
 
     // Check all conditions based on the rule
+    // Status IDs are already integers from the database - no conversion needed
     const checks: boolean[] = []
 
-    // Check user status
+    // Check user status (already have integer ID)
     if (rule.userStatusIds && rule.userStatusIds.length > 0) {
-      const userStatusId = userStatuses.userFunnelStatus
-        ? await getStatusId('user_funnel', userStatuses.userFunnelStatus)
-        : null
-      checks.push(userStatusId !== null && rule.userStatusIds.includes(userStatusId))
+      checks.push(
+        userStatuses.userFunnelStatusId !== null &&
+        rule.userStatusIds.includes(userStatuses.userFunnelStatusId)
+      )
     }
 
-    // Check member status
+    // Check member status (already have integer ID)
     if (rule.memberStatusIds && rule.memberStatusIds.length > 0) {
-      const memberStatusId = userStatuses.memberStatus
-        ? await getStatusId('member_eligibility', userStatuses.memberStatus)
-        : null
-      checks.push(memberStatusId !== null && rule.memberStatusIds.includes(memberStatusId))
+      checks.push(
+        userStatuses.memberStatusId !== null &&
+        rule.memberStatusIds.includes(userStatuses.memberStatusId)
+      )
     }
 
-    // Check subscription status
+    // Check subscription status (already have integer ID)
     if (rule.subscriptionStatusIds && rule.subscriptionStatusIds.length > 0) {
-      const subStatusId = userStatuses.subscriptionStatus
-        ? await getStatusId('subscription_status', userStatuses.subscriptionStatus)
-        : null
-      checks.push(subStatusId !== null && rule.subscriptionStatusIds.includes(subStatusId))
+      checks.push(
+        userStatuses.subscriptionStatusId !== null &&
+        rule.subscriptionStatusIds.includes(userStatuses.subscriptionStatusId)
+      )
     }
 
-    // Check KYC status
+    // Check KYC status (still uses string - needs lookup)
     if (rule.kycStatusIds && rule.kycStatusIds.length > 0) {
       const kycStatusId = userStatuses.kycStatus
-        ? await getStatusId('kyc_status', userStatuses.kycStatus)
+        ? await getKycStatusId(userStatuses.kycStatus)
         : null
       checks.push(kycStatusId !== null && rule.kycStatusIds.includes(kycStatusId))
     }

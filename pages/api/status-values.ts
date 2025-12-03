@@ -29,9 +29,8 @@ const LOOKUP_TABLES: Record<string, string> = {
 interface StatusValue {
   id: number;
   name: string;
+  description: string | null;
   color: string;
-  sortOrder: number;
-  isActive: boolean;
   categoryCode: string;
 }
 
@@ -60,18 +59,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const query = `
-        SELECT id, name, color, sort_order, is_active
+        SELECT id, name, description, color
         FROM ${tableName}
-        WHERE is_active = true
-        ORDER BY sort_order, id
+        ORDER BY id
       `;
       const result = await getPool().query(query);
       results = result.rows.map(row => ({
         id: row.id,
         name: row.name,
+        description: row.description,
         color: row.color || '#6B7280',
-        sortOrder: row.sort_order,
-        isActive: row.is_active,
         categoryCode: category,
       }));
     } else {
@@ -79,18 +76,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       for (const [categoryCode, tableName] of Object.entries(LOOKUP_TABLES)) {
         try {
           const query = `
-            SELECT id, name, color, sort_order, is_active
+            SELECT id, name, description, color
             FROM ${tableName}
-            WHERE is_active = true
-            ORDER BY sort_order, id
+            ORDER BY id
           `;
           const result = await getPool().query(query);
           results.push(...result.rows.map(row => ({
             id: row.id,
             name: row.name,
+            description: row.description,
             color: row.color || '#6B7280',
-            sortOrder: row.sort_order,
-            isActive: row.is_active,
             categoryCode,
           })));
         } catch {

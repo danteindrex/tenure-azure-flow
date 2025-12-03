@@ -121,38 +121,24 @@ export {
 } from './content'
 
 // ============================================================================
-// STATUS LOOKUP SYSTEM TABLES
+// ACCESS CONTROL TABLES
 // ============================================================================
 export {
-  statusCategories,
-  statusValues,
-  statusTransitions,
   accessControlRules,
   protectedRoutes,
   featureAccess,
   // Relations
-  statusCategoriesRelations,
-  statusValuesRelations,
-  statusTransitionsRelations,
   accessControlRulesRelations,
   protectedRoutesRelations,
   featureAccessRelations,
   // Types
-  type StatusCategory,
-  type NewStatusCategory,
-  type StatusValue,
-  type NewStatusValue,
-  type StatusTransition,
-  type NewStatusTransition,
   type AccessControlRule,
   type NewAccessControlRule,
   type ProtectedRoute,
   type NewProtectedRoute,
   type FeatureAccess,
   type NewFeatureAccess,
-  // Constants
-  STATUS_CATEGORIES,
-  // Status ID constants (new)
+  // Status ID constants
   USER_STATUS,
   MEMBER_STATUS,
   SUBSCRIPTION_STATUS,
@@ -183,7 +169,4 @@ export {
   // Stripe mapping functions
   mapStripeSubscriptionStatus,
   mapStripePaymentStatus,
-  // Legacy aliases (deprecated - use new names)
-  USER_FUNNEL_STATUS,
-  MEMBER_ELIGIBILITY_STATUS,
 } from './status-system'

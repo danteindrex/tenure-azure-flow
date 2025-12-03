@@ -1,14 +1,12 @@
 /**
- * Status Lookup System Schema
+ * Access Control System Schema
  *
- * This schema defines the unified status lookup tables that replace
- * hardcoded ENUMs with admin-configurable statuses.
+ * This schema defines the access control tables for route protection.
+ * Status lookups use individual lookup tables (e.g., member_eligibility_statuses)
+ * with integer FK references.
  *
  * Architecture:
- * - status_categories: Groups of related statuses (e.g., 'user_funnel', 'member_eligibility')
- * - status_values: Individual status options within each category
- * - status_transitions: Valid state transitions between statuses
- * - access_control_rules: Conditions for accessing routes/features
+ * - access_control_rules: Conditions for accessing routes/features (uses status ID arrays)
  * - protected_routes: Maps routes to access control rules
  * - feature_access: Feature-level access control
  */
@@ -21,112 +19,10 @@ import {
   boolean,
   integer,
   timestamp,
-  jsonb,
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
 import { relations, sql } from 'drizzle-orm'
-
-// =====================================================
-// STATUS CATEGORIES
-// =====================================================
-
-export const statusCategories = pgTable('status_categories', {
-  id: serial('id').primaryKey(),
-  code: varchar('code', { length: 50 }).unique().notNull(),
-  name: varchar('name', { length: 100 }).notNull(),
-  description: text('description'),
-  tableName: varchar('table_name', { length: 100 }),
-  columnName: varchar('column_name', { length: 100 }),
-  isSystem: boolean('is_system').default(false),
-  isActive: boolean('is_active').default(true),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-}, (table) => ({
-  codeIdx: uniqueIndex('idx_status_categories_code').on(table.code),
-}))
-
-export const statusCategoriesRelations = relations(statusCategories, ({ many }) => ({
-  values: many(statusValues),
-  transitions: many(statusTransitions),
-}))
-
-// =====================================================
-// STATUS VALUES
-// =====================================================
-
-export const statusValues = pgTable('status_values', {
-  id: serial('id').primaryKey(),
-  categoryId: integer('category_id').notNull().references(() => statusCategories.id, { onDelete: 'cascade' }),
-  code: varchar('code', { length: 50 }).notNull(),
-  displayName: varchar('display_name', { length: 100 }).notNull(),
-  description: text('description'),
-  color: varchar('color', { length: 20 }).default('#6B7280'),
-  icon: varchar('icon', { length: 50 }),
-  sortOrder: integer('sort_order').default(0),
-  isDefault: boolean('is_default').default(false),
-  isTerminal: boolean('is_terminal').default(false),
-  isActive: boolean('is_active').default(true),
-  metadata: jsonb('metadata').default({}),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-}, (table) => ({
-  categoryCodeIdx: uniqueIndex('idx_status_values_category_code').on(table.categoryId, table.code),
-  categoryIdx: index('idx_status_values_category').on(table.categoryId),
-  codeIdx: index('idx_status_values_code').on(table.code),
-  activeIdx: index('idx_status_values_active').on(table.isActive),
-}))
-
-export const statusValuesRelations = relations(statusValues, ({ one, many }) => ({
-  category: one(statusCategories, {
-    fields: [statusValues.categoryId],
-    references: [statusCategories.id],
-  }),
-  transitionsFrom: many(statusTransitions, { relationName: 'fromStatus' }),
-  transitionsTo: many(statusTransitions, { relationName: 'toStatus' }),
-}))
-
-// =====================================================
-// STATUS TRANSITIONS
-// =====================================================
-
-export const statusTransitions = pgTable('status_transitions', {
-  id: serial('id').primaryKey(),
-  categoryId: integer('category_id').notNull().references(() => statusCategories.id, { onDelete: 'cascade' }),
-  fromStatusId: integer('from_status_id').references(() => statusValues.id, { onDelete: 'cascade' }),
-  toStatusId: integer('to_status_id').notNull().references(() => statusValues.id, { onDelete: 'cascade' }),
-  requiresAdmin: boolean('requires_admin').default(false),
-  requiresReason: boolean('requires_reason').default(false),
-  autoTrigger: varchar('auto_trigger', { length: 100 }),
-  isActive: boolean('is_active').default(true),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-}, (table) => ({
-  categoryIdx: index('idx_status_transitions_category').on(table.categoryId),
-  fromIdx: index('idx_status_transitions_from').on(table.fromStatusId),
-  toIdx: index('idx_status_transitions_to').on(table.toStatusId),
-  uniqueTransition: uniqueIndex('idx_status_transitions_unique').on(
-    table.categoryId,
-    table.fromStatusId,
-    table.toStatusId
-  ),
-}))
-
-export const statusTransitionsRelations = relations(statusTransitions, ({ one }) => ({
-  category: one(statusCategories, {
-    fields: [statusTransitions.categoryId],
-    references: [statusCategories.id],
-  }),
-  fromStatus: one(statusValues, {
-    fields: [statusTransitions.fromStatusId],
-    references: [statusValues.id],
-    relationName: 'fromStatus',
-  }),
-  toStatus: one(statusValues, {
-    fields: [statusTransitions.toStatusId],
-    references: [statusValues.id],
-    relationName: 'toStatus',
-  }),
-}))
 
 // =====================================================
 // ACCESS CONTROL RULES
@@ -248,15 +144,6 @@ export const featureAccessRelations = relations(featureAccess, ({ one }) => ({
 // TYPE EXPORTS
 // =====================================================
 
-export type StatusCategory = typeof statusCategories.$inferSelect
-export type NewStatusCategory = typeof statusCategories.$inferInsert
-
-export type StatusValue = typeof statusValues.$inferSelect
-export type NewStatusValue = typeof statusValues.$inferInsert
-
-export type StatusTransition = typeof statusTransitions.$inferSelect
-export type NewStatusTransition = typeof statusTransitions.$inferInsert
-
 export type AccessControlRule = typeof accessControlRules.$inferSelect
 export type NewAccessControlRule = typeof accessControlRules.$inferInsert
 
@@ -269,8 +156,7 @@ export type NewFeatureAccess = typeof featureAccess.$inferInsert
 // =====================================================
 // STATUS ID CONSTANTS
 // =====================================================
-// These are now defined in src/lib/status-ids.ts
-// Re-export them here for backward compatibility
+// Re-export from src/lib/status-ids.ts for convenience
 export {
   USER_STATUS,
   MEMBER_STATUS,
@@ -322,25 +208,3 @@ export {
   type SignupSessionStatusId,
   type TransactionMonitoringStatusId,
 } from '../../src/lib/status-ids'
-
-// Legacy aliases for backward compatibility (deprecated - use new names)
-export { USER_STATUS as USER_FUNNEL_STATUS } from '../../src/lib/status-ids'
-export { MEMBER_STATUS as MEMBER_ELIGIBILITY_STATUS } from '../../src/lib/status-ids'
-
-// =====================================================
-// STATUS CATEGORY CODES (for lookup tables)
-// =====================================================
-
-export const STATUS_CATEGORIES = {
-  USER_FUNNEL: 'user_funnel',
-  MEMBER_ELIGIBILITY: 'member_eligibility',
-  KYC_STATUS: 'kyc_status',
-  VERIFICATION_STATUS: 'verification_status',
-  SUBSCRIPTION_STATUS: 'subscription_status',
-  PAYMENT_STATUS: 'payment_status',
-  PAYOUT_STATUS: 'payout_status',
-  ADMIN_STATUS: 'admin_status',
-  ADMIN_ROLE: 'admin_role',
-} as const
-
-export type StatusCategoryCode = typeof STATUS_CATEGORIES[keyof typeof STATUS_CATEGORIES]
