@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
+import { LiquidGlassCard } from "@/components/ui/liquid-glass-card";
+import { BeamsBackground } from "@/components/ui/beams-background";
 import { Crown, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/router";
@@ -167,7 +168,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
+    <BeamsBackground intensity="medium" className="min-h-screen flex items-center justify-center p-4">
       {/* Theme Toggle Button */}
       <Button
         variant="ghost"
@@ -186,14 +187,9 @@ const Login = () => {
         </span>
       </Button>
 
-      {/* Background Glow Effect */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute top-1/4 right-1/4 w-[400px] h-[400px] bg-purple-500/8 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-1/4 left-1/4 w-[350px] h-[350px] bg-cyan-500/6 rounded-full blur-[90px] pointer-events-none" />
-      
-      <Card className="w-full max-w-md p-8 relative z-10 backdrop-blur-xl border border-border shadow-2xl bg-card">
+      <LiquidGlassCard className="w-full max-w-[680px]" glassSize="lg">
         {/* Logo */}
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center mb-6">
           <div className="flex items-center gap-2">
             <Crown className="w-8 h-8 text-accent" />
             <span className="text-2xl font-bold text-foreground">Home Solutions</span>
@@ -303,8 +299,8 @@ const Login = () => {
             Sign up
           </Link>
         </p>
-      </Card>
-    </div>
+      </LiquidGlassCard>
+    </BeamsBackground>
   );
 };
 

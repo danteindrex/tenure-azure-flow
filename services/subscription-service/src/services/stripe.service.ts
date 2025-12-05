@@ -93,7 +93,9 @@ export class StripeService {
         throw new Error('PAYMENT_PROCESSING: Your payment is being processed. Please wait a moment and refresh the page.');
       }
 
-      // 3. Check Stripe directly for active subscriptions (in case webhook failed to sync)
+      // 3. Check Stripe directly for active subscriptions FOR THIS APP (in case webhook failed to sync)
+      // IMPORTANT: Filter by our specific price IDs to avoid blocking users who have
+      // subscriptions from other apps on the same Stripe account
       const existingCustomersCheck = await stripe.customers.list({
         email: user.email,
         limit: 1,
@@ -120,17 +122,31 @@ export class StripeService {
           ...trialingSubscriptions.data,
         ];
 
-        if (allActiveSubscriptions.length > 0) {
-          const stripeSub = allActiveSubscriptions[0];
-          logger.info(`Found active subscription in Stripe for user ${userId}, syncing to database`, {
+        // Filter subscriptions to only those belonging to THIS app (by price ID)
+        const ourPriceIds = [STRIPE_PRICE_IDS.MONTHLY, STRIPE_PRICE_IDS.ANNUAL];
+        const ourAppSubscriptions = allActiveSubscriptions.filter(sub => {
+          // Check if any subscription item uses our price IDs
+          return sub.items.data.some(item => ourPriceIds.includes(item.price.id));
+        });
+
+        if (ourAppSubscriptions.length > 0) {
+          const stripeSub = ourAppSubscriptions[0];
+          logger.info(`Found active subscription in Stripe for user ${userId} with our price IDs, syncing to database`, {
             stripeSubscriptionId: stripeSub.id,
             status: stripeSub.status,
+            priceIds: stripeSub.items.data.map(item => item.price.id),
           });
 
           // Sync the subscription to our database and update membership
           await this.syncStripeSubscriptionToDatabase(userId, stripeCustomer.id, stripeSub);
 
           throw new Error('SUBSCRIPTION_SYNCED: You already have an active subscription. Your account has been updated. Please refresh the page.');
+        } else if (allActiveSubscriptions.length > 0) {
+          // User has subscriptions but not for our app - that's fine, let them proceed
+          logger.info(`User ${userId} has ${allActiveSubscriptions.length} active subscriptions in Stripe, but none with our price IDs. Allowing checkout.`, {
+            foundPriceIds: allActiveSubscriptions.flatMap(sub => sub.items.data.map(item => item.price.id)),
+            ourPriceIds,
+          });
         }
       }
 
@@ -1193,7 +1209,7 @@ export class StripeService {
     try {
       // Get user's subscription to find their Stripe customer ID
       const subscription = await pool.query(
-        `SELECT provider_customer_id, status
+        `SELECT provider_customer_id, subscription_status_id
          FROM user_subscriptions
          WHERE user_id = $1
          ORDER BY created_at DESC
@@ -1205,7 +1221,7 @@ export class StripeService {
         throw new Error('No subscription found for user');
       }
 
-      const { provider_customer_id, status } = subscription.rows[0];
+      const { provider_customer_id, subscription_status_id } = subscription.rows[0];
 
       if (!provider_customer_id) {
         throw new Error('No Stripe customer ID found for subscription');
@@ -1251,7 +1267,7 @@ export class StripeService {
 
       // Check if subscription already exists in DB (might be with different status)
       const existingSubQuery = `
-        SELECT id, status FROM user_subscriptions
+        SELECT id, subscription_status_id FROM user_subscriptions
         WHERE provider_subscription_id = $1
         LIMIT 1
       `;

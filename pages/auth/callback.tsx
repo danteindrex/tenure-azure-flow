@@ -37,7 +37,8 @@ const AuthCallback = () => {
         if (!session?.user) {
           // No session even after refresh, redirect to login
           console.log('❌ No session found after refresh, redirecting to login');
-          router.replace('/login');
+          // Use window.location to avoid Next.js router invariant error
+          window.location.href = '/login';
           return;
         }
 
@@ -160,8 +161,8 @@ const AuthCallback = () => {
         <div className="text-center">
           <div className="text-destructive mb-4">Authentication Error</div>
           <p className="text-muted-foreground mb-4">{error}</p>
-          <button 
-            onClick={() => router.replace('/login')}
+          <button
+            onClick={() => { window.location.href = '/login'; }}
             className="px-4 py-2 bg-accent text-accent-foreground rounded-md hover:bg-accent/90"
           >
             Return to Login

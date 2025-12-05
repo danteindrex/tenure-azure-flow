@@ -39,6 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       middle_name,
       date_of_birth,
       phone,
+      phone_country_code, // Phone country code (e.g., +1, +44, +256)
       street_address,
       address_line_2,
       city,
@@ -101,12 +102,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             userId: userId,
             contactType: 'phone',
             contactValue: phone,
+            countryCode: phone_country_code || '+1', // Store phone country code separately
             isPrimary: true,
             isVerified: false,
           })
           .onConflictDoUpdate({
             target: [userContacts.userId, userContacts.contactType, userContacts.contactValue],
             set: {
+              countryCode: phone_country_code || '+1',
               isPrimary: true,
               updatedAt: new Date()
             }

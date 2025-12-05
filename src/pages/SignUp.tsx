@@ -1140,6 +1140,7 @@ const SignUp = () => {
           middle_name: formData.middleName,
           date_of_birth: formData.dateOfBirth,
           phone: formatPhoneNumber(formData.phoneNumber, formData.phoneCountryCode),
+          phone_country_code: formData.phoneCountryCode, // Store phone country code separately
           street_address: formData.streetAddress,
           address_line_2: formData.addressLine2,
           city: formData.city,
@@ -1366,7 +1367,7 @@ const SignUp = () => {
         </span>
       </Button>
 
-      <LiquidGlassCard className="w-full max-w-lg" glassSize="lg">
+      <LiquidGlassCard className="w-full max-w-xl" glassSize="lg">
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <div className="flex items-center gap-2">

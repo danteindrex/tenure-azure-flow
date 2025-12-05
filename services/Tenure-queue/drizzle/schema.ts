@@ -1217,7 +1217,7 @@ export const protectedRoutes = pgTable("protected_routes", {
 	checkPhoneVerified: boolean("check_phone_verified"),
 	checkProfileComplete: boolean("check_profile_complete"),
 	checkSubscriptionActive: boolean("check_subscription_active"),
-	checkMemberStatus: varchar("check_member_status", { length: 50 }),
+	checkMemberStatusId: integer("check_member_status_id"),
 	priority: integer().default(0),
 	isActive: boolean("is_active").default(true),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),

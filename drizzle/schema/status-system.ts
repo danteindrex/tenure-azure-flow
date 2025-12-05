@@ -93,7 +93,7 @@ export const protectedRoutes = pgTable('protected_routes', {
   checkPhoneVerified: boolean('check_phone_verified'),
   checkProfileComplete: boolean('check_profile_complete'),
   checkSubscriptionActive: boolean('check_subscription_active'),
-  checkMemberStatus: varchar('check_member_status', { length: 50 }), // e.g., 'Suspended'
+  checkMemberStatusId: integer('check_member_status_id'), // FK to member_eligibility_statuses.id
 
   priority: integer('priority').default(0),
   isActive: boolean('is_active').default(true),

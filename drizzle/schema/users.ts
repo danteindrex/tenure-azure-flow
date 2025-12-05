@@ -46,6 +46,7 @@ export const userContacts = pgTable('user_contacts', {
   userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   contactType: varchar('contact_type', { length: 20 }).notNull(), // 'phone', 'email', 'emergency'
   contactValue: varchar('contact_value', { length: 255 }).notNull(),
+  countryCode: varchar('country_code', { length: 10 }), // Phone country code (e.g., +1, +44, +256)
   isPrimary: boolean('is_primary').default(false),
   isVerified: boolean('is_verified').default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),

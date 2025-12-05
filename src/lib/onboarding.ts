@@ -55,7 +55,7 @@ interface OnboardingStepConfig {
   checkPhoneVerified: boolean | null
   checkProfileComplete: boolean | null
   checkSubscriptionActive: boolean | null
-  checkMemberStatus: string | null
+  checkMemberStatusId: number | null
 }
 
 export interface UserOnboardingStatus {
@@ -116,7 +116,7 @@ export class OnboardingService {
         checkPhoneVerified: protectedRoutes.checkPhoneVerified,
         checkProfileComplete: protectedRoutes.checkProfileComplete,
         checkSubscriptionActive: protectedRoutes.checkSubscriptionActive,
-        checkMemberStatus: protectedRoutes.checkMemberStatus,
+        checkMemberStatusId: protectedRoutes.checkMemberStatusId,
       })
       .from(protectedRoutes)
       .where(
@@ -136,7 +136,7 @@ export class OnboardingService {
       checkPhoneVerified: s.checkPhoneVerified,
       checkProfileComplete: s.checkProfileComplete,
       checkSubscriptionActive: s.checkSubscriptionActive,
-      checkMemberStatus: s.checkMemberStatus,
+      checkMemberStatusId: s.checkMemberStatusId,
     }))
   }
 
@@ -156,18 +156,9 @@ export class OnboardingService {
     isOAuthUser: boolean
   ): boolean {
     // Check member status first (e.g., Suspended)
-    // checkMemberStatus stores the status name, we need to map it to ID
-    if (step.checkMemberStatus !== null) {
-      const statusNameToId: Record<string, number> = {
-        'Inactive': MEMBER_STATUS.INACTIVE,
-        'Active': MEMBER_STATUS.ACTIVE,
-        'Suspended': MEMBER_STATUS.SUSPENDED,
-        'Cancelled': MEMBER_STATUS.CANCELLED,
-        'Won': MEMBER_STATUS.WON,
-        'Paid': MEMBER_STATUS.PAID,
-      }
-      const expectedStatusId = statusNameToId[step.checkMemberStatus]
-      if (expectedStatusId && userState.memberStatusId === expectedStatusId) {
+    // checkMemberStatusId stores the status ID directly (integer FK)
+    if (step.checkMemberStatusId !== null) {
+      if (userState.memberStatusId === step.checkMemberStatusId) {
         return true // User matches this status, show this step
       }
       return false // User doesn't match this status, skip this step

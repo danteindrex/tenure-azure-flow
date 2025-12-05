@@ -55,8 +55,8 @@ function LiquidGlassCard({
       <div
         className={cn(
           "absolute -inset-[1px] rounded-2xl opacity-0 blur-sm transition-opacity duration-500",
-          "bg-gradient-to-br from-amber-200 via-amber-300/80 to-orange-400",
-          "dark:from-amber-500/40 dark:via-amber-600/30 dark:to-orange-500/40",
+          "bg-gradient-to-br from-blue-200 via-blue-300/80 to-cyan-400",
+          "dark:from-blue-500/40 dark:via-blue-600/30 dark:to-cyan-500/40",
           "group-hover:opacity-100"
         )}
       />
@@ -77,8 +77,8 @@ function LiquidGlassCard({
         <div
           className={cn(
             "absolute inset-0 opacity-0 transition-opacity duration-500",
-            "bg-gradient-to-br from-amber-50/50 via-transparent to-orange-50/30",
-            "dark:from-amber-500/5 dark:via-transparent dark:to-orange-500/5",
+            "bg-gradient-to-br from-blue-50/50 via-transparent to-cyan-50/30",
+            "dark:from-blue-500/5 dark:via-transparent dark:to-cyan-500/5",
             "group-hover:opacity-100"
           )}
         />

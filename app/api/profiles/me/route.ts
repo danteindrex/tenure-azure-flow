@@ -50,20 +50,22 @@ export async function GET(request: Request) {
       .limit(1)
       .then(rows => rows[0]);
 
-    // Extract phone parts if exists
+    // Extract phone parts if exists - use stored country_code column
     let phoneData = null;
     if (phoneContact) {
-      // Assume format: +1234567890 or just phone number
-      const phoneValue = phoneContact.contactValue || '';
-      const countryCodeMatch = phoneValue.match(/^\+(\d{1,3})/);
-      const countryCode = countryCodeMatch ? `+${countryCodeMatch[1]}` : '+1';
-      const number = phoneValue.replace(/^\+\d{1,3}/, '');
+      const fullNumber = phoneContact.contactValue || '';
+      // Use stored country code from database (set during signup)
+      const countryCode = phoneContact.countryCode || '+1';
+      // Remove the country code from the full number to get just the local number
+      const number = fullNumber.startsWith(countryCode)
+        ? fullNumber.slice(countryCode.length)
+        : fullNumber;
 
       phoneData = {
         countryCode,
         number,
         isVerified: phoneContact.isVerified,
-        fullNumber: phoneValue
+        fullNumber
       };
     }
 
