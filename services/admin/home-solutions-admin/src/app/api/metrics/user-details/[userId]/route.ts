@@ -1,1 +1,0 @@
-export { GET } from '../../../../../api/metrics/user-details'

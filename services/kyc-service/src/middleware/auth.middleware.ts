@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../../drizzle/db';
+import { KYC_STATUS } from '../config/status-constants';
 
 // Extend Express Request type to include user
 declare global {
@@ -126,7 +127,7 @@ export async function requireKYCVerification(
       where: (kyc, { eq, and }) =>
         and(
           eq(kyc.userId, req.userId),
-          eq(kyc.status, 'verified')
+          eq(kyc.status, KYC_STATUS.VERIFIED)
         )
     });
 

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "@/lib/auth-client";
 import { usePaymentHistory } from "@/hooks/usePaymentHistory";
+import { PAYMENT_STATUS, getPaymentStatusName } from "@/lib/status-ids";
 import {
   History as HistoryIcon,
   Search,
@@ -117,13 +118,14 @@ const History = () => {
     });
   }, [activityData, paymentHistoryData]);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
+  const getStatusIcon = (status: number | string) => {
+    const statusId = typeof status === 'string' ? parseInt(status) : status;
+    switch (statusId) {
+      case PAYMENT_STATUS.SUCCEEDED:
         return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case "failed":
+      case PAYMENT_STATUS.FAILED:
         return <XCircle className="w-4 h-4 text-red-500" />;
-      case "pending":
+      case PAYMENT_STATUS.PENDING:
         return <Clock className="w-4 h-4 text-yellow-500" />;
       default:
         return <AlertCircle className="w-4 h-4 text-gray-500" />;
@@ -149,16 +151,19 @@ const History = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Completed</Badge>;
-      case "failed":
-        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Failed</Badge>;
-      case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Pending</Badge>;
+  const getStatusBadge = (status: number | string) => {
+    const statusId = typeof status === 'string' ? parseInt(status) : status;
+    const statusName = getPaymentStatusName(statusId);
+    
+    switch (statusId) {
+      case PAYMENT_STATUS.SUCCEEDED:
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">{statusName}</Badge>;
+      case PAYMENT_STATUS.FAILED:
+        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">{statusName}</Badge>;
+      case PAYMENT_STATUS.PENDING:
+        return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">{statusName}</Badge>;
       default:
-        return <Badge variant="secondary">Unknown</Badge>;
+        return <Badge variant="secondary">{statusName}</Badge>;
     }
   };
 
@@ -208,7 +213,7 @@ const History = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Completed</p>
-              <p className="text-2xl font-bold">{historyData.filter(h => h.status === "succeeded").length}</p>
+              <p className="text-2xl font-bold">{historyData.filter(h => h.status === PAYMENT_STATUS.SUCCEEDED || h.status === PAYMENT_STATUS.SUCCEEDED.toString()).length}</p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-500" />
           </div>
@@ -219,7 +224,7 @@ const History = () => {
               <p className="text-sm text-muted-foreground">Total Amount</p>
               <p className="text-2xl font-bold">
                 ${historyData
-                  .filter(h => h.type === 'payment' && h.status === 'succeeded')
+                  .filter(h => h.type === 'payment' && (h.status === PAYMENT_STATUS.SUCCEEDED || h.status === PAYMENT_STATUS.SUCCEEDED.toString()))
                   .reduce((sum, h) => sum + (h.amount || 0), 0)
                   .toFixed(2)}
               </p>
@@ -318,7 +323,7 @@ const History = () => {
                             item.type === "bonus" ? "text-green-500" :
                             "text-blue-500"
                           }`}>
-                            {item.type === "payment" && item.status === "failed" ? "-" : "+"}${item.amount?.toFixed(2)}
+                            {item.type === "payment" && (item.status === PAYMENT_STATUS.FAILED || item.status === PAYMENT_STATUS.FAILED.toString()) ? "-" : "+"}${item.amount?.toFixed(2)}
                           </p>
                         )}
                         {getStatusBadge(item.status)}

@@ -105,12 +105,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       nextPaymentDue = new Date(new Date(lastPaymentDate).getTime() + (30 * 24 * 60 * 60 * 1000));
     }
 
-    // Determine payment status
-    let status: 'current' | 'overdue' | 'pending' = 'pending';
+    // Determine payment status using status IDs
+    let statusId: number = PAYMENT_STATUS.PENDING;
     if (isInDefault) {
-      status = 'overdue';
+      statusId = PAYMENT_STATUS.FAILED;
     } else if (joiningFee) {
-      status = 'current';
+      statusId = PAYMENT_STATUS.SUCCEEDED;
     }
 
     return res.status(200).json({
@@ -125,7 +125,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         isInDefault,
         daysSinceLastPayment,
         nextPaymentDue: nextPaymentDue?.toISOString() || null,
-        status,
+        status: statusId,
         gracePeriodDays: gracePeriod,
         daysUntilDefault: !isInDefault && lastPaymentDate
           ? Math.max(0, gracePeriod - daysSinceLastPayment)

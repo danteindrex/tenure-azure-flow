@@ -75,10 +75,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const paymentStatusName = getPaymentStatusName(payment.paymentStatusId);
       const description = `${payment.paymentStatusId === PAYMENT_STATUS.SUCCEEDED ? 'Successfully processed' : paymentStatusName} payment of $${Number(payment.amount).toFixed(2)}`;
 
-      // Map payment status ID to activity status
-      const activityStatus = payment.paymentStatusId === PAYMENT_STATUS.SUCCEEDED ? 'completed'
-        : payment.paymentStatusId === PAYMENT_STATUS.FAILED ? 'failed'
-        : 'pending';
+      // Map payment status ID to activity status ID
+      const activityStatusId = payment.paymentStatusId === PAYMENT_STATUS.SUCCEEDED ? PAYMENT_STATUS.SUCCEEDED
+        : payment.paymentStatusId === PAYMENT_STATUS.FAILED ? PAYMENT_STATUS.FAILED
+        : PAYMENT_STATUS.PENDING;
 
       activities.push({
         id: `payment-${payment.id}`,
@@ -86,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         action,
         description,
         amount: Number(payment.amount),
-        status: activityStatus,
+        status: activityStatusId,
         date: payment.paymentDate.toISOString().split('T')[0],
         time: payment.paymentDate.toTimeString().split(' ')[0].substring(0, 5),
         details: `Payment method: ${payment.provider || 'Unknown'} • Transaction ID: ${payment.providerPaymentId || 'N/A'}`,
@@ -110,7 +110,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         action,
         description,
         amount: null,
-        status: log.success ? 'completed' : 'failed',
+        status: log.success ? PAYMENT_STATUS.SUCCEEDED : PAYMENT_STATUS.FAILED,
         date: log.createdAt.toISOString().split('T')[0],
         time: log.createdAt.toTimeString().split(' ')[0].substring(0, 5),
         details: log.errorMessage || JSON.stringify(log.metadata || {}),
@@ -126,7 +126,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         action: 'Joined Membership Queue',
         description: `Assigned queue position #${queueData.queuePosition}`,
         amount: null,
-        status: 'completed',
+        status: PAYMENT_STATUS.SUCCEEDED,
         date: queueData.joinedQueueAt.toISOString().split('T')[0],
         time: queueData.joinedQueueAt.toTimeString().split(' ')[0].substring(0, 5),
         details: `Position: ${queueData.queuePosition} • Eligible: ${queueData.isEligible ? 'Yes' : 'No'}`,

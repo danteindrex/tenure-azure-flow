@@ -3,6 +3,7 @@ import { db } from '../../drizzle/db';
 import { kycVerification, userMemberships } from '../../drizzle/schema';
 import { eq } from 'drizzle-orm';
 import * as plaidService from '../services/plaid.service';
+import { KYC_STATUS } from '../config/status-constants';
 
 /**
  * Create Plaid Link Token for Identity Verification
@@ -24,7 +25,7 @@ export async function createLinkToken(req: Request, res: Response) {
       where: eq(kycVerification.userId, userId)
     });
 
-    if (existingKYC && existingKYC.status === 'verified') {
+    if (existingKYC && existingKYC.status === KYC_STATUS.VERIFIED) {
       return res.status(400).json({
         success: false,
         error: 'User already has verified KYC'
@@ -103,7 +104,7 @@ export async function verifyKYC(req: Request, res: Response) {
           verificationData: verificationData as any,
           documentType: documentType || existingKYC.documentType,
           riskScore,
-          verifiedAt: status === 'verified' ? new Date().toISOString() : existingKYC.verifiedAt,
+          verifiedAt: status === KYC_STATUS.VERIFIED ? new Date().toISOString() : existingKYC.verifiedAt,
           updatedAt: new Date().toISOString(),
         })
         .where(eq(kycVerification.id, existingKYC.id));
@@ -125,7 +126,7 @@ export async function verifyKYC(req: Request, res: Response) {
     }
 
     // If verification is successful, update userMemberships table to mark as VERIFIED
-    if (status === 'verified') {
+    if (status === KYC_STATUS.VERIFIED) {
       await db
         .update(userMemberships)
         .set({
@@ -183,7 +184,7 @@ export async function getKYCStatus(req: Request, res: Response) {
       success: true,
       data: {
         status: kycRecord.status,
-        verified: kycRecord.status === 'verified',
+        verified: kycRecord.status === KYC_STATUS.VERIFIED,
         verifiedAt: kycRecord.verifiedAt,
         verificationProvider: kycRecord.verificationProvider,
         riskScore: kycRecord.riskScore,

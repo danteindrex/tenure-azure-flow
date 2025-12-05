@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { useSession } from "@/lib/auth-client";
 import { UserActivityHistory, TransactionHistory } from "@/lib/history";
 import { useHistoryData, useHistorySummary, useSearchHistory } from "@/hooks/useHistoryData";
+import { PAYMENT_STATUS, getPaymentStatusName } from "@/lib/status-ids";
 
 const HistoryNew = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -75,34 +76,37 @@ const HistoryNew = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
+  const getStatusIcon = (status: number | string) => {
+    const statusId = typeof status === 'string' ? parseInt(status) : status;
+    switch (statusId) {
+      case PAYMENT_STATUS.SUCCEEDED:
         return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case "failed":
+      case PAYMENT_STATUS.FAILED:
         return <XCircle className="w-4 h-4 text-red-500" />;
-      case "pending":
+      case PAYMENT_STATUS.PENDING:
         return <Clock className="w-4 h-4 text-yellow-500" />;
-      case "cancelled":
+      case PAYMENT_STATUS.CANCELED:
         return <XCircle className="w-4 h-4 text-gray-500" />;
       default:
         return <AlertCircle className="w-4 h-4 text-gray-500" />;
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "completed":
-      case "succeeded": // Payment transactions use "succeeded"
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Completed</Badge>;
-      case "failed":
-        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Failed</Badge>;
-      case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Pending</Badge>;
-      case "cancelled":
-        return <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">Cancelled</Badge>;
+  const getStatusBadge = (status: number | string) => {
+    const statusId = typeof status === 'string' ? parseInt(status) : status;
+    const statusName = getPaymentStatusName(statusId);
+    
+    switch (statusId) {
+      case PAYMENT_STATUS.SUCCEEDED:
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">{statusName}</Badge>;
+      case PAYMENT_STATUS.FAILED:
+        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">{statusName}</Badge>;
+      case PAYMENT_STATUS.PENDING:
+        return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">{statusName}</Badge>;
+      case PAYMENT_STATUS.CANCELED:
+        return <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">{statusName}</Badge>;
       default:
-        return <Badge variant="secondary">Unknown</Badge>;
+        return <Badge variant="secondary">{statusName}</Badge>;
     }
   };
 
