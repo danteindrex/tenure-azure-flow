@@ -8,9 +8,9 @@
 import { pgTable, text, timestamp, boolean, uuid, integer } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
-// Map to your existing 'users' table structure exactly
+// Map to  existing 'users' table structure exactly
 export const user = pgTable("users", {
-  // Your existing columns - use UUID to match your database
+  // existing columns - use UUID to match your database
   id: uuid("id").primaryKey().defaultRandom(), // UUID to match your existing table
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false),

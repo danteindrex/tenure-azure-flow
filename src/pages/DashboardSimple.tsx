@@ -13,6 +13,7 @@ import { usePaymentHistory } from "@/hooks/usePaymentHistory";
 import { useNewsFeed } from "@/hooks/useNewsFeed";
 import { useStatusValues, getStatusColor, getStatusDisplayName } from "@/hooks/useStatusValues";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useMemberStatus } from "@/hooks/useMemberStatus";
 
 const DashboardSimple = () => {
 
@@ -41,10 +42,14 @@ const DashboardSimple = () => {
   const { data: statusValuesData } = useStatusValues('member_eligibility');
   const statusMap = statusValuesData?.data?.statusMap;
 
+  // Fetch member status to determine if user can rejoin
+  const { data: memberStatusData, isLoading: isLoadingMemberStatus } = useMemberStatus();
+
   // UI state
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [rejoining, setRejoining] = useState(false);
 
   const BUSINESS_LAUNCH_DATE = process.env.NEXT_PUBLIC_BUSINESS_LAUNCH_DATE || ""; // ISO string fallback
   const PRIZE_PER_WINNER = 100000; // BR-4: $100,000 per winner
@@ -242,6 +247,46 @@ const DashboardSimple = () => {
     }
   };
 
+  const handleRejoinSubscription = async () => {
+    if (!user) {
+      toast.error("Please sign in to rejoin");
+      return;
+    }
+
+    try {
+      setRejoining(true);
+      // Use relative URL to call Next.js API route (same as step 5 checkout)
+      const response = await fetch(`/api/subscriptions/${user.id}/rejoin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          successUrl: `${window.location.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${window.location.origin}/dashboard?canceled=true`
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create rejoin checkout session');
+      }
+
+      const result = await response.json();
+      if (result.success && result.data?.url) {
+        // Redirect to Stripe checkout (same as step 5)
+        window.location.href = result.data.url;
+      } else {
+        throw new Error('Invalid response from server');
+      }
+    } catch (error: any) {
+      console.error('Error rejoining subscription:', error);
+      await logError(`Error rejoining subscription: ${error.message}`, user.id);
+      toast.error(error.message || 'Failed to start rejoin process');
+    } finally {
+      setRejoining(false);
+    }
+  };
+
   const userData = {
     memberId: userDatabaseId ? `#${userDatabaseId.toString().padStart(3, '0')}` : (queuePosition ? `#${queuePosition.toString().padStart(3, '0')}` : "Not in queue"),
     tenureStart: "", // Not available here
@@ -256,9 +301,6 @@ const DashboardSimple = () => {
     paymentAmount,
     queuePosition: queuePosition ?? 0,
     totalQueueCount,
-  };
-  const fundData = {
-    nextDrawDate: `${daysUntilDraw} days`,
   };
 
   return (
@@ -292,6 +334,61 @@ const DashboardSimple = () => {
           <span className="hidden sm:inline">Refresh</span>
         </Button>
       </div>
+
+      {/* Rejoin Section - Shows for canceled/paid out members */}
+      {memberStatusData?.data?.canRejoin && (
+        <Card className="p-3 sm:p-4 md:p-6 shadow-lg border-2 border-accent bg-accent/5">
+          <div className="text-center space-y-3 sm:space-y-4">
+            <div className="flex items-center justify-center gap-2">
+              <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-accent" />
+              <h2 className="text-lg sm:text-xl font-bold text-accent">
+                {memberStatusData.data.memberStatus === 'Cancelled' ? 'Subscription Canceled' : 
+                 memberStatusData.data.memberStatus === 'Paid' ? 'Congratulations! You Won!' : 
+                 'Rejoin Home Solutions'}
+              </h2>
+            </div>
+            
+            <div className="space-y-2">
+              <p className="text-sm sm:text-base text-muted-foreground">
+                {memberStatusData.data.memberStatus === 'Cancelled' ? 
+                  'You were removed from the queue when you canceled your subscription.' :
+                  memberStatusData.data.memberStatus === 'Paid' ? 
+                  'You can rejoin to compete for future payouts.' :
+                  'Start a new membership to join the queue.'}
+              </p>
+              
+              {memberStatusData.data.memberStatus === 'Cancelled' && (
+                <p className="text-xs sm:text-sm text-yellow-600 dark:text-yellow-400 font-medium">
+                  ⚠️ If you rejoin, you'll start at the back of the queue (position #{stats.totalQueueCount + 1})
+                </p>
+              )}
+            </div>
+
+            <Button
+              onClick={handleRejoinSubscription}
+              disabled={rejoining}
+              className="w-full sm:w-auto px-6 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-bold text-sm sm:text-base shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+              size="lg"
+            >
+              {rejoining ? (
+                <>
+                  <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin" />
+                  <span>Starting Checkout...</span>
+                </>
+              ) : (
+                <>
+                  <Crown className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                  <span>Rejoin for $325 - Start New Membership</span>
+                </>
+              )}
+            </Button>
+            
+            <p className="text-xs text-muted-foreground">
+              Same process as initial signup - includes first month ($25) + first year ($300)
+            </p>
+          </div>
+        </Card>
+      )}
 
       {/* Key Stats - 3 columns on mobile and desktop (removed queue position) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
@@ -445,10 +542,24 @@ const DashboardSimple = () => {
         ) : (
           <div className="text-center py-6 sm:py-8">
             <Users className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
-            <p className="text-sm sm:text-base text-muted-foreground px-4">No members in queue yet</p>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-2 px-4">
-              {!currentUserEntry ? "Complete your membership to join the queue" : ""}
-            </p>
+            {memberStatusData?.data?.canRejoin ? (
+              <>
+                <p className="text-sm sm:text-base text-muted-foreground px-4">You are not currently in the queue</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-2 px-4">
+                  {memberStatusData.data.memberStatus === 'Cancelled' ? 
+                    'Your subscription was canceled and you were removed from the queue' :
+                    'Use the rejoin button above to start a new membership'
+                  }
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm sm:text-base text-muted-foreground px-4">No members in queue yet</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-2 px-4">
+                  {!currentUserEntry ? "Complete your membership to join the queue" : ""}
+                </p>
+              </>
+            )}
           </div>
         )}
       </Card>
@@ -539,10 +650,12 @@ const DashboardSimple = () => {
                 variant="destructive"
                 className="w-full shadow-lg text-xs sm:text-sm py-2 sm:py-2.5"
                 onClick={() => setShowCancelModal(true)}
-                disabled={!queuePosition}
+                disabled={!queuePosition || memberStatusData?.data?.canRejoin}
               >
                 <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4 mr-2 shrink-0" />
-                <span className="truncate">Cancel Subscription</span>
+                <span className="truncate">
+                  {memberStatusData?.data?.canRejoin ? 'Already Canceled' : 'Cancel Subscription'}
+                </span>
               </Button>
               <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground text-center px-2">
                 Update payment method and manage billing through Stripe's secure portal

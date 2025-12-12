@@ -73,9 +73,7 @@ export const membershipQueue = pgTable('membership_queue', {
   eligibleIdx: index('idx_membership_queue_eligible').on(table.isEligible)
 }))
 
-// ============================================================================
 // 3. KYC VERIFICATION (EXISTING TABLE - EXACT MAPPING)
-// ============================================================================
 export const kycVerification = pgTable('kyc_verification', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),

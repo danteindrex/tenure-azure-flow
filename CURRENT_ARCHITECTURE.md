@@ -1,10 +1,5 @@
-# Current Architecture Analysis - Tenure Azure Flow
-
-## Architecture Pattern: **Microservices Architecture with Shared Database**
-
-Based on the codebase analysis, the current architecture is **Microservices Architecture** with the following characteristics:
-
-## Current State Analysis
+# Current Architecture --home soluitons
+ **Microservices Architecture with Shared Database**
 
 ### 1. Main Application (Monolith Core)
 - **Framework**: Next.js 15.5.6 with Pages Router
@@ -152,11 +147,6 @@ Based on the codebase analysis, the current architecture is **Microservices Arch
 - **Database Consistency**: Shared data ensures consistency
 - **Scalability**: Individual service scaling possible
 
-#### Current Limitations
-- **Database Coupling**: Shared database creates tight coupling
-- **Single Point of Failure**: Database failure affects all services
-- **Transaction Complexity**: Cross-service transactions not supported
-- **Service Discovery**: Hardcoded URLs, no dynamic discovery
 
 ### 10. Security Architecture
 
@@ -171,15 +161,4 @@ Based on the codebase analysis, the current architecture is **Microservices Arch
 - **Helmet**: Security headers
 - **Input Validation**: Zod schemas
 
-### 11. Current State Summary
 
-The project currently implements a **Microservices Architecture with Shared Database** pattern:
-
-- **4 Independent Microservices** + **1 Main Next.js Application**
-- **Shared PostgreSQL Database** accessed by all services
-- **HTTP REST Communication** between services
-- **Docker Compose** for local development
-- **Serverless Ready** for cloud deployment
-- **Session-Based Authentication** across all services
-
-This is a hybrid approach where the main Next.js application acts as both frontend and API gateway, while specialized business functions are extracted into independent microservices that share the same database for data consistency.

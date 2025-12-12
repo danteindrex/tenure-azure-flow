@@ -1100,6 +1100,31 @@ export class StripeService {
 
       logger.info(`Member status set to Cancelled (ID: ${MEMBER_STATUS.CANCELLED}) for subscription ${dbSubscription.id}`);
 
+      // Send cancellation email
+      try {
+        // Get user name for personalized email
+        const userNameQuery = `
+          SELECT u.name, p.first_name, p.last_name, u.email
+          FROM users u
+          LEFT JOIN user_profiles p ON u.id = p.user_id
+          WHERE u.id = $1
+        `;
+        const userResult = await pool.query(userNameQuery, [dbSubscription.user_id]);
+        const userData = userResult.rows[0];
+
+        if (userData?.email) {
+          const userName = userData.first_name || userData.name || 'Member';
+          await emailService.sendCancellationEmail({
+            to: userData.email,
+            name: userName
+          });
+          logger.info(`Cancellation email sent to ${userData.email}`);
+        }
+      } catch (emailError) {
+        // Don't fail the webhook if email fails - just log it
+        logger.error('Failed to send cancellation email:', emailError);
+      }
+
       // Refresh the queue to reflect the status change
       try {
         await pool.query('SELECT refresh_active_member_queue()');
