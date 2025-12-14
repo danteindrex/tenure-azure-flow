@@ -52,6 +52,7 @@
     "services/Tenure-queue/**/*",
     "services/kyc-service/**/*",
     "services/payout-service/**/*",
+    "services/cms/**/*",
     "tests/**/*",
     "**/*.test.ts",
     "**/*.test.tsx",

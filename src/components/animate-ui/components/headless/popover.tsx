@@ -1,88 +1,45 @@
 import * as React from 'react';
-
-import {
-  Popover as PopoverPrimitive,
-  PopoverButton as PopoverButtonPrimitive,
-  PopoverPanel as PopoverPanelPrimitive,
-  PopoverBackdrop as PopoverBackdropPrimitive,
-  PopoverGroup as PopoverGroupPrimitive,
-  type PopoverProps as PopoverPrimitiveProps,
-  type PopoverButtonProps as PopoverButtonPrimitiveProps,
-  type PopoverPanelProps as PopoverPanelPrimitiveProps,
-  type PopoverBackdropProps as PopoverBackdropPrimitiveProps,
-  type PopoverGroupProps as PopoverGroupPrimitiveProps,
-} from '@/components/animate-ui/primitives/headless/popover';
+import { Popover as BasePopover } from '@base-ui-components/react/popover';
 import { cn } from '@/lib/utils';
 
-type PopoverProps<TTag extends React.ElementType = 'div'> =
-  PopoverPrimitiveProps<TTag>;
-
-function Popover<TTag extends React.ElementType = 'div'>(
-  props: PopoverProps<TTag>,
-) {
-  return <PopoverPrimitive {...props} />;
+// Correct Base UI Popover API implementation
+export function PopoverRoot({ children, ...props }: any) {
+  return <BasePopover.Root {...props}>{children}</BasePopover.Root>;
 }
 
-type PopoverButtonProps<TTag extends React.ElementType = 'button'> =
-  PopoverButtonPrimitiveProps<TTag>;
-
-function PopoverButton<TTag extends React.ElementType = 'button'>(
-  props: PopoverButtonProps<TTag>,
-) {
-  return <PopoverButtonPrimitive {...props} />;
+export function PopoverTrigger({ children, ...props }: any) {
+  return <BasePopover.Trigger {...props}>{children}</BasePopover.Trigger>;
 }
 
-type PopoverPanelProps<TTag extends React.ElementType = 'div'> =
-  PopoverPanelPrimitiveProps<TTag>;
+export function PopoverPortal({ children, ...props }: any) {
+  return <BasePopover.Portal {...props}>{children}</BasePopover.Portal>;
+}
 
-function PopoverPanel<TTag extends React.ElementType = 'div'>({
-  className,
-  anchor = { to: 'bottom', gap: 4 },
-  ...props
-}: PopoverPanelProps<TTag>) {
+export function PopoverPositioner({ children, ...props }: any) {
+  return <BasePopover.Positioner {...props}>{children}</BasePopover.Positioner>;
+}
+
+export function PopoverPopup({ className, children, ...props }: any) {
   return (
-    <PopoverPanelPrimitive
-      anchor={anchor}
+    <BasePopover.Popup
       className={cn(
-        'bg-popover text-popover-foreground z-50 w-72 rounded-md border p-4 shadow-md outline-hidden',
-        'data-[anchor=top_center]:origin-bottom data-[anchor=top_start]:origin-bottom-left data-[anchor=top_end]:origin-bottom-right',
-        'data-[anchor=bottom_center]:origin-top data-[anchor=bottom_start]:origin-top-left data-[anchor=bottom_end]:origin-top-right',
-        'data-[anchor=left_center]:origin-right data-[anchor=left_start]:origin-top-right data-[anchor=left_end]:origin-bottom-right',
-        'data-[anchor=right_center]:origin-left data-[anchor=right_start]:origin-top-left data-[anchor=right_end]:origin-bottom-left',
+        'absolute z-50 rounded-md border border-border bg-popover p-4 text-popover-foreground shadow-md outline-none',
         className,
       )}
       {...props}
-    />
+    >
+      {children}
+    </BasePopover.Popup>
   );
 }
 
-type PopoverBackdropProps<TTag extends React.ElementType = 'div'> =
-  PopoverBackdropPrimitiveProps<TTag>;
-
-function PopoverBackdrop<TTag extends React.ElementType = 'div'>(
-  props: PopoverBackdropProps<TTag>,
-) {
-  return <PopoverBackdropPrimitive {...props} />;
+export function PopoverArrow({ className, ...props }: any) {
+  return <BasePopover.Arrow className={cn('fill-popover', className)} {...props} />;
 }
 
-type PopoverGroupProps<TTag extends React.ElementType = 'div'> =
-  PopoverGroupPrimitiveProps<TTag>;
-
-function PopoverGroup<TTag extends React.ElementType = 'div'>(
-  props: PopoverGroupProps<TTag>,
-) {
-  return <PopoverGroupPrimitive {...props} />;
-}
-
-export {
-  Popover,
-  PopoverButton,
-  PopoverPanel,
-  PopoverBackdrop,
-  PopoverGroup,
-  type PopoverProps,
-  type PopoverButtonProps,
-  type PopoverPanelProps,
-  type PopoverBackdropProps,
-  type PopoverGroupProps,
-};
+// Legacy API compatibility - map old names to new ones
+export const Popover = PopoverRoot;
+export const PopoverButton = PopoverTrigger;
+export const PopoverPanel = PopoverPopup;
+export const PopoverBackdrop = () => null; // Not used in Base UI
+export const PopoverGroup = ({ children, ...props }: any) => <div {...props}>{children}</div>;

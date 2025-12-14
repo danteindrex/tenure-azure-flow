@@ -39,6 +39,7 @@ function Popover<TTag extends React.ElementType = 'div'>({
   ...props
 }: PopoverProps<TTag>) {
   return (
+    // @ts-expect-error Type mismatch with Headless UI and motion props
     <PopoverPrimitive data-slot="popover" {...props}>
       {(bag) => (
         <PopoverProvider value={{ isOpen: bag.open }}>
@@ -105,6 +106,7 @@ function PopoverPanel<TTag extends React.ElementType = 'div'>(
   return (
     <AnimatePresence>
       {isOpen && (
+        // @ts-expect-error Type mismatch with Headless UI and motion props
         <PopoverPanelPrimitive
           key="popover-panel"
           data-slot="popover-panel"

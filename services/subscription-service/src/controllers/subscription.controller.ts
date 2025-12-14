@@ -90,15 +90,15 @@ export class SubscriptionController {
    */
   static async cancelSubscription(req: Request, res: Response): Promise<void> {
     try {
-      const memberId = parseInt(req.params.memberId);
+      const userId = req.params.memberId; // This is actually a userId (UUID string)
       const { immediately = false } = req.body;
 
-      if (isNaN(memberId)) {
-        res.status(400).json({ error: 'Invalid member ID' });
+      if (!userId) {
+        res.status(400).json({ error: 'Invalid user ID' });
         return;
       }
 
-      await StripeService.cancelSubscription(memberId, immediately);
+      await StripeService.cancelSubscription(userId, immediately);
 
       res.status(200).json({
         success: true,
@@ -121,14 +121,14 @@ export class SubscriptionController {
    */
   static async reactivateSubscription(req: Request, res: Response): Promise<void> {
     try {
-      const memberId = parseInt(req.params.memberId);
+      const userId = req.params.memberId; // This is actually a userId (UUID string)
 
-      if (isNaN(memberId)) {
-        res.status(400).json({ error: 'Invalid member ID' });
+      if (!userId) {
+        res.status(400).json({ error: 'Invalid user ID' });
         return;
       }
 
-      await StripeService.reactivateSubscription(memberId);
+      await StripeService.reactivateSubscription(userId);
 
       res.status(200).json({
         success: true,

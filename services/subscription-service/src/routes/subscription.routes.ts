@@ -10,14 +10,14 @@ router.post('/checkout', validateSession, SubscriptionController.createCheckoutS
 // Get subscription details (protected)
 router.get('/:memberId', validateSession, SubscriptionController.getSubscription);
 
-// Cancel subscription (protected)
-router.post('/:memberId/cancel', validateSession, SubscriptionController.cancelSubscription);
+ // Cancel subscription (protected)
+ router.post('/:userId/cancel', validateSession, SubscriptionController.cancelSubscription);
 
-// Reactivate subscription (protected)
-router.post('/:memberId/reactivate', validateSession, SubscriptionController.reactivateSubscription);
+ // Reactivate subscription (protected)
+ router.post('/:userId/reactivate', validateSession, SubscriptionController.reactivateSubscription);
 
-// Get payment history (protected)
-router.get('/:memberId/payments', validateSession, SubscriptionController.getPaymentHistory);
+ // Get payment history (protected)
+ router.get('/:userId/payments', validateSession, SubscriptionController.getPaymentHistory);
 
 // Create billing portal session for payment method updates (protected)
 router.post('/:userId/update-payment', validateSession, SubscriptionController.createUpdatePaymentSession);

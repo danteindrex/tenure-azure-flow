@@ -1,6 +1,6 @@
 import React from 'react'
 import { PreviewCard } from '../animate-ui/components/base/preview-card'
-import { AnimateTooltip } from '../animate-ui/components/animate/tooltip'
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../animate-ui/components/animate/tooltip'
 
 interface Card {
   title: string
@@ -59,29 +59,38 @@ export function InteractiveCardsBlock({
     switch (card.cardType) {
       case 'preview':
         return (
-          <PreviewCard key={index} className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
-            {cardContent}
-          </PreviewCard>
+          <div key={index} className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+            <PreviewCard>
+              {cardContent}
+            </PreviewCard>
+          </div>
         )
       
       case 'tooltip':
         return (
-          <AnimateTooltip key={index} content={card.description}>
-            <div className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer">
-              {card.image && (
-                <div className="aspect-video overflow-hidden rounded-lg mb-4">
-                  <img
-                    src={card.image.url}
-                    alt={card.image.alt || card.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
+          <TooltipProvider key={index}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow cursor-pointer">
+                  {card.image && (
+                    <div className="aspect-video overflow-hidden rounded-lg mb-4">
+                      <img
+                        src={card.image.url}
+                        alt={card.image.alt || card.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                  )}
+                  <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                    {card.title}
+                  </h3>
                 </div>
-              )}
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                {card.title}
-              </h3>
-            </div>
-          </AnimateTooltip>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{card.description}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )
       
       case 'hover':

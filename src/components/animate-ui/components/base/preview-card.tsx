@@ -1,78 +1,48 @@
 import * as React from 'react';
-
-import {
-  PreviewCard as PreviewCardPrimitive,
-  PreviewCardTrigger as PreviewCardTriggerPrimitive,
-  PreviewCardPortal as PreviewCardPortalPrimitive,
-  PreviewCardPositioner as PreviewCardPositionerPrimitive,
-  PreviewCardPopup as PreviewCardPopupPrimitive,
-  PreviewCardBackdrop as PreviewCardBackdropPrimitive,
-  type PreviewCardProps as PreviewCardPrimitiveProps,
-  type PreviewCardTriggerProps as PreviewCardTriggerPrimitiveProps,
-  type PreviewCardPositionerProps as PreviewCardPositionerPrimitiveProps,
-  type PreviewCardPopupProps as PreviewCardPopupPrimitiveProps,
-  type PreviewCardBackdropProps as PreviewCardBackdropPrimitiveProps,
-} from '@/components/animate-ui/primitives/base/preview-card';
 import { cn } from '@/lib/utils';
 
-type PreviewCardProps = PreviewCardPrimitiveProps;
+// Simplified PreviewCard as a basic card component
+const PreviewCard = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn('rounded-md border bg-card text-card-foreground shadow-sm', className)}
+    {...props}
+  />
+));
+PreviewCard.displayName = 'PreviewCard';
 
-function PreviewCard(props: PreviewCardProps) {
-  return <PreviewCardPrimitive {...props} />;
-}
+const PreviewCardTrigger = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement>
+>(({ className, ...props }, ref) => (
+  <button
+    ref={ref}
+    className={cn('inline-flex items-center justify-center', className)}
+    {...props}
+  />
+));
+PreviewCardTrigger.displayName = 'PreviewCardTrigger';
 
-type PreviewCardTriggerProps = PreviewCardTriggerPrimitiveProps;
-
-function PreviewCardTrigger(props: PreviewCardTriggerProps) {
-  return <PreviewCardTriggerPrimitive {...props} />;
-}
-
-type PreviewCardPanelProps = PreviewCardPositionerPrimitiveProps &
-  PreviewCardPopupPrimitiveProps;
-
-function PreviewCardPanel({
-  className,
-  align = 'center',
-  sideOffset = 4,
-  style,
-  children,
-  ...props
-}: PreviewCardPanelProps) {
-  return (
-    <PreviewCardPortalPrimitive>
-      <PreviewCardPositionerPrimitive
-        align={align}
-        sideOffset={sideOffset}
-        className="z-50"
-        {...props}
-      >
-        <PreviewCardPopupPrimitive
-          className={cn(
-            'bg-popover text-popover-foreground w-64 origin-(--transform-origin) rounded-md border p-4 shadow-md outline-hidden',
-            className,
-          )}
-          style={style}
-        >
-          {children}
-        </PreviewCardPopupPrimitive>
-      </PreviewCardPositionerPrimitive>
-    </PreviewCardPortalPrimitive>
-  );
-}
-
-type PreviewCardBackdropProps = PreviewCardBackdropPrimitiveProps;
-
-function PreviewCardBackdrop(props: PreviewCardBackdropProps) {
-  return <PreviewCardBackdropPrimitive {...props} />;
-}
+const PreviewCardContent = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      'z-50 w-64 rounded-md border bg-popover p-4 text-popover-foreground shadow-md',
+      className
+    )}
+    {...props}
+  />
+));
+PreviewCardContent.displayName = 'PreviewCardContent';
 
 export {
   PreviewCard,
   PreviewCardTrigger,
-  PreviewCardPanel,
-  PreviewCardBackdrop,
-  type PreviewCardProps,
-  type PreviewCardTriggerProps,
-  type PreviewCardPanelProps,
-  type PreviewCardBackdropProps,
+  PreviewCardContent,
 };

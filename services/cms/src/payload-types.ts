@@ -261,9 +261,93 @@ export interface Page {
             description?: string | null;
             buttonText: string;
             buttonLink: string;
+            buttonStyle?: ('primary' | 'secondary' | 'outline') | null;
             id?: string | null;
             blockName?: string | null;
             blockType: 'cta';
+          }
+        | {
+            backgroundType: 'hexagon' | 'hole' | 'stars' | 'gravity-stars';
+            title?: string | null;
+            subtitle?: string | null;
+            overlay?: boolean | null;
+            hexagonSettings?: {
+              strokeColor?: string | null;
+              numberOfLines?: number | null;
+            };
+            holeSettings?: {
+              strokeColor?: string | null;
+              numberOfLines?: number | null;
+              numberOfDiscs?: number | null;
+            };
+            starsSettings?: {
+              factor?: number | null;
+              speed?: number | null;
+              starColor?: string | null;
+            };
+            gravityStarsSettings?: {
+              particleCount?: number | null;
+              particleColor?: string | null;
+            };
+            content?: {
+              root: {
+                type: string;
+                children: {
+                  type: any;
+                  version: number;
+                  [k: string]: unknown;
+                }[];
+                direction: ('ltr' | 'rtl') | null;
+                format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+                indent: number;
+                version: number;
+              };
+              [k: string]: unknown;
+            } | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'animatedBackground';
+          }
+        | {
+            title?: string | null;
+            description?: string | null;
+            layout?: ('grid' | 'list' | 'masonry') | null;
+            cards?:
+              | {
+                  title: string;
+                  description?: string | null;
+                  image?: (number | null) | Media;
+                  cardType: 'standard' | 'preview' | 'tooltip';
+                  link?: string | null;
+                  id?: string | null;
+                }[]
+              | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'interactiveCards';
+          }
+        | {
+            title?: string | null;
+            content: {
+              root: {
+                type: string;
+                children: {
+                  type: any;
+                  version: number;
+                  [k: string]: unknown;
+                }[];
+                direction: ('ltr' | 'rtl') | null;
+                format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+                indent: number;
+                version: number;
+              };
+              [k: string]: unknown;
+            };
+            animation?: ('fadeIn' | 'slideUp' | 'slideLeft' | 'slideRight' | 'scaleIn') | null;
+            delay?: number | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'animatedContent';
           }
       )[]
     | null;
@@ -443,6 +527,73 @@ export interface PagesSelect<T extends boolean = true> {
               description?: T;
               buttonText?: T;
               buttonLink?: T;
+              buttonStyle?: T;
+              id?: T;
+              blockName?: T;
+            };
+        animatedBackground?:
+          | T
+          | {
+              backgroundType?: T;
+              title?: T;
+              subtitle?: T;
+              overlay?: T;
+              hexagonSettings?:
+                | T
+                | {
+                    strokeColor?: T;
+                    numberOfLines?: T;
+                  };
+              holeSettings?:
+                | T
+                | {
+                    strokeColor?: T;
+                    numberOfLines?: T;
+                    numberOfDiscs?: T;
+                  };
+              starsSettings?:
+                | T
+                | {
+                    factor?: T;
+                    speed?: T;
+                    starColor?: T;
+                  };
+              gravityStarsSettings?:
+                | T
+                | {
+                    particleCount?: T;
+                    particleColor?: T;
+                  };
+              content?: T;
+              id?: T;
+              blockName?: T;
+            };
+        interactiveCards?:
+          | T
+          | {
+              title?: T;
+              description?: T;
+              layout?: T;
+              cards?:
+                | T
+                | {
+                    title?: T;
+                    description?: T;
+                    image?: T;
+                    cardType?: T;
+                    link?: T;
+                    id?: T;
+                  };
+              id?: T;
+              blockName?: T;
+            };
+        animatedContent?:
+          | T
+          | {
+              title?: T;
+              content?: T;
+              animation?: T;
+              delay?: T;
               id?: T;
               blockName?: T;
             };

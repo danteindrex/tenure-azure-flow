@@ -6,7 +6,8 @@ import { motion, type HTMLMotionProps } from 'motion/react';
 import { Slot, type WithAsChild } from '@/components/animate-ui/primitives/animate/slot';
 
 type LiquidButtonProps = WithAsChild<
-  HTMLMotionProps<'button'> & {
+  Omit<HTMLMotionProps<'button'>, 'ref'> & {
+    ref?: React.Ref<HTMLButtonElement>;
     delay?: string;
     fillHeight?: string;
     hoverScale?: number;

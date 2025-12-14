@@ -53,34 +53,24 @@ export function AnimatedBackgroundBlock({
       case 'hexagon':
         return (
           <HexagonBackground
-            strokeColor={hexagonSettings?.strokeColor}
-            numberOfLines={hexagonSettings?.numberOfLines}
             className="absolute inset-0"
           />
         )
       case 'hole':
         return (
           <HoleBackground
-            strokeColor={holeSettings?.strokeColor}
-            numberOfLines={holeSettings?.numberOfLines}
-            numberOfDiscs={holeSettings?.numberOfDiscs}
             className="absolute inset-0"
           />
         )
       case 'stars':
         return (
           <StarsBackground
-            factor={starsSettings?.factor}
-            speed={starsSettings?.speed}
-            starColor={starsSettings?.starColor}
             className="absolute inset-0"
           />
         )
       case 'gravity-stars':
         return (
           <GravityStarsBackground
-            particleCount={gravityStarsSettings?.particleCount}
-            particleColor={gravityStarsSettings?.particleColor}
             className="absolute inset-0"
           />
         )

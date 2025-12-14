@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 
 export interface CMSPageBlock {
-  blockType: 'hero' | 'features' | 'cta'
+  blockType: 'hero' | 'features' | 'cta' | 'animatedBackground' | 'interactiveCards' | 'animatedContent'
   id: string
   [key: string]: any
 }
