@@ -55,10 +55,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Get subscription status if membership exists
     let subscriptionStatusId = null;
+    let cancelAtPeriodEnd = false;
+    let currentPeriodEnd = null;
     if (memberData.subscriptionId) {
       const subscription = await db
         .select({
-          subscriptionStatusId: userSubscriptions.subscriptionStatusId
+          subscriptionStatusId: userSubscriptions.subscriptionStatusId,
+          cancelAtPeriodEnd: userSubscriptions.cancelAtPeriodEnd,
+          currentPeriodEnd: userSubscriptions.currentPeriodEnd
         })
         .from(userSubscriptions)
         .where(eq(userSubscriptions.id, memberData.subscriptionId))
@@ -66,6 +70,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (subscription.length > 0) {
         subscriptionStatusId = subscription[0].subscriptionStatusId;
+        cancelAtPeriodEnd = subscription[0].cancelAtPeriodEnd || false;
+        currentPeriodEnd = subscription[0].currentPeriodEnd;
       }
     }
 
@@ -96,10 +102,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     };
 
-    // Determine if user can rejoin (if they're canceled or paid out)
-    const canRejoin = memberData.memberStatusId === MEMBER_STATUS.CANCELLED || 
-                     memberData.memberStatusId === MEMBER_STATUS.PAID ||
-                     subscriptionStatusId === SUBSCRIPTION_STATUS.CANCELED;
+    // Determine subscription state
+    const isInGracePeriod = cancelAtPeriodEnd && 
+                           subscriptionStatusId === SUBSCRIPTION_STATUS.ACTIVE &&
+                           currentPeriodEnd && new Date(currentPeriodEnd) > new Date();
+
+    const isFullyCanceled = memberData.memberStatusId === MEMBER_STATUS.CANCELLED || 
+                           subscriptionStatusId === SUBSCRIPTION_STATUS.CANCELED;
+
+    const canRejoin = memberData.memberStatusId === MEMBER_STATUS.PAID || isFullyCanceled;
+    const canUndoCancel = isInGracePeriod;
 
     return res.status(200).json({
       success: true,
@@ -108,7 +120,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         memberStatus: getStatusName(memberData.memberStatusId),
         subscriptionStatusId,
         subscriptionStatus: getSubscriptionStatusName(subscriptionStatusId),
-        canRejoin
+        cancelAtPeriodEnd,
+        currentPeriodEnd,
+        isInGracePeriod,
+        isFullyCanceled,
+        canRejoin,
+        canUndoCancel
       }
     });
 

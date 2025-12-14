@@ -10,7 +10,7 @@ import { useQueueData } from "@/hooks/useQueueData";
 import { useStatistics } from "@/hooks/useStatistics";
 import { useBillingSchedules } from "@/hooks/useBillingSchedules";
 import { usePaymentHistory } from "@/hooks/usePaymentHistory";
-import { useNewsFeed } from "@/hooks/useNewsFeed";
+import { useCMSPosts } from "@/hooks/useCMSPosts";
 import { useStatusValues, getStatusColor, getStatusDisplayName } from "@/hooks/useStatusValues";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemberStatus } from "@/hooks/useMemberStatus";
@@ -36,7 +36,7 @@ const DashboardSimple = () => {
   const { data: statsData, isLoading: isLoadingStats } = useStatistics();
   const { data: billingData, isLoading: isLoadingBilling } = useBillingSchedules(user?.id);
   const { data: paymentHistoryData, isLoading: isLoadingPayments } = usePaymentHistory(user?.id);
-  const { data: newsResponse, isLoading: isLoadingNews } = useNewsFeed();
+  const { posts: cmsPosts, loading: isLoadingNews } = useCMSPosts(3);
 
   // Fetch status values with colors from database
   const { data: statusValuesData } = useStatusValues('member_eligibility');
@@ -287,6 +287,43 @@ const DashboardSimple = () => {
     }
   };
 
+  const handleUndoCancellation = async () => {
+    if (!user) {
+      toast.error("Please sign in to undo cancellation");
+      return;
+    }
+
+    try {
+      setRejoining(true);
+      // Use relative URL to call Next.js API route
+      const response = await fetch(`/api/subscriptions/${user.id}/reactivate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to undo cancellation');
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success('Cancellation undone! Your subscription will continue.');
+        // Refresh data to update UI
+        window.location.reload();
+      } else {
+        throw new Error('Invalid response from server');
+      }
+    } catch (error: any) {
+      console.error('Error undoing cancellation:', error);
+      await logError(`Error undoing cancellation: ${error.message}`, user.id);
+      toast.error(error.message || 'Failed to undo cancellation');
+    } finally {
+      setRejoining(false);
+    }
+  };
+
   const userData = {
     memberId: userDatabaseId ? `#${userDatabaseId.toString().padStart(3, '0')}` : (queuePosition ? `#${queuePosition.toString().padStart(3, '0')}` : "Not in queue"),
     tenureStart: "", // Not available here
@@ -335,14 +372,25 @@ const DashboardSimple = () => {
         </Button>
       </div>
 
-      {/* Rejoin Section - Shows for canceled/paid out members */}
-      {memberStatusData?.data?.canRejoin && (
-        <Card className="p-3 sm:p-4 md:p-6 shadow-lg border-2 border-accent bg-accent/5">
+      {/* Smart Action Section - Morphs based on subscription state */}
+      {(memberStatusData?.data?.canRejoin || memberStatusData?.data?.canUndoCancel) && (
+        <Card className={`p-3 sm:p-4 md:p-6 shadow-lg border-2 ${
+          memberStatusData.data.canUndoCancel 
+            ? 'border-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/20' 
+            : 'border-accent bg-accent/5'
+        }`}>
           <div className="text-center space-y-3 sm:space-y-4">
             <div className="flex items-center justify-center gap-2">
-              <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-accent" />
-              <h2 className="text-lg sm:text-xl font-bold text-accent">
-                {memberStatusData.data.memberStatus === 'Cancelled' ? 'Subscription Canceled' : 
+              {memberStatusData.data.canUndoCancel ? (
+                <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-accent" />
+              )}
+              <h2 className={`text-lg sm:text-xl font-bold ${
+                memberStatusData.data.canUndoCancel ? 'text-yellow-600' : 'text-accent'
+              }`}>
+                {memberStatusData.data.canUndoCancel ? 'Cancellation Pending' :
+                 memberStatusData.data.memberStatus === 'Cancelled' ? 'Subscription Canceled' : 
                  memberStatusData.data.memberStatus === 'Paid' ? 'Congratulations! You Won!' : 
                  'Rejoin Home Solutions'}
               </h2>
@@ -350,14 +398,24 @@ const DashboardSimple = () => {
             
             <div className="space-y-2">
               <p className="text-sm sm:text-base text-muted-foreground">
-                {memberStatusData.data.memberStatus === 'Cancelled' ? 
+                {memberStatusData.data.canUndoCancel ? 
+                  'Your subscription will end at the current period. You can undo this cancellation.' :
+                  memberStatusData.data.memberStatus === 'Cancelled' ? 
                   'You were removed from the queue when you canceled your subscription.' :
                   memberStatusData.data.memberStatus === 'Paid' ? 
                   'You can rejoin to compete for future payouts.' :
                   'Start a new membership to join the queue.'}
               </p>
               
-              {memberStatusData.data.memberStatus === 'Cancelled' && (
+              {memberStatusData.data.canUndoCancel && memberStatusData.data.currentPeriodEnd && (
+                <p className="text-xs sm:text-sm text-yellow-600 dark:text-yellow-400 font-medium">
+                  ⏰ Ends on: {new Date(memberStatusData.data.currentPeriodEnd).toLocaleDateString('en-US', {
+                    year: 'numeric', month: 'long', day: 'numeric'
+                  })}
+                </p>
+              )}
+              
+              {memberStatusData.data.canRejoin && memberStatusData.data.memberStatus === 'Cancelled' && (
                 <p className="text-xs sm:text-sm text-yellow-600 dark:text-yellow-400 font-medium">
                   ⚠️ If you rejoin, you'll start at the back of the queue (position #{stats.totalQueueCount + 1})
                 </p>
@@ -365,15 +423,24 @@ const DashboardSimple = () => {
             </div>
 
             <Button
-              onClick={handleRejoinSubscription}
+              onClick={memberStatusData.data.canUndoCancel ? handleUndoCancellation : handleRejoinSubscription}
               disabled={rejoining}
-              className="w-full sm:w-auto px-6 py-3 bg-accent hover:bg-accent/90 text-accent-foreground font-bold text-sm sm:text-base shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+              className={`w-full sm:w-auto px-6 py-3 font-bold text-sm sm:text-base shadow-lg transition-all duration-200 transform hover:scale-[1.02] ${
+                memberStatusData.data.canUndoCancel 
+                  ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                  : 'bg-accent hover:bg-accent/90 text-accent-foreground'
+              }`}
               size="lg"
             >
               {rejoining ? (
                 <>
                   <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin" />
-                  <span>Starting Checkout...</span>
+                  <span>{memberStatusData.data.canUndoCancel ? 'Undoing...' : 'Starting Checkout...'}</span>
+                </>
+              ) : memberStatusData.data.canUndoCancel ? (
+                <>
+                  <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                  <span>Undo Cancellation - Keep Subscription</span>
                 </>
               ) : (
                 <>
@@ -384,7 +451,10 @@ const DashboardSimple = () => {
             </Button>
             
             <p className="text-xs text-muted-foreground">
-              Same process as initial signup - includes first month ($25) + first year ($300)
+              {memberStatusData.data.canUndoCancel ? 
+                'Your subscription will continue and you\'ll keep your queue position' :
+                'Same process as initial signup - includes first month ($25) + first year ($300)'
+              }
             </p>
           </div>
         </Card>
@@ -542,11 +612,13 @@ const DashboardSimple = () => {
         ) : (
           <div className="text-center py-6 sm:py-8">
             <Users className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
-            {memberStatusData?.data?.canRejoin ? (
+            {(memberStatusData?.data?.canRejoin || memberStatusData?.data?.canUndoCancel) ? (
               <>
                 <p className="text-sm sm:text-base text-muted-foreground px-4">You are not currently in the queue</p>
                 <p className="text-xs sm:text-sm text-muted-foreground mt-2 px-4">
-                  {memberStatusData.data.memberStatus === 'Cancelled' ? 
+                  {memberStatusData.data.canUndoCancel ? 
+                    'Your subscription is scheduled to cancel - use the button above to undo' :
+                    memberStatusData.data.memberStatus === 'Cancelled' ? 
                     'Your subscription was canceled and you were removed from the queue' :
                     'Use the rejoin button above to start a new membership'
                   }
@@ -568,23 +640,23 @@ const DashboardSimple = () => {
         <h3 className="text-base sm:text-lg md:text-xl font-semibold mb-3 sm:mb-4">Recent News</h3>
         {isLoadingNews ? (
           <div className="py-4 text-center text-muted-foreground">Loading...</div>
-        ) : (newsResponse?.posts || []).slice(0,3).length === 0 ? (
+        ) : cmsPosts.length === 0 ? (
           <div className="py-4 text-center text-muted-foreground">No announcements yet</div>
         ) : (
-          (newsResponse?.posts || []).slice(0,3).map((post) => (
+          cmsPosts.map((post) => (
             <div key={post.id} className="py-2">
               <div className="flex items-center justify-between">
                 <p className="font-medium">{post.title}</p>
                 <span className="text-xs text-muted-foreground">
-                  {new Date(post.publish_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  {new Date(post.publishedAt || post.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground line-clamp-2">{typeof post.content === 'string' ? post.content : (post.content?.text || '')}</p>
+              <p className="text-xs text-muted-foreground line-clamp-2">{post.excerpt || 'No excerpt available'}</p>
             </div>
           ))
         )}
         <div className="pt-3">
-          <Button variant="outline" size="sm" onClick={() => (window.location.href = '/dashboard/news')}>View All News</Button>
+          <Button variant="outline" size="sm" onClick={() => (window.location.href = '/news')}>View All News</Button>
         </div>
       </Card>
 

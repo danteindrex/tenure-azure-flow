@@ -5,7 +5,12 @@ interface MemberStatusData {
   memberStatus: string;
   subscriptionStatusId: number | null;
   subscriptionStatus: string;
+  cancelAtPeriodEnd: boolean;
+  currentPeriodEnd: string | null;
+  isInGracePeriod: boolean;
+  isFullyCanceled: boolean;
   canRejoin: boolean;
+  canUndoCancel: boolean;
 }
 
 interface MemberStatusResponse {
