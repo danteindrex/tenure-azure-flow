@@ -87,8 +87,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         description,
         amount: Number(payment.amount),
         status: activityStatusId,
-        date: payment.paymentDate.toISOString().split('T')[0],
-        time: payment.paymentDate.toTimeString().split(' ')[0].substring(0, 5),
+        date: new Date(payment.paymentDate).toISOString().split('T')[0],
+        time: new Date(payment.paymentDate).toTimeString().split(' ')[0].substring(0, 5),
         details: `Payment method: ${payment.provider || 'Unknown'} • Transaction ID: ${payment.providerPaymentId || 'N/A'}`,
         metadata: {
           paymentId: payment.id,
@@ -111,8 +111,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         description,
         amount: null,
         status: log.success ? PAYMENT_STATUS.SUCCEEDED : PAYMENT_STATUS.FAILED,
-        date: log.createdAt.toISOString().split('T')[0],
-        time: log.createdAt.toTimeString().split(' ')[0].substring(0, 5),
+        date: new Date(log.createdAt).toISOString().split('T')[0],
+        time: new Date(log.createdAt).toTimeString().split(' ')[0].substring(0, 5),
         details: log.errorMessage || JSON.stringify(log.metadata || {}),
         metadata: log.metadata
       });
@@ -127,8 +127,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         description: `Assigned queue position #${queueData.queuePosition}`,
         amount: null,
         status: PAYMENT_STATUS.SUCCEEDED,
-        date: queueData.joinedQueueAt.toISOString().split('T')[0],
-        time: queueData.joinedQueueAt.toTimeString().split(' ')[0].substring(0, 5),
+        date: new Date(queueData.joinedQueueAt).toISOString().split('T')[0],
+        time: new Date(queueData.joinedQueueAt).toTimeString().split(' ')[0].substring(0, 5),
         details: `Position: ${queueData.queuePosition} • Eligible: ${queueData.isEligible ? 'Yes' : 'No'}`,
         metadata: {
           queuePosition: queueData.queuePosition,

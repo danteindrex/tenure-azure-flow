@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { auth } from "@/lib/auth";
 import { db } from "@/drizzle/db";
-import { user } from "@/drizzle/schema";
+import { users as user } from "@/drizzle/migrations/schema";
 import { eq } from "drizzle-orm";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Check if user row exists after signup
-    const userRecord = await db.query.user.findFirst({
+    const userRecord = await db.query.users.findFirst({
       where: eq(user.email, email),
       columns: {
         id: true,

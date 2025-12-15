@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { authClient } from '@/lib/auth-client';
 
 /**
- * Proxy endpoint to verify KYC and store results
- * Forwards Plaid session ID to KYC microservice
+ * Proxy endpoint to verify KYC
+ * Validates session on frontend side and passes user data to KYC service
  */
 export default async function handler(
   req: NextApiRequest,
@@ -16,6 +17,23 @@ export default async function handler(
   }
 
   try {
+    // Validate session using Better Auth client
+    const session = await authClient.getSession({
+      fetchOptions: {
+        headers: {
+          cookie: req.headers.cookie || '',
+        },
+      },
+    });
+
+    if (!session?.data?.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'No session token provided'
+      });
+    }
+
+    const user = session.data.user;
     const { sessionId, applicantId } = req.body;
 
     if (!sessionId && !applicantId) {
@@ -25,16 +43,20 @@ export default async function handler(
       });
     }
 
-    const KYC_SERVICE_URL = process.env.KYC_SERVICE_URL || 'http://localhost:3003';
+    const KYC_SERVICE_URL = process.env.KYC_SERVICE_URL;
 
-    // Forward request to KYC microservice with session cookie
+    // Forward request to KYC microservice with user data
     const response = await fetch(`${KYC_SERVICE_URL}/kyc/verify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Cookie': req.headers.cookie || '', // Forward session cookie
+        'Authorization': `Bearer ${user.id}`, // Pass user ID for service-side validation
       },
-      body: JSON.stringify({ sessionId, applicantId }),
+      body: JSON.stringify({
+        userId: user.id,
+        sessionId,
+        applicantId
+      }),
     });
 
     const data = await response.json();

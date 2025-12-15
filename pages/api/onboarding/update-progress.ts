@@ -64,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 contactValue: phone,
                 isVerified: true,
                 updatedAt: new Date()
-              })
+              } as any)
               .where(eq(userContacts.id, existingContact.id));
           } else {
             // Check if this phone number already exists for a different user
@@ -96,7 +96,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 contactValue: phone,
                 isPrimary: true,
                 isVerified: true
-              });
+              } as any);
           }
         }
         break;
@@ -110,7 +110,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .set({
             userStatusId: USER_STATUS.ONBOARDED,
             updatedAt: new Date()
-          })
+          } as any)
           .where(eq(user.id, currentUserId));
         break;
 

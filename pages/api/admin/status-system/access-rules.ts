@@ -61,7 +61,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             conditionLogic: conditionLogic || 'all',
             priority: priority || 0,
             isActive: true,
-          })
+          } as any)
           .returning()
 
         return res.status(201).json({ rule: newRule })

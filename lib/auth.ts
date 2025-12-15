@@ -17,6 +17,7 @@ import { nextCookies } from 'better-auth/next-js'
 import { twoFactor, organization, emailOTP } from 'better-auth/plugins'
 import { passkey } from '@better-auth/passkey'
 import { db } from '../drizzle/db'
+import * as schema from '../drizzle/migrations/schema'
 import { emailService } from '../src/lib/email'
 
 // SMTP email service initialized
@@ -24,7 +25,11 @@ import { emailService } from '../src/lib/email'
 export const auth = betterAuth({
   // Database adapter
   database: drizzleAdapter(db, {
-    provider: 'pg'
+    provider: 'pg',
+    schema: {
+      ...schema,
+      user: schema.users, // Map 'user' to 'users' table for Better Auth
+    }
   }),
 
   // Base URL for authentication

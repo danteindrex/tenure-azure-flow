@@ -33,7 +33,7 @@
 
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
-import * as schema from './schema'
+import * as schema from './migrations/schema'
 
 // Lazy initialization - only create pool/db when actually used at runtime
 // This prevents errors during Next.js build when DATABASE_URL isn't set

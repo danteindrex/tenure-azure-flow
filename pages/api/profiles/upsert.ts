@@ -79,7 +79,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               middleName: middle_name ?? null,
               dateOfBirth: date_of_birth ?? null,
               updatedAt: new Date()
-            })
+            } as any)
             .where(eq(userProfiles.userId, userId));
         } else {
           // Create new profile - generate unique ID
@@ -91,7 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               lastName: last_name ?? (full_name && full_name.includes(' ') ? full_name.split(' ').slice(1).join(' ') : null),
               middleName: middle_name ?? null,
               dateOfBirth: date_of_birth ?? null,
-            });
+            } as any);
         }
       }
 
@@ -105,14 +105,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             countryCode: phone_country_code || '+1', // Store phone country code separately
             isPrimary: true,
             isVerified: false,
-          })
+          } as any)
           .onConflictDoUpdate({
             target: [userContacts.userId, userContacts.contactType, userContacts.contactValue],
             set: {
               countryCode: phone_country_code || '+1',
               isPrimary: true,
               updatedAt: new Date()
-            }
+            } as any
           });
       }
 
@@ -141,7 +141,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               countryCode: country_code ?? 'US',
               isPrimary: true,
               updatedAt: new Date()
-            })
+            } as any)
             .where(eq(userAddresses.userId, userId));
         } else {
           // Create new address - all fields required except address_line_2
@@ -156,7 +156,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               postalCode: zip_code,
               countryCode: country_code ?? 'US',
               isPrimary: true,
-            });
+            } as any);
         }
       }
 

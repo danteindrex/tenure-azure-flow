@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { auth } from "@/lib/auth";
 import { db } from "@/drizzle/db";
-import { user, userContacts } from "@/drizzle/schema";
+import { users as user, userContacts } from "@/drizzle/migrations/schema";
 import { eq, and } from "drizzle-orm";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Get user ID from our users table
-    const userData = await db.query.user.findFirst({
+    const userData = await db.query.users.findFirst({
       where: eq(user.id, session.user.id),
       columns: { id: true }
     });
@@ -51,13 +51,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           contactValue: contact_value,
           isPrimary: is_primary || false,
           isVerified: false, // New contacts need verification
-        })
+        } as any)
         .onConflictDoUpdate({
           target: [userContacts.userId, userContacts.contactType, userContacts.contactValue],
           set: {
             isPrimary: is_primary || false,
             updatedAt: new Date()
-          }
+          } as any
         });
 
       return res.status(200).json({ success: true });

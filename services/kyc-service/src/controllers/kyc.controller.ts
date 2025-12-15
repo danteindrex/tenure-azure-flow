@@ -16,14 +16,30 @@ const KYC_PROVIDER = process.env.KYC_PROVIDER || 'plaid'; // 'plaid' or 'sumsub'
  */
 export async function createLinkToken(req: Request, res: Response) {
   try {
-    if (!req.user || !req.userId) {
+    // Try to get user from session validation (for direct calls)
+    let userId = req.userId;
+    let email = req.user?.email;
+
+    // If no session validation, try to get from request body (from frontend proxy)
+    if (!userId) {
+      userId = req.body?.userId;
+      email = req.body?.email;
+    }
+
+    // Also check Authorization header for user ID
+    if (!userId) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        userId = authHeader.substring(7); // Remove 'Bearer ' prefix
+      }
+    }
+
+    if (!userId || !email) {
       return res.status(401).json({
         success: false,
         error: 'User not authenticated'
       });
     }
-
-    const { email, id: userId } = req.user;
 
     // Check if user already has a verified KYC
     const existingKYC = await db.query.kycVerification.findFirst({
@@ -86,7 +102,23 @@ export async function createLinkToken(req: Request, res: Response) {
  */
 export async function verifyKYC(req: Request, res: Response) {
   try {
-    if (!req.user || !req.userId) {
+    // Try to get user from session validation (for direct calls)
+    let userId = req.userId;
+
+    // If no session validation, try to get from request body or Authorization header
+    if (!userId) {
+      userId = req.body?.userId;
+    }
+
+    // Also check Authorization header for user ID
+    if (!userId) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        userId = authHeader.substring(7); // Remove 'Bearer ' prefix
+      }
+    }
+
+    if (!userId) {
       return res.status(401).json({
         success: false,
         error: 'User not authenticated'
@@ -212,7 +244,18 @@ export async function verifyKYC(req: Request, res: Response) {
  */
 export async function getKYCStatus(req: Request, res: Response) {
   try {
-    if (!req.userId) {
+    // Try to get user from session validation (for direct calls)
+    let userId = req.userId;
+
+    // If no session validation, check Authorization header for user ID
+    if (!userId) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        userId = authHeader.substring(7); // Remove 'Bearer ' prefix
+      }
+    }
+
+    if (!userId) {
       return res.status(401).json({
         success: false,
         error: 'User not authenticated'
@@ -220,7 +263,7 @@ export async function getKYCStatus(req: Request, res: Response) {
     }
 
     const kycRecord = await db.query.kycVerification.findFirst({
-      where: eq(kycVerification.userId, req.userId)
+      where: eq(kycVerification.userId, userId)
     });
 
     if (!kycRecord) {

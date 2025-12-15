@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { authClient } from '@/lib/auth-client';
 
 /**
- * Proxy endpoint to create Plaid Link token for KYC verification
- * Forwards request to KYC microservice with session cookie
+ * Proxy endpoint to create KYC verification token
+ * Validates session on frontend side and passes user data to KYC service
  */
 export default async function handler(
   req: NextApiRequest,
@@ -16,20 +17,49 @@ export default async function handler(
   }
 
   try {
-    const KYC_SERVICE_URL = process.env.KYC_SERVICE_URL || 'http://localhost:3003';
+    // Validate session using Better Auth client
+    const session = await authClient.getSession({
+      fetchOptions: {
+        headers: {
+          cookie: req.headers.cookie || '',
+        },
+      },
+    });
+
+    if (!session?.data?.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'No session token provided'
+      });
+    }
+
+    const user = session.data.user;
+    const KYC_SERVICE_URL = process.env.KYC_SERVICE_URL;
 
     console.log('🔍 Create Link Token Request:');
     console.log('  Service URL:', KYC_SERVICE_URL);
-    console.log('  Cookies:', req.headers.cookie);
+    console.log('  All env vars:', Object.keys(process.env).filter(key => key.includes('KYC') || key.includes('SERVICE')));
 
-    // Forward request to KYC microservice with session cookie
+    if (!KYC_SERVICE_URL) {
+      console.error('❌ KYC_SERVICE_URL environment variable is not set!');
+      return res.status(500).json({
+        success: false,
+        error: 'KYC service URL not configured'
+      });
+    }
+
+    // Forward request to KYC microservice with user data
     const response = await fetch(`${KYC_SERVICE_URL}/kyc/create-link-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Cookie': req.headers.cookie || '', // Forward session cookie
+        'Authorization': `Bearer ${user.id}`, // Pass user ID for service-side validation
       },
-      body: JSON.stringify(req.body),
+      body: JSON.stringify({
+        userId: user.id,
+        email: user.email,
+        ...req.body,
+      }),
     });
 
     console.log('📤 KYC Service Response:', response.status, response.statusText);

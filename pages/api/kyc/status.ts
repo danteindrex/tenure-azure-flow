@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { authClient } from '@/lib/auth-client';
 
 /**
  * Proxy endpoint to get user's KYC verification status
- * Forwards request to KYC microservice with session cookie
+ * Validates session on frontend side and passes user data to KYC service
  */
 export default async function handler(
   req: NextApiRequest,
@@ -16,17 +17,34 @@ export default async function handler(
   }
 
   try {
-    const KYC_SERVICE_URL = process.env.KYC_SERVICE_URL || 'http://localhost:3003';
+    // Validate session using Better Auth client
+    const session = await authClient.getSession({
+      fetchOptions: {
+        headers: {
+          cookie: req.headers.cookie || '',
+        },
+      },
+    });
+
+    if (!session?.data?.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'No session token provided'
+      });
+    }
+
+    const user = session.data.user;
+    const KYC_SERVICE_URL = process.env.KYC_SERVICE_URL;
 
     console.log('🔍 KYC Status Request:');
     console.log('  Service URL:', KYC_SERVICE_URL);
-    console.log('  Cookies:', req.headers.cookie);
+    console.log('  User ID:', user.id);
 
-    // Forward request to KYC microservice with session cookie
+    // Forward request to KYC microservice with user data
     const response = await fetch(`${KYC_SERVICE_URL}/kyc/status`, {
       method: 'GET',
       headers: {
-        'Cookie': req.headers.cookie || '', // Forward session cookie
+        'Authorization': `Bearer ${user.id}`, // Pass user ID for service-side validation
         'Content-Type': 'application/json',
       },
     });

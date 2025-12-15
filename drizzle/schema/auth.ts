@@ -19,12 +19,14 @@ export const user = pgTable("users", {
   // 1 = Pending, 2 = Onboarded
   userStatusId: integer("user_status_id").default(1),
 
-  // Onboarding flags (used by trigger to auto-update user_status_id)
-  profileCompleted: boolean("profile_completed").default(false),
-  financialAgreementAccepted: boolean("financial_agreement_accepted").default(false),
-  policyAgreementAccepted: boolean("policy_agreement_accepted").default(false),
+   // Onboarding flags (used by trigger to auto-update user_status_id)
+   profileCompleted: boolean("profile_completed").default(false),
+   financialAgreementAccepted: boolean("financial_agreement_accepted").default(false),
+   policyAgreementAccepted: boolean("policy_agreement_accepted").default(false),
+   financialAgreementAcceptedAt: timestamp("financial_agreement_accepted_at"),
+   policyAgreementAcceptedAt: timestamp("policy_agreement_accepted_at"),
 
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 
   // Better Auth required fields (add these to your users table)
