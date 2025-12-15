@@ -67,7 +67,6 @@ export default function NewsfeedManagement() {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
-    imageUrl: '',
     isPublished: false,
   });
 
@@ -120,7 +119,6 @@ export default function NewsfeedManagement() {
     setFormData({
       title: '',
       content: '',
-      imageUrl: '',
       isPublished: false,
     });
     setEditingPost(null);
@@ -136,7 +134,6 @@ export default function NewsfeedManagement() {
     setFormData({
       title: post.title,
       content: post.content,
-      imageUrl: post.imageUrl || '',
       isPublished: post.isPublished,
     });
     setIsDialogOpen(true);
@@ -275,15 +272,7 @@ export default function NewsfeedManagement() {
                 rows={6}
               />
             </div>
-            <div>
-              <Label htmlFor="imageUrl">Image URL (optional)</Label>
-              <Input
-                id="imageUrl"
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                placeholder="https://example.com/image.jpg"
-              />
-            </div>
+
             <div className="flex items-center space-x-2">
               <Switch
                 id="isPublished"
