@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "uvx",
+      "args": ["mcp-server-postgres@latest"],
+      "env": {
+        "DATABASE_URL": "postgresql://postgres.exneyqwvvckzxqzlknxv:keithtwesigye74@aws-1-us-east-1.pooler.supabase.com:6543/postgres",
+        "POSTGRES_HOST": "aws-1-us-east-1.pooler.supabase.com",
+        "POSTGRES_PORT": "6543",
+        "POSTGRES_DB": "postgres",
+        "POSTGRES_USER": "postgres.exneyqwvvckzxqzlknxv",
+        "POSTGRES_PASSWORD": "keithtwesigye74"
+      },
+      "disabled": false,
+      "autoApprove": ["query", "list_tables", "describe_table", "list_schemas"]
+    }
+  }
+}
