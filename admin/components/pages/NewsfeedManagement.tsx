@@ -209,7 +209,10 @@ export default function NewsfeedManagement() {
                       {post.isPublished ? 'Published' : 'Draft'}
                     </Badge>
                   </TableCell>
-                  <TableCell>{new Date(post.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    {post.created_at ? new Date(post.created_at).toLocaleDateString() : 
+                     post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'N/A'}
+                  </TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button
                       variant="ghost"
@@ -251,6 +254,14 @@ export default function NewsfeedManagement() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingPost ? 'Edit Post' : 'Create New Post'}</DialogTitle>
+            {editingPost && (
+              <p className="text-sm text-muted-foreground">
+                Created: {editingPost.created_at ? 
+                  new Date(editingPost.created_at).toLocaleString() : 
+                  editingPost.createdAt ? 
+                  new Date(editingPost.createdAt).toLocaleString() : 'Unknown'}
+              </p>
+            )}
           </DialogHeader>
           <div className="space-y-4">
             <div>
