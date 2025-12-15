@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sumsub KYC Integration</title>
+    <script src="https://websdk.sumsub.com/websdk.js"></script>
+</head>
+<body>
+    <div id="sumsub-websdk-container"></div>
+
+    <script>
+        // This would typically be called after getting accessToken from your backend
+        async function getAccessToken() {
+            try {
+                const response = await fetch('/api/kyc/create-link-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + getAuthToken() // Your auth token
+                    }
+                });
+
+                const data = await response.json();
+                if (data.success && data.data.provider === 'sumsub') {
+                    return data.data.accessToken;
+                }
+                throw new Error('Failed to get access token');
+            } catch (error) {
+                console.error('Error getting access token:', error);
+                throw error;
+            }
+        }
+
+        async function getNewAccessToken() {
+            // This function should return a Promise that resolves to a new access token
+            return getAccessToken();
+        }
+
+        async function launchWebSdk(accessToken) {
+            let snsWebSdkInstance = snsWebSdk.init(
+                accessToken,
+                // token update callback, must return Promise
+                () => getNewAccessToken()
+            )
+            .withConf({
+                //language of WebSDK texts and comments (ISO 639-1 format)
+                lang: 'en',
+            })
+            .on('onError', (error) => {
+                console.log('onError', error);
+                // Handle error - maybe redirect to error page
+            })
+            .onMessage((type, payload) => {
+                console.log('onMessage', type, payload);
+
+                // Handle different message types
+                if (type === 'idCheck.onApplicantLoaded') {
+                    console.log('Applicant loaded');
+                } else if (type === 'idCheck.onApplicantSubmitted') {
+                    console.log('Applicant submitted, verification complete');
+                    // You might want to call your backend to check status
+                    checkVerificationStatus(payload.applicantId);
+                }
+            })
+            .build();
+
+            // Launch the WebSDK
+            snsWebSdkInstance.launch('#sumsub-websdk-container');
+        }
+
+        async function checkVerificationStatus(applicantId) {
+            try {
+                const response = await fetch('/api/kyc/verify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + getAuthToken()
+                    },
+                    body: JSON.stringify({
+                        applicantId: applicantId
+                    })
+                });
+
+                const result = await response.json();
+                console.log('Verification result:', result);
+
+                if (result.success) {
+                    // Handle successful verification
+                    alert('KYC verification completed with status: ' + result.data.status);
+                }
+            } catch (error) {
+                console.error('Error checking verification status:', error);
+            }
+        }
+
+        function getAuthToken() {
+            // Return your authentication token (JWT, etc.)
+            return localStorage.getItem('authToken') || '';
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const accessToken = await getAccessToken();
+                await launchWebSdk(accessToken);
+            } catch (error) {
+                console.error('Failed to initialize Sumsub WebSDK:', error);
+                document.getElementById('sumsub-websdk-container').innerHTML =
+                    '<p>Failed to load KYC verification. Please try again.</p>';
+            }
+        });
+    </script>
+</body>
+</html>

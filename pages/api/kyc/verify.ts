@@ -16,12 +16,12 @@ export default async function handler(
   }
 
   try {
-    const { sessionId } = req.body;
+    const { sessionId, applicantId } = req.body;
 
-    if (!sessionId) {
+    if (!sessionId && !applicantId) {
       return res.status(400).json({
         success: false,
-        error: 'Session ID is required'
+        error: 'Session ID or Applicant ID is required'
       });
     }
 
@@ -34,7 +34,7 @@ export default async function handler(
         'Content-Type': 'application/json',
         'Cookie': req.headers.cookie || '', // Forward session cookie
       },
-      body: JSON.stringify({ sessionId }),
+      body: JSON.stringify({ sessionId, applicantId }),
     });
 
     const data = await response.json();

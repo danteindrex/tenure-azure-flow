@@ -12,10 +12,16 @@ services:
       - PORT=3002
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
+      - KYC_PROVIDER=${KYC_PROVIDER:-sumsub}
       - PLAID_CLIENT_ID=${PLAID_CLIENT_ID}
       - PLAID_SECRET=${PLAID_SECRET}
       - PLAID_ENV=${PLAID_ENV:-sandbox}
       - PLAID_IDV_TEMPLATE_ID=${PLAID_IDV_TEMPLATE_ID}
+      - SUMSUB_APP_TOKEN=${SUMSUB_APP_TOKEN}
+      - SUMSUB_SECRET_KEY=${SUMSUB_SECRET_KEY}
+      - SUMSUB_WEBHOOK_SECRET=${SUMSUB_WEBHOOK_SECRET}
+      - SUMSUB_BASE_URL=${SUMSUB_BASE_URL:-https://api.sumsub.com}
+      - SUMSUB_LEVEL_NAME=${SUMSUB_LEVEL_NAME:-Home solutions verify}
       - ALLOWED_ORIGINS=http://localhost:3000,http://main-app:3000
     networks:
       - tenure-network
