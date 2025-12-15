@@ -1142,9 +1142,9 @@ export class StripeService {
   /**
    * Cancel a subscription
    */
-  static async cancelSubscription(userId: number, immediately: boolean = false): Promise<void> {
+  static async cancelSubscription(userId: string, immediately: boolean = false): Promise<void> {
     try {
-      const dbSubscription = await SubscriptionModel.findByUserId(userId.toString());
+      const dbSubscription = await SubscriptionModel.findByUserId(userId);
 
       if (!dbSubscription) {
         throw new Error('No active subscription found');
@@ -1173,9 +1173,9 @@ export class StripeService {
   /**
    * Reactivate a subscription
    */
-  static async reactivateSubscription(userId: number): Promise<void> {
+  static async reactivateSubscription(userId: string): Promise<void> {
     try {
-      const dbSubscription = await SubscriptionModel.findByUserId(userId.toString());
+      const dbSubscription = await SubscriptionModel.findByUserId(userId);
 
       if (!dbSubscription) {
         throw new Error('No subscription found');

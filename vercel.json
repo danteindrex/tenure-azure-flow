@@ -1,0 +1,15 @@
+{
+  "buildCommand": "npm run build:next",
+  "devCommand": "npm run dev:next",
+  "installCommand": "npm install --legacy-peer-deps",
+  "framework": "nextjs",
+  "functions": {
+    "src/pages/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "regions": ["iad1"],
+  "env": {
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  }
+}

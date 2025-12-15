@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Crown, Check, ChevronRight, ChevronLeft, Loader2, Mail, Phone, Fingerprint, Shield, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
@@ -1836,32 +1837,26 @@ const SignUp = () => {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="country" className="text-foreground">Country <span className="text-muted-foreground">*</span></Label>
-                  <Select
-                    value={formData.country}
-                    onValueChange={(value) => {
-                      handleInputChange("country", value);
-                      // Clear state when country changes since states are country-specific
-                      setFormData(prev => ({ ...prev, state: "" }));
-                    }}
-                  >
-                    <SelectTrigger className="bg-input border-border focus:border-accent">
-                      <SelectValue placeholder="Select country" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {countriesLoading ? (
-                        <SelectItem value="loading" disabled>Loading...</SelectItem>
-                      ) : (
-                        countries?.map((country) => (
-                          <SelectItem key={country.code} value={country.code}>
-                            {country.flag} {country.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
+                 <div className="space-y-2">
+                   <Label htmlFor="country" className="text-foreground">Country <span className="text-muted-foreground">*</span></Label>
+                   <SearchableSelect
+                     options={countriesLoading ? [] : (countries?.map((country) => ({
+                       value: country.code,
+                       label: `${country.flag} ${country.name}`
+                     })) || [])}
+                     value={formData.country}
+                     onValueChange={(value) => {
+                       handleInputChange("country", value);
+                       // Clear state when country changes since states are country-specific
+                       setFormData(prev => ({ ...prev, state: "" }));
+                     }}
+                     placeholder="Select country"
+                     searchPlaceholder="Search countries..."
+                     emptyMessage="No countries found."
+                     disabled={countriesLoading}
+                     className="bg-input border-border focus:border-accent"
+                   />
+                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="city" className="text-foreground">

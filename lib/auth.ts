@@ -15,7 +15,7 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { nextCookies } from 'better-auth/next-js'
 import { twoFactor, organization, emailOTP } from 'better-auth/plugins'
-import { passkey } from 'better-auth/plugins/passkey'
+import { passkey } from '@better-auth/passkey'
 import { db } from '../drizzle/db'
 import { emailService } from '../src/lib/email'
 

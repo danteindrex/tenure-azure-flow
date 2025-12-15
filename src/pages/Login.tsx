@@ -187,7 +187,7 @@ const Login = () => {
         </span>
       </Button>
 
-      <LiquidGlassCard className="w-full max-w-[680px]" glassSize="lg">
+      <LiquidGlassCard className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl" glassSize="lg">
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <div className="flex items-center gap-2">
@@ -203,9 +203,9 @@ const Login = () => {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-foreground">Email</Label>
+            <Label htmlFor="email" className="text-foreground">Email Address</Label>
             <Input
               id="email"
               type="email"
@@ -225,6 +225,18 @@ const Login = () => {
               }`}
               required
             />
+            {fieldValidation.email.touched && !fieldValidation.email.isValid && email.length > 0 && (
+              <p className="text-xs text-red-400 flex items-center gap-1">
+                <span>⚠</span>
+                Please enter a valid email address
+              </p>
+            )}
+            {fieldValidation.email.touched && fieldValidation.email.isValid && (
+              <p className="text-xs text-green-400 flex items-center gap-1">
+                <span>✓</span>
+                Valid email address
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -232,7 +244,7 @@ const Login = () => {
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="Enter your password"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
@@ -248,6 +260,12 @@ const Login = () => {
               }`}
               required
             />
+            {fieldValidation.password.touched && !fieldValidation.password.isValid && password.length > 0 && (
+              <p className="text-xs text-red-400 flex items-center gap-1">
+                <span>⚠</span>
+                Password must be at least 8 characters
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-between text-sm">

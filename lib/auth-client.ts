@@ -13,7 +13,8 @@
 'use client'
 
 import { createAuthClient } from 'better-auth/react'
-import { passkeyClient, twoFactorClient, organizationClient, emailOTPClient } from 'better-auth/client/plugins'
+import { passkeyClient } from '@better-auth/passkey/client'
+import { twoFactorClient, organizationClient, emailOTPClient } from 'better-auth/client/plugins'
 
 // Automatically detect the base URL
 const getBaseURL = () => {
