@@ -57,9 +57,30 @@ export function LivenessCheckForm({ applicantId, onComplete, onBack }: LivenessC
       // Create file from blob
       const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
 
-      // Start verification process (Sumsub handles liveness through their verification flow)
-      // Note: We're capturing the selfie for UI purposes but not uploading it to Sumsub
-      // Sumsub's verification process will handle liveness requirements
+      // Upload selfie for liveness verification
+      const metadata = {
+        idDocType: 'SELFIE',
+        country: 'US',
+        idDocSubType: 'FRONT_SIDE'
+      };
+
+      const formData = new FormData();
+      formData.append('metadata', JSON.stringify(metadata));
+      formData.append('content', file);
+      formData.append('applicantId', applicantId);
+
+      const uploadResponse = await fetch('/api/kyc/upload-document', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const uploadResult = await uploadResponse.json();
+
+      if (!uploadResponse.ok || !uploadResult.success) {
+        throw new Error(uploadResult.error || 'Failed to upload selfie');
+      }
+
+      // Start verification process (now that selfie is uploaded)
       const verifyResponse = await fetch('/api/kyc/start-verification', {
         method: 'POST',
         headers: {
