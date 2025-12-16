@@ -90,12 +90,15 @@ export class SumsubService {
       'X-App-Access-Sig': signature,
     };
 
-    // For FormData from npm form-data package, use getHeaders()
+    // For FormData, manually set Content-Type with boundary
     if (!isFormData) {
       headers['Content-Type'] = 'application/json';
     } else if (body && isFormData && body instanceof FormData) {
-      // Use form-data package headers
-      Object.assign(headers, body.getHeaders());
+      // Manually set Content-Type for FormData to ensure proper boundary
+      const formHeaders = body.getHeaders();
+      if (formHeaders['content-type']) {
+        headers['Content-Type'] = formHeaders['content-type'];
+      }
     }
 
     console.log('🚀 Final request details:', {
@@ -116,7 +119,7 @@ export class SumsubService {
     const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
       method,
       headers,
-      body: isFormData && body instanceof FormData ? body : (typeof signatureBody === 'string' ? signatureBody : undefined),
+      body: isFormData && body instanceof FormData ? body.getBuffer() : (typeof signatureBody === 'string' ? signatureBody : undefined),
     });
 
     if (!response.ok) {
