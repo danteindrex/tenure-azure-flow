@@ -164,15 +164,24 @@ export const adminSessions = pgTable("admin_sessions", {
 
 export const users = pgTable("users", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	authUserId: text("auth_user_id"),
 	email: varchar({ length: 255 }).notNull(),
 	emailVerified: boolean("email_verified").default(false),
-	status: enumUsersStatus().default('Pending').notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	name: text(),
+	image: text(),
+	twoFactorEnabled: boolean("two_factor_enabled").default(false),
+	profileCompleted: boolean("profile_completed").default(false),
+	financialAgreementAccepted: boolean("financial_agreement_accepted").default(false),
+	policyAgreementAccepted: boolean("policy_agreement_accepted").default(false),
+	financialAgreementAcceptedAt: timestamp("financial_agreement_accepted_at", { withTimezone: true, mode: 'string' }),
+	policyAgreementAcceptedAt: timestamp("policy_agreement_accepted_at", { withTimezone: true, mode: 'string' }),
+	userStatusId: integer("user_status_id").default(1).notNull(),
 }, (table) => [
-	pgPolicy("Users can view their own data", { as: "permissive", for: "select", to: ["public"], using: sql`(auth_user_id = (auth.uid())::text)` }),
-	pgPolicy("Service can manage users", { as: "permissive", for: "all", to: ["public"] }),
+	index("idx_users_email").using("btree", table.email.asc().nullsLast().op("text_ops")),
+	index("idx_users_email_verified").using("btree", table.emailVerified.asc().nullsLast().op("bool_ops")),
+	index("idx_users_name").using("btree", table.name.asc().nullsLast().op("text_ops")),
+	index("idx_users_status_id").using("btree", table.userStatusId.asc().nullsLast().op("int4_ops")),
 ]);
 
 export const signupSessions = pgTable("signup_sessions", {
@@ -300,8 +309,9 @@ export const userMemberships = pgTable("user_memberships", {
 	subscriptionId: uuid("subscription_id").unique(), // One membership per subscription
 	joinDate: date("join_date").default(sql`CURRENT_DATE`).notNull(),
 	tenure: numeric().default('0'),
-	verificationStatus: varchar("verification_status", { length: 20 }).default('PENDING'),
-	memberStatus: varchar("member_status", { length: 20 }).default('inactive'), // Member eligibility status: inactive, active, suspended, cancelled, won, paid
+	verificationStatusId: integer("verification_status_id").default(1),
+	memberStatusId: integer("member_status_id").default(1),
+	memberEligibilityStatusId: integer("member_eligibility_status_id").default(1),
 	notes: text(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
@@ -309,8 +319,10 @@ export const userMemberships = pgTable("user_memberships", {
 	index("idx_user_memberships_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	index("idx_user_memberships_subscription_id").using("btree", table.subscriptionId.asc().nullsLast().op("uuid_ops")),
 	index("idx_user_memberships_join_date").using("btree", table.joinDate.asc().nullsLast().op("date_ops")),
-	index("idx_user_memberships_member_status").using("btree", table.memberStatus.asc().nullsLast().op("text_ops")),
-	foreignKey({
+	index("idx_user_memberships_status_id").using("btree", table.memberStatusId.asc().nullsLast().op("int4_ops")),
+	index("idx_user_memberships_verification_status_id").using("btree", table.verificationStatusId.asc().nullsLast().op("int4_ops")),
+	index("idx_user_memberships_member_eligibility_status_id").using("btree", table.memberEligibilityStatusId.asc().nullsLast().op("int4_ops")),
+		foreignKey({
 			columns: [table.subscriptionId],
 			foreignColumns: [userSubscriptions.id],
 			name: "user_memberships_subscription_id_fkey"
@@ -548,10 +560,16 @@ export const auditlog = pgTable("auditlog", {
 	createdAt: timestamp("created_at", { precision: 3, withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
 
+export const kycStatuses = pgTable("kyc_statuses", {
+	id: serial().primaryKey().notNull(),
+	name: varchar({ length: 100 }).notNull(),
+	description: text(),
+	color: varchar({ length: 20 }).default('#6B7280'),
+});
+
 export const kycVerification = pgTable("kyc_verification", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id").notNull(),
-	status: text().default('pending').notNull(),
 	verificationMethod: text("verification_method"),
 	documentType: text("document_type"),
 	documentNumber: text("document_number"),
@@ -568,23 +586,25 @@ export const kycVerification = pgTable("kyc_verification", {
 	reviewerNotes: text("reviewer_notes"),
 	riskScore: integer("risk_score"),
 	riskFactors: jsonb("risk_factors").default([]),
-	ipAddress: inet("ip_address"),
+	ipAddress: text("ip_address"),
 	userAgent: text("user_agent"),
 	geolocation: jsonb(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	kycStatusId: integer("kyc_status_id").default(1).notNull(),
 }, (table) => [
-	index("idx_kyc_verification_status").using("btree", table.status.asc().nullsLast().op("text_ops")),
+	index("idx_kyc_verification_status_id").using("btree", table.kycStatusId.asc().nullsLast().op("int4_ops")),
 	index("idx_kyc_verification_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.kycStatusId],
+			foreignColumns: [kycStatuses.id],
+			name: "kyc_verification_kyc_status_id_fkey"
+		}),
 	foreignKey({
 			columns: [table.userId],
 			foreignColumns: [users.id],
-			name: "kyc_verification_user_id_fkey"
-		}),
-	check("kyc_verification_document_type_check", sql`document_type = ANY (ARRAY['passport'::text, 'drivers_license'::text, 'national_id'::text, 'ssn'::text])`),
-	check("kyc_verification_risk_score_check", sql`(risk_score >= 0) AND (risk_score <= 100)`),
-	check("kyc_verification_status_check", sql`status = ANY (ARRAY['pending'::text, 'in_review'::text, 'verified'::text, 'rejected'::text, 'expired'::text])`),
-	check("kyc_verification_verification_method_check", sql`verification_method = ANY (ARRAY['manual'::text, 'stripe_identity'::text, 'plaid'::text, 'persona'::text, 'onfido'::text])`),
+			name: "kyc_verification_user_id_users_id_fk"
+		}).onDelete("cascade"),
 ]);
 
 export const adminAlerts = pgTable("admin_alerts", {
@@ -961,19 +981,22 @@ export const user = pgTable("user", {
 ]);
 
 export const session = pgTable("session", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: uuid("user_id").notNull(),
-	expiresAt: timestamp("expires_at", { withTimezone: true, mode: 'string' }).notNull(),
-	token: text("token").notNull().unique(),
+	id: text().primaryKey().notNull(),
+	expiresAt: timestamp("expires_at", { mode: 'string' }).notNull(),
 	ipAddress: text("ip_address"),
 	userAgent: text("user_agent"),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	token: text().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).notNull(),
+	activeOrganizationId: text("active_organization_id"),
+	userId: uuid("user_id").notNull(),
 }, (table) => [
 	foreignKey({
 			columns: [table.userId],
-			foreignColumns: [user.id],
-			name: "session_userId_user_id_fk"
+			foreignColumns: [users.id],
+			name: "session_user_id_users_id_fk"
 		}).onDelete("cascade"),
+	unique("session_token_unique").on(table.token),
 ]);
 
 export const account = pgTable("account", {

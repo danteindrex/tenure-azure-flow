@@ -2,14 +2,14 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { authClient } from '@/lib/auth-client';
 
 /**
- * Proxy endpoint to get user's KYC verification status
- * Validates session on frontend side and passes user data to KYC service
+ * POST /api/kyc/create-applicant
+ * Create a new Sumsub applicant for KYC verification
  */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== 'GET') {
+  if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,
       error: 'Method not allowed'
@@ -36,7 +36,7 @@ export default async function handler(
     const user = session.data.user;
     const KYC_SERVICE_URL = process.env.KYC_SERVICE_URL;
 
-    console.log('🔍 KYC Status Request:');
+    console.log('🔍 Create Applicant Request:');
     console.log('  Service URL:', KYC_SERVICE_URL);
     console.log('  User ID:', user.id);
 
@@ -54,13 +54,18 @@ export default async function handler(
       .map(([key, value]) => `${key}=${value}`)
       .join('; ');
 
-    const response = await fetch(`${KYC_SERVICE_URL}/kyc/status`, {
-      method: 'GET',
+    const response = await fetch(`${KYC_SERVICE_URL}/kyc/create-applicant`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Cookie': cookieHeader, // Forward Better Auth session cookie
-        'Authorization': req.headers.authorization || `Bearer ${user.id}`, // Pass user ID as backup
+        'Cookie': cookieHeader,
+        'Authorization': req.headers.authorization || `Bearer ${user.id}`,
       },
+      body: JSON.stringify({
+        userId: user.id,
+        email: user.email,
+        ...req.body,
+      }),
     }).catch(err => {
       console.error('❌ Failed to connect to KYC service:', err.message);
       throw new Error(`KYC service unavailable: ${err.message}`);
@@ -71,15 +76,16 @@ export default async function handler(
     const data = await response.json();
 
     if (!response.ok) {
+      console.error('❌ KYC Service Error:', data);
       return res.status(response.status).json(data);
     }
 
     return res.status(200).json(data);
   } catch (error: any) {
-    console.error('Error fetching KYC status:', error);
+    console.error('Error creating Sumsub applicant:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to fetch KYC status. Please try again.',
+      error: 'Failed to create verification applicant. Please try again.',
     });
   }
 }

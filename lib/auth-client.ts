@@ -28,8 +28,8 @@ const getBaseURL = () => {
     return window.location.origin
   }
 
-  // Default for SSR
-  return 'http://localhost:3000'
+  // Default for SSR - use BETTER_AUTH_URL as fallback
+  return process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 }
 
 export const authClient = createAuthClient({

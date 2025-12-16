@@ -1,6 +1,8 @@
+'use client';
+
 import { useState, useEffect } from 'react';
-import { usePlaidLink } from 'react-plaid-link';
 import { useToast } from '@/components/ui/use-toast';
+import { useSession } from '@/lib/auth-client';
 import {
   Dialog,
   DialogContent,
@@ -8,15 +10,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Shield, Loader2 } from 'lucide-react';
+import { StepIndicator } from './KYCVerificationModal/StepIndicator';
+import { DocumentUploadForm } from './KYCVerificationModal/DocumentUploadForm';
+import { LivenessCheckForm } from './KYCVerificationModal/LivenessCheckForm';
 
-// Type declarations for Sumsub WebSDK
-declare global {
-  interface Window {
-    snsWebSdk: any;
-  }
-}
 
 interface KYCVerificationModalProps {
   isOpen: boolean;
@@ -24,62 +21,72 @@ interface KYCVerificationModalProps {
   onSuccess?: () => void;
 }
 
+type VerificationStep = 'document-upload' | 'liveness-check';
+
 export function KYCVerificationModal({
   isOpen,
   onClose,
   onSuccess,
 }: KYCVerificationModalProps) {
-  const [linkToken, setLinkToken] = useState<string | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [provider, setProvider] = useState<'plaid' | 'sumsub' | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [sumsubInstance, setSumsubInstance] = useState<any>(null);
+  const [currentStep, setCurrentStep] = useState<VerificationStep>('document-upload');
+  const [applicantId, setApplicantId] = useState<string>('');
+
+  const [isCreatingApplicant, setIsCreatingApplicant] = useState(false);
   const { toast } = useToast();
+  const { data: session } = useSession();
+  const user = session?.user;
 
-  // Fetch token when modal opens
+  // Create applicant when modal opens
   useEffect(() => {
-    if (isOpen && !linkToken && !accessToken) {
-      fetchToken();
+    if (isOpen && !applicantId && !isCreatingApplicant && user?.id) {
+      createApplicant();
     }
-  }, [isOpen]);
+  }, [isOpen, applicantId, isCreatingApplicant, user?.id]);
 
-  // Load Sumsub WebSDK when needed
-  useEffect(() => {
-    if (provider === 'sumsub' && accessToken && !sumsubInstance) {
-      loadSumsubSDK();
+  const createApplicant = async () => {
+    if (!user?.id) {
+      console.log('❌ No user ID available');
+      toast({
+        title: 'Error',
+        description: 'User not authenticated. Please log in again.',
+        variant: 'destructive',
+      });
+      onClose();
+      return;
     }
-  }, [provider, accessToken]);
 
-  const fetchToken = async () => {
+    console.log('🚀 Starting applicant creation for user:', user.id);
+    setIsCreatingApplicant(true);
+
     try {
-      setIsLoading(true);
-      const response = await fetch('/api/kyc/create-link-token', {
+      console.log('📡 Making API call to /api/kyc/create-applicant');
+      const response = await fetch('/api/kyc/create-applicant', {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          email: user.email,
+        }),
       });
 
+      console.log('📥 API Response status:', response.status, response.statusText);
+
       const data = await response.json();
+      console.log('📦 API Response data:', data);
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to create verification token');
+        throw new Error(data.error || `API error: ${response.status} ${response.statusText}`);
       }
 
-      const tokenData = data.data;
-
-      if (tokenData.provider === 'sumsub') {
-        setAccessToken(tokenData.accessToken);
-        setProvider('sumsub');
-      } else {
-        // Default to Plaid
-        setLinkToken(tokenData.linkToken);
-        setProvider('plaid');
+      if (!data.data?.id) {
+        throw new Error('No applicant ID returned from API');
       }
+
+      console.log('✅ Applicant created successfully:', data.data.id);
+      setApplicantId(data.data.id);
     } catch (error: any) {
-      console.error('Error fetching verification token:', error);
+      console.error('❌ Error creating applicant:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to initialize verification. Please try again.',
@@ -87,254 +94,87 @@ export function KYCVerificationModal({
       });
       onClose();
     } finally {
-      setIsLoading(false);
+      console.log('🏁 Setting isCreatingApplicant to false');
+      setIsCreatingApplicant(false);
     }
   };
 
-  const loadSumsubSDK = async () => {
-    try {
-      // Load Sumsub WebSDK script if not already loaded
-      if (!window.snsWebSdk) {
-        const script = document.createElement('script');
-        script.src = 'https://websdk.sumsub.com/websdk.js';
-        script.async = true;
-        document.head.appendChild(script);
-
-        await new Promise((resolve, reject) => {
-          script.onload = resolve;
-          script.onerror = reject;
-        });
-      }
-
-      // Initialize Sumsub WebSDK
-      const instance = window.snsWebSdk.init(
-        accessToken,
-        () => getNewAccessToken()
-      )
-      .withConf({
-        lang: 'en',
-      })
-      .on('onError', (error: any) => {
-        console.log('Sumsub onError:', error);
-        toast({
-          title: 'Verification Error',
-          description: 'An error occurred during verification. Please try again.',
-          variant: 'destructive',
-        });
-        onClose();
-      })
-      .onMessage((type: string, payload: any) => {
-        console.log('Sumsub onMessage:', type, payload);
-
-        if (type === 'idCheck.onApplicantSubmitted') {
-          handleSumsubSuccess(payload);
-        }
-      })
-      .build();
-
-      setSumsubInstance(instance);
-    } catch (error) {
-      console.error('Error loading Sumsub SDK:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load verification system. Please try again.',
-        variant: 'destructive',
-      });
-      onClose();
-    }
+  const handleDocumentComplete = () => {
+    setCurrentStep('liveness-check');
   };
 
-  const getNewAccessToken = async () => {
-    // This function should return a Promise that resolves to a new access token
-    await fetchToken();
-    return accessToken;
-  };
-
-  const handleSumsubSuccess = async (payload: any) => {
-    try {
-      setIsVerifying(true);
-
-      const applicantId = payload.applicantId;
-
-      const response = await fetch('/api/kyc/verify', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ applicantId }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to verify identity');
-      }
-
-      toast({
-        title: 'Verification Successful',
-        description: 'Your identity has been verified successfully!',
-      });
-
-      if (onSuccess) {
-        onSuccess();
-      }
-
-      onClose();
-    } catch (error: any) {
-      console.error('Error verifying KYC:', error);
-      toast({
-        title: 'Verification Failed',
-        description: error.message || 'Failed to complete verification. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handlePlaidSuccess = async (public_token: string, metadata: any) => {
-    try {
-      setIsVerifying(true);
-
-      // The metadata contains the identity_verification_id (session ID)
-      const sessionId = metadata.link_session_id;
-
-      const response = await fetch('/api/kyc/verify', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ sessionId }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to verify identity');
-      }
-
-      toast({
-        title: 'Verification Successful',
-        description: 'Your identity has been verified successfully!',
-      });
-
-      if (onSuccess) {
-        onSuccess();
-      }
-
-      onClose();
-    } catch (error: any) {
-      console.error('Error verifying KYC:', error);
-      toast({
-        title: 'Verification Failed',
-        description: error.message || 'Failed to complete verification. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handlePlaidExit = (error: any, metadata: any) => {
-    if (error) {
-      console.error('Plaid Link error:', error);
-      toast({
-        title: 'Verification Cancelled',
-        description: 'Identity verification was cancelled or failed.',
-        variant: 'destructive',
-      });
-    }
+  const handleLivenessComplete = () => {
+    // Skip verification status display - just close the modal
+    // Results are stored in database via webhook
     onClose();
   };
 
-  const { open, ready } = usePlaidLink({
-    token: linkToken,
-    onSuccess: handlePlaidSuccess,
-    onExit: handlePlaidExit,
-  });
 
-  const handleStartVerification = () => {
-    if (provider === 'sumsub' && sumsubInstance) {
-      // Launch Sumsub WebSDK
-      const container = document.getElementById('sumsub-websdk-container');
-      if (container) {
-        sumsubInstance.launch('#sumsub-websdk-container');
-      }
-    } else if (provider === 'plaid' && ready) {
-      // Launch Plaid Link
-      open();
+
+  const handleBack = () => {
+    if (currentStep === 'liveness-check') {
+      setCurrentStep('document-upload');
+    }
+  };
+
+  const getStepNumber = (): number => {
+    switch (currentStep) {
+      case 'document-upload': return 1;
+      case 'liveness-check': return 2;
+      default: return 1;
+    }
+  };
+
+  const renderCurrentStep = () => {
+    if (isCreatingApplicant) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Setting up verification...</p>
+          </div>
+        </div>
+      );
+    }
+
+    switch (currentStep) {
+      case 'document-upload':
+        return (
+          <DocumentUploadForm
+            applicantId={applicantId}
+            onComplete={handleDocumentComplete}
+            onBack={onClose}
+          />
+        );
+
+      case 'liveness-check':
+        return (
+          <LivenessCheckForm
+            applicantId={applicantId}
+            onComplete={handleLivenessComplete}
+            onBack={handleBack}
+          />
+        );
+
+      default:
+        return null;
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center gap-2 mb-2">
-            <Shield className="w-6 h-6 text-blue-500" />
-            <DialogTitle>Identity Verification</DialogTitle>
-          </div>
+          <DialogTitle>Identity Verification</DialogTitle>
           <DialogDescription>
-            Complete identity verification to access all features and ensure account security.
+            Complete your identity verification to access all platform features.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="space-y-2 text-sm">
-            <p className="font-medium">What you'll need:</p>
-            <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-              <li>Government-issued ID (passport, driver's license, or national ID)</li>
-              <li>Access to your device camera</li>
-              <li>2-3 minutes to complete</li>
-            </ul>
-          </div>
+        <div className="space-y-6">
+          <StepIndicator currentStep={getStepNumber()} />
 
-          <div className="bg-muted p-3 rounded-lg text-sm">
-            <p className="text-muted-foreground">
-              <strong>Secure & Private:</strong> Your information is encrypted and verified by
-              our trusted partner{provider === 'sumsub' ? ', Sumsub' : ', Plaid'}. We never store your ID images.
-            </p>
-          </div>
-
-          {/* Sumsub WebSDK Container */}
-          {provider === 'sumsub' && (
-            <div id="sumsub-websdk-container" className="min-h-[400px] border rounded-lg"></div>
-          )}
-
-          <Button
-            onClick={handleStartVerification}
-            disabled={
-              (provider === 'plaid' && !ready) ||
-              (provider === 'sumsub' && !sumsubInstance) ||
-              isLoading ||
-              isVerifying
-            }
-            className="w-full"
-            size="lg"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Initializing...
-              </>
-            ) : isVerifying ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Verifying...
-              </>
-            ) : (
-              <>
-                <Shield className="mr-2 h-4 w-4" />
-                Start Verification
-              </>
-            )}
-          </Button>
-
-          <p className="text-xs text-center text-muted-foreground">
-            By continuing, you agree to share your identity information for verification purposes.
-          </p>
+          {renderCurrentStep()}
         </div>
       </DialogContent>
     </Dialog>

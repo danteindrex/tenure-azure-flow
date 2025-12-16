@@ -45,18 +45,35 @@ export default async function handler(
 
     const KYC_SERVICE_URL = process.env.KYC_SERVICE_URL;
 
-    // Forward request to KYC microservice with user data
+    if (!KYC_SERVICE_URL) {
+      console.error('❌ KYC_SERVICE_URL environment variable is not set!');
+      return res.status(500).json({
+        success: false,
+        error: 'KYC service URL not configured'
+      });
+    }
+
+    // Forward request to KYC microservice with proper cookie forwarding
+    // Convert cookies object to cookie header string
+    const cookieHeader = Object.entries(req.cookies)
+      .map(([key, value]) => `${key}=${value}`)
+      .join('; ');
+
     const response = await fetch(`${KYC_SERVICE_URL}/kyc/verify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${user.id}`, // Pass user ID for service-side validation
+        'Cookie': cookieHeader, // Forward Better Auth session cookie
+        'Authorization': req.headers.authorization || `Bearer ${user.id}`, // Pass user ID as backup
       },
       body: JSON.stringify({
         userId: user.id,
         sessionId,
         applicantId
       }),
+    }).catch(err => {
+      console.error('❌ Failed to connect to KYC service:', err.message);
+      throw new Error(`KYC service unavailable: ${err.message}`);
     });
 
     const data = await response.json();

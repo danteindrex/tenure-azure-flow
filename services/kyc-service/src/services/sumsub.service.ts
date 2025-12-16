@@ -1,208 +1,293 @@
-import axios from 'axios';
+import crypto from 'crypto';
+import FormData from 'form-data';
 
-// Sumsub API configuration
-const SUMSUB_BASE_URL = process.env.SUMSUB_BASE_URL || 'https://api.sumsub.com';
-const SUMSUB_APP_TOKEN = process.env.SUMSUB_APP_TOKEN || '';
-const SUMSUB_SECRET_KEY = process.env.SUMSUB_SECRET_KEY || '';
-const SUMSUB_WEBHOOK_SECRET = process.env.SUMSUB_WEBHOOK_SECRET || '';
-const SUMSUB_LEVEL_NAME = process.env.SUMSUB_LEVEL_NAME || 'Home solutions verify';
+export interface SumsubConfig {
+  appToken: string;
+  secretKey: string;
+  baseUrl: string;
+  levelName: string;
+}
 
-/**
- * Generate Sumsub access token for WebSDK
- */
-export async function createSumsubAccessToken(
-  userId: string,
-  email: string,
-  firstName?: string,
-  lastName?: string
-): Promise<{ accessToken: string; expiresAt: string; applicantId?: string }> {
-  try {
-    if (!SUMSUB_APP_TOKEN || !SUMSUB_SECRET_KEY) {
-      throw new Error('SUMSUB_APP_TOKEN and SUMSUB_SECRET_KEY must be configured');
-    }
+export interface ApplicantData {
+  externalUserId: string;
+  levelName: string;
+  email?: string;
+  phone?: string;
+}
 
-    const timestamp = Math.floor(Date.now() / 1000);
-    const signature = generateSignature(timestamp);
+export interface DocumentMetadata {
+  idDocType: string;
+  country: string;
+  idDocSubType?: 'FRONT_SIDE' | 'BACK_SIDE';
+}
 
-    const requestBody = {
-      userId,
-      levelName: SUMSUB_LEVEL_NAME,
-      ttlInSecs: 600, // 10 minutes
-      ...(firstName && lastName && {
-        applicant: {
-          externalUserId: userId,
-          email,
-          info: {
-            firstName,
-            lastName,
-          },
-        },
-      }),
-    };
+export class SumsubService {
+  private config: SumsubConfig;
 
-    const response = await axios.post(
-      `${SUMSUB_BASE_URL}/resources/accessTokens`,
-      requestBody,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-App-Token': SUMSUB_APP_TOKEN,
-          'X-App-Access-Sig': signature,
-          'X-App-Access-Ts': timestamp.toString(),
-        },
-      }
-    );
-
-    const expiresAt = new Date(Date.now() + 600 * 1000).toISOString(); // 10 minutes from now
-
-    return {
-      accessToken: response.data.token,
-      expiresAt,
-      applicantId: response.data.applicantId,
-    };
-  } catch (error: any) {
-    console.error('Error creating Sumsub access token:', error.response?.data || error.message);
-    throw new Error('Failed to create Sumsub access token');
+  constructor(config: SumsubConfig) {
+    this.config = config;
   }
-}
 
-/**
- * Get applicant verification status from Sumsub
- */
-export async function getApplicantStatus(applicantId: string) {
-  try {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const signature = generateSignature(timestamp);
-
-    const response = await axios.get(
-      `${SUMSUB_BASE_URL}/resources/applicants/${applicantId}/status`,
-      {
-        headers: {
-          'X-App-Token': SUMSUB_APP_TOKEN,
-          'X-App-Access-Sig': signature,
-          'X-App-Access-Ts': timestamp.toString(),
-        },
-      }
-    );
-
-    return response.data;
-  } catch (error: any) {
-    console.error('Error fetching applicant status:', error.response?.data || error.message);
-    throw new Error('Failed to fetch applicant status');
-  }
-}
-
-/**
- * Get applicant data from Sumsub
- */
-export async function getApplicantData(applicantId: string) {
-  try {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const signature = generateSignature(timestamp);
-
-    const response = await axios.get(
-      `${SUMSUB_BASE_URL}/resources/applicants/${applicantId}/one`,
-      {
-        headers: {
-          'X-App-Token': SUMSUB_APP_TOKEN,
-          'X-App-Access-Sig': signature,
-          'X-App-Access-Ts': timestamp.toString(),
-        },
-      }
-    );
-
-    return response.data;
-  } catch (error: any) {
-    console.error('Error fetching applicant data:', error.response?.data || error.message);
-    throw new Error('Failed to fetch applicant data');
-  }
-}
-
-/**
- * Generate HMAC signature for Sumsub API authentication
- */
-function generateSignature(timestamp: number): string {
-  const crypto = require('crypto');
-  const signature = crypto
-    .createHmac('sha256', SUMSUB_SECRET_KEY)
-    .update(timestamp + SUMSUB_APP_TOKEN)
-    .digest('hex');
-
-  return signature;
-}
-
-/**
- * Map Sumsub verification status to our internal status
- */
-export function mapSumsubStatusToInternal(sumsubStatus: string): string {
-  const statusMap: Record<string, string> = {
-    'pending': 'pending',
-    'queued': 'pending',
-    'prechecked': 'pending',
-    'init': 'pending',
-    'review': 'in_review',
-    'onHold': 'in_review',
-    'completed': 'verified',
-    'approved': 'verified',
-    'accepted': 'verified',
-    'rejected': 'rejected',
-    'declined': 'rejected',
-    'expired': 'expired',
-  };
-
-  return statusMap[sumsubStatus] || 'pending';
-}
-
-/**
- * Extract risk score from Sumsub verification data
- */
-export function extractRiskScore(applicantData: any): number {
-  // Sumsub provides risk scoring through their AML and fraud detection
-  // We'll create a risk score based on review results and checks
-
-  let riskScore = 0;
-
-  const review = applicantData?.review;
-  if (review) {
-    // If rejected, high risk
-    if (review.reviewStatus === 'rejected') {
-      riskScore += 80;
-    }
-
-    // Check for failed checks
-    const checks = review.checks || [];
-    checks.forEach((check: any) => {
-      if (check.checkResult === 'failed') {
-        riskScore += 20;
-      } else if (check.checkResult === 'warning') {
-        riskScore += 10;
-      }
+  /**
+   * Generate HMAC signature for API authentication
+   */
+  private generateSignature(timestamp: string, method: string, url: string, body?: string | Buffer): string {
+    console.log('🔐 Signature Debug:', {
+      timestamp,
+      method: method.toUpperCase(),
+      url,
+      body: body ? (body instanceof Buffer ? `Buffer(${body.length} bytes)` : (typeof body === 'string' ? body.substring(0, 100) + (body.length > 100 ? '...' : '') : 'unknown')) : '(no body)',
+      secretKeyLength: this.config.secretKey?.length || 0,
+      appTokenLength: this.config.appToken?.length || 0
     });
 
-    // Moderate risk for manual review
-    if (review.reviewStatus === 'onHold') {
-      riskScore += 30;
+    if (!this.config.secretKey) {
+      throw new Error('Secret key is not configured');
+    }
+
+    const signature = crypto.createHmac('sha256', this.config.secretKey);
+    signature.update(timestamp + method.toUpperCase() + url);
+
+    if (body instanceof Buffer) {
+      signature.update(body);
+    } else if (body) {
+      signature.update(body);
+    }
+    // If body is undefined, don't include it in signature (matches Sumsub docs)
+
+    const result = signature.digest('hex');
+    console.log('🔑 Generated signature:', result.substring(0, 20) + '...');
+    return result;
+  }
+
+  /**
+   * Make authenticated request to Sumsub API
+   */
+  private async makeRequest(
+    method: 'GET' | 'POST' | 'PATCH' | 'PUT',
+    endpoint: string,
+    body?: any,
+    isFormData: boolean = false
+  ): Promise<any> {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const url = endpoint.replace(this.config.baseUrl, '');
+
+    // For FormData, include the raw multipart buffer in signature calculation
+    let signatureBody: string | Buffer | undefined = undefined;
+    if (body && !isFormData) {
+      signatureBody = JSON.stringify(body);
+    } else if (body && isFormData && body instanceof FormData) {
+      // For FormData from npm form-data package, use getBuffer() directly
+      signatureBody = body.getBuffer();
+    }
+    // Note: For requests without body, signatureBody remains undefined (no body in signature)
+
+    const signature = this.generateSignature(timestamp, method, url, signatureBody);
+
+    const headers: Record<string, string> = {
+      'X-App-Token': this.config.appToken,
+      'X-App-Access-Ts': timestamp,
+      'X-App-Access-Sig': signature,
+    };
+
+    // For FormData from npm form-data package, use getHeaders()
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    } else if (body && isFormData && body instanceof FormData) {
+      // Use form-data package headers
+      Object.assign(headers, body.getHeaders());
+    }
+
+    console.log('🚀 Final request details:', {
+      fullUrl: `${this.config.baseUrl}${endpoint}`,
+      method,
+      headers: {
+        'X-App-Token': headers['X-App-Token'] ? 'present' : 'missing',
+        'X-App-Access-Ts': headers['X-App-Access-Ts'],
+        'X-App-Access-Sig': headers['X-App-Access-Sig']?.substring(0, 20) + '...',
+        'Content-Type': headers['Content-Type'] || 'auto-set-by-fetch'
+      },
+      hasBody: !!body,
+      isFormData,
+      bodyType: body?.constructor?.name || 'none',
+      signatureBodyString: signatureBody instanceof Buffer ? `Buffer(${signatureBody.length} bytes)` : (typeof signatureBody === 'string' ? signatureBody.substring(0, 100) + (signatureBody.length > 100 ? '...' : '') : 'unknown')
+    });
+
+    const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
+      method,
+      headers,
+      body: isFormData && body instanceof FormData ? body : (typeof signatureBody === 'string' ? signatureBody : undefined),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Sumsub API error: ${response.status} ${errorText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Create a new applicant
+   */
+  async createApplicant(data: ApplicantData): Promise<any> {
+    const levelName = data.levelName || this.config.levelName;
+    const endpoint = `/resources/applicants?levelName=${encodeURIComponent(levelName)}`;
+
+    const body = {
+      externalUserId: data.externalUserId,
+      email: data.email,
+      phone: data.phone,
+    };
+
+    return this.makeRequest('POST', endpoint, body);
+  }
+
+  /**
+   * Upload document for applicant
+   */
+  async uploadDocument(
+    applicantId: string,
+    file: any,
+    metadata: DocumentMetadata
+  ): Promise<any> {
+    const endpoint = `/resources/applicants/${applicantId}/info/idDoc`;
+
+    const form = new FormData();
+    form.append('metadata', JSON.stringify(metadata));
+
+    // Handle different file formats (multer vs browser File)
+    if (file.buffer) {
+      // Multer file - use buffer directly
+      form.append('content', file.buffer, {
+        filename: file.originalname,
+        contentType: file.mimetype
+      });
+    } else {
+      // Browser File - convert to buffer
+      const buffer = Buffer.from(await file.arrayBuffer());
+      form.append('content', buffer, {
+        filename: file.name,
+        contentType: file.type
+      });
+    }
+
+    return this.makeRequest('POST', endpoint, form, true);
+  }
+
+  /**
+   * Start verification process
+   */
+  async startVerification(applicantId: string): Promise<any> {
+    const endpoint = `/resources/applicants/${applicantId}/status/pending`;
+    return this.makeRequest('POST', endpoint);
+  }
+
+  /**
+   * Get verification status
+   */
+  async getVerificationStatus(applicantId: string): Promise<any> {
+    const endpoint = `/resources/applicants/${applicantId}/status`;
+    return this.makeRequest('GET', endpoint);
+  }
+
+  /**
+   * Get complete applicant data
+   */
+  async getApplicantData(applicantId: string): Promise<any> {
+    const endpoint = `/resources/applicants/${applicantId}/one`;
+    return this.makeRequest('GET', endpoint);
+  }
+
+  /**
+   * Get available verification levels
+   */
+  async getVerificationLevels(): Promise<any> {
+    const endpoint = `/resources/applicants/-/levels`;
+    return this.makeRequest('GET', endpoint);
+  }
+
+  /**
+   * Map Sumsub status to internal status
+   */
+  mapSumsubStatusToInternal(sumsubStatus: any): number {
+    const status = sumsubStatus?.reviewStatus;
+    switch (status) {
+      case 'completed':
+        return sumsubStatus.reviewResult?.reviewAnswer === 'GREEN' ? 3 : 4; // verified or rejected
+      case 'pending':
+      case 'review':
+        return 2; // review
+      default:
+        return 1; // pending
     }
   }
 
-  // Cap at 100
-  return Math.min(riskScore, 100);
-}
+  /**
+   * Extract risk score from Sumsub response
+   */
+  extractRiskScore(applicantData: any): number {
+    // Sumsub provides risk scores in various formats
+    // This is a simplified extraction - adjust based on actual response structure
+    return applicantData?.riskScore?.value || 0;
+  }
 
-/**
- * Extract document information from Sumsub applicant data
- */
-export function extractDocumentInfo(applicantData: any): { documentType?: string; documentNumber?: string } {
-  const info = applicantData?.info || {};
-  const documents = info.documents || [];
-
-  if (documents.length > 0) {
-    const primaryDoc = documents[0];
+  /**
+   * Extract document information
+   */
+  extractDocumentInfo(applicantData: any): any {
+    // Extract document information from Sumsub response
     return {
-      documentType: primaryDoc.idDocType,
-      documentNumber: primaryDoc.number,
+      documents: applicantData?.info?.idDocs || [],
+      documentTypes: applicantData?.requiredIdDocs || []
     };
   }
 
-  return {};
+  /**
+   * Get applicant status (alias for getVerificationStatus)
+   */
+  async getApplicantStatus(applicantId: string): Promise<any> {
+    const endpoint = `/resources/applicants/${applicantId}/status`;
+    return this.makeRequest('GET', endpoint);
+  }
+
+  /**
+   * Get SDK access token for liveness verification
+   */
+  async getSdkToken(applicantId: string): Promise<any> {
+    const endpoint = `/resources/accessTokens?userId=${encodeURIComponent(applicantId)}&levelName=${encodeURIComponent(this.config.levelName)}&ttlInSecs=600`;
+    return this.makeRequest('POST', endpoint);
+  }
+}
+
+// Factory function to create service instance
+export function createSumsubService(): SumsubService {
+  const config: SumsubConfig = {
+    appToken: process.env.SUMSUB_APP_TOKEN!,
+    secretKey: process.env.SUMSUB_SECRET_KEY!,
+    baseUrl: process.env.SUMSUB_BASE_URL || 'https://api.sumsub.com',
+    levelName: process.env.SUMSUB_LEVEL_NAME || 'basic-kyc-level',
+  };
+
+  console.log('🔧 Sumsub Service Config:', {
+    appToken: config.appToken ? `${config.appToken.substring(0, 10)}...` : 'missing',
+    secretKey: config.secretKey ? `${config.secretKey.substring(0, 10)}...` : 'missing',
+    baseUrl: config.baseUrl,
+    levelName: config.levelName,
+    appTokenLength: config.appToken?.length,
+    secretKeyLength: config.secretKey?.length
+  });
+
+  if (!config.appToken || !config.secretKey) {
+    throw new Error('Sumsub credentials not configured');
+  }
+
+  // Test signature generation with a known value
+  const testSignature = crypto.createHmac('sha256', config.secretKey)
+    .update('test')
+    .digest('hex');
+
+  console.log('🧪 Signature test (should be consistent):', testSignature.substring(0, 20) + '...');
+
+  return new SumsubService(config);
 }

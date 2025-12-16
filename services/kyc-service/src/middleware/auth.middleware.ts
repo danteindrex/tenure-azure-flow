@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../../drizzle/db';
+import { kycVerification } from '../../drizzle/schema';
 import { KYC_STATUS } from '../config/status-constants';
 
 // Extend Express Request type to include user
@@ -27,65 +28,102 @@ export async function validateSession(
 ) {
   try {
     console.log('🔐 Auth Middleware - All cookies:', req.cookies);
+    console.log('🔑 Authorization header:', req.headers.authorization ? 'Present' : 'Missing');
 
-    // Get session ID from cookie
-    // Better Auth stores the session ID directly in the cookie
-    // Try multiple possible cookie names
-    const sessionCookie = req.cookies['better-auth.session_token'] ||
-                          req.cookies['better_auth_session'] ||
-                          req.cookies['authjs.session-token'] ||
-                          req.cookies['__Secure-authjs.session-token'];
+    // Try to get session token from cookie first
+    let sessionToken = req.cookies['better-auth.session_token'] ||
+                       req.cookies['better_auth_session'] ||
+                       req.cookies['authjs.session-token'] ||
+                       req.cookies['__Secure-authjs.session-token'];
 
-    console.log('🔑 Session cookie found:', sessionCookie ? 'Yes' : 'No');
+    let userId: string | null = null;
 
-    if (!sessionCookie) {
-      console.log('❌ No session token in cookies');
+    // If no cookie, check Authorization header as fallback (for service-to-service calls)
+    if (!sessionToken && req.headers.authorization) {
+      const authHeader = req.headers.authorization;
+      if (authHeader.startsWith('Bearer ')) {
+        userId = authHeader.substring(7);
+        console.log('🔓 Using Authorization header with userId:', userId);
+      } else {
+        console.log('❌ Authorization header present but does not start with Bearer');
+      }
+    }
+
+    if (!sessionToken && !userId) {
+      console.log('❌ No session token in cookies or authorization header');
+      console.log('   Cookies keys:', Object.keys(req.cookies));
+      console.log('   Authorization header present:', !!req.headers.authorization);
       return res.status(401).json({
         success: false,
         error: 'No session token provided'
       });
     }
 
-    // Better Auth uses signed tokens in format: token.signature
-    // Extract just the token part (before the dot) to match what's stored in DB
-    const sessionId = sessionCookie.split('.')[0];
+    let user;
 
-    // Query session from shared database using Drizzle
-    // The session token in the cookie matches session.token in the database
-    console.log('🔍 Looking for session with token:', sessionId.substring(0, 20) + '...');
+    // If we have a session token, validate it
+    if (sessionToken) {
+      console.log('🔑 Session token from cookie:', sessionToken);
 
-    const sessionRecord = await db.query.session.findFirst({
-      where: (session, { eq }) => eq(session.token, sessionId)
-    });
+      // Extract session token from signed cookie (format: "token.signature")
+      // Better Auth signs the token, we need the part before the dot
+      const token = sessionToken.split('.')[0];
+      console.log('🔓 Extracted token:', token);
 
-    console.log('📊 Session found:', sessionRecord ? 'Yes' : 'No');
-    if (sessionRecord) {
-      console.log('📊 Session user ID:', sessionRecord.userId);
+      // Query session from shared database using Drizzle
+      console.log('🔍 Querying session table by token:', token);
+
+      const sessionRecord = await db.query.session.findFirst({
+        where: (session, { eq }) => eq(session.token, token)
+      });
+
+      console.log('📋 Session found:', sessionRecord ? 'Yes' : 'No');
+      if (sessionRecord) {
+        console.log('   User ID:', sessionRecord.userId);
+        console.log('   Expires:', sessionRecord.expiresAt);
+      }
+
+      if (!sessionRecord) {
+        console.log('❌ Session not found in database');
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid session token'
+        });
+      }
+
+      // Check if session expired
+      const expiresAt = new Date(sessionRecord.expiresAt);
+      if (expiresAt < new Date()) {
+        return res.status(401).json({
+          success: false,
+          error: 'Session expired'
+        });
+      }
+
+      userId = sessionRecord.userId;
     }
 
-    if (!sessionRecord) {
-      console.log('❌ Session not found in database with token:', sessionId);
+    // Query user by ID
+    if (!userId) {
+      console.log('❌ No userId available after session validation');
       return res.status(401).json({
         success: false,
-        error: 'Invalid session token'
+        error: 'User ID not found'
       });
     }
 
-    // Check if session expired
-    const expiresAt = new Date(sessionRecord.expiresAt);
-    if (expiresAt < new Date()) {
-      return res.status(401).json({
-        success: false,
-        error: 'Session expired'
-      });
-    }
-
-    // Query user separately
-    const user = await db.query.users.findFirst({
-      where: (users, { eq }) => eq(users.id, sessionRecord.userId)
+    console.log('🔍 Querying user by ID:', userId);
+    user = await db.query.users.findFirst({
+      where: (users, { eq }) => eq(users.id, userId)
     });
+
+    console.log('👤 User found:', user ? 'Yes' : 'No');
+    if (user) {
+      console.log('   User email:', user.email);
+    }
 
     if (!user) {
+      console.log('❌ User not found in database for ID:', userId);
       return res.status(401).json({
         success: false,
         error: 'User not found'
@@ -96,9 +134,11 @@ export async function validateSession(
     req.user = user;
     req.userId = user.id;
 
+    console.log('✅ Session validated for user:', user.id);
     next();
   } catch (error) {
     console.error('Session validation error:', error);
+    console.error('Error stack:', error.stack);
     return res.status(500).json({
       success: false,
       error: 'Authentication failed'
@@ -127,7 +167,7 @@ export async function requireKYCVerification(
       where: (kyc, { eq, and }) =>
         and(
           eq(kyc.userId, req.userId),
-          eq(kyc.status, KYC_STATUS.VERIFIED)
+          eq(kyc.kycStatusId, KYC_STATUS.VERIFIED)
         )
     });
 

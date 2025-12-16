@@ -100,12 +100,18 @@ async function handleApplicantReviewed(webhookData: any) {
     });
 
     // Forward the webhook data to the KYC service for processing
-    const KYC_SERVICE_URL = process.env.KYC_SERVICE_URL || 'http://localhost:3003';
+    const KYC_SERVICE_URL = process.env.KYC_SERVICE_URL;
+
+    if (!KYC_SERVICE_URL) {
+      console.error('❌ KYC_SERVICE_URL environment variable is not set!');
+      return;
+    }
 
     const response = await fetch(`${KYC_SERVICE_URL}/kyc/webhook/applicant-reviewed`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        // No cookies for webhook, as it's from external service
       },
       body: JSON.stringify({
         applicantId,

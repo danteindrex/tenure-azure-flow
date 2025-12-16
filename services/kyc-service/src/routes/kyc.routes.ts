@@ -1,32 +1,80 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { validateSession } from '../middleware/auth.middleware';
 import * as kycController from '../controllers/kyc.controller';
 
+// Configure multer for file uploads
+const upload = multer({
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+});
+
 const router = Router();
 
-// All routes require valid session
+/**
+ * POST /kyc/webhook/applicant-reviewed
+ * Webhook endpoint for Sumsub applicant review events (no auth required)
+ */
+router.post('/webhook/applicant-reviewed', kycController.handleApplicantReviewedWebhook);
+
+// All other routes require valid session
 router.use(validateSession);
 
 /**
- * POST /kyc/create-link-token
- * Create a Link/Access token for Identity Verification (Plaid or Sumsub)
+ * POST /kyc/create-applicant
+ * Create a new Sumsub applicant for direct API integration
  */
-router.post('/create-link-token', kycController.createLinkToken);
+router.post('/create-applicant', kycController.createApplicant);
 
 /**
- * POST /kyc/verify
- * Verify KYC using session ID or applicant ID and store results
- * Body: { sessionId: string } or { applicantId: string }
+ * POST /kyc/upload-document
+ * Upload document for KYC verification
  */
-router.post('/verify', kycController.verifyKYC);
+router.post('/upload-document', upload.fields([
+  { name: 'content', maxCount: 1 },
+  { name: 'backFile', maxCount: 1 }
+]), kycController.uploadDocument);
 
 /**
- * GET /kyc/status
- * Get user's current KYC verification status
+ * POST /kyc/start-verification
+ * Start the verification process for an applicant
  */
-router.get('/status', kycController.getKYCStatus);
+router.post('/start-verification', kycController.startVerification);
 
-// Admin audit endpoints (TODO: Add admin authentication middleware)
+/**
+ * POST /kyc/get-sdk-token
+ * Get Sumsub SDK access token for liveness verification
+ */
+router.post('/get-sdk-token', kycController.getSdkToken);
+
+/**
+ * GET /kyc/check-status
+ * Check the verification status of an applicant
+ */
+router.get('/check-status', kycController.getKYCStatus);
+
+
+
+/**
+ * POST /kyc/upload-document
+ * Upload document for KYC verification
+ */
+router.post('/upload-document', upload.fields([
+  { name: 'content', maxCount: 1 },
+  { name: 'backFile', maxCount: 1 }
+]), kycController.uploadDocument);
+
+
+
 /**
  * GET /kyc/admin/applicant/:applicantId
  * Get full applicant data for audit purposes (Sumsub only)
@@ -34,7 +82,6 @@ router.get('/status', kycController.getKYCStatus);
 router.get('/admin/applicant/:applicantId', kycController.getApplicantDataForAudit);
 
 /**
- * GET /kyc/admin/applicant/:applicantId/status
  * Get applicant status for audit purposes (Sumsub only)
  */
 router.get('/admin/applicant/:applicantId/status', kycController.getApplicantStatusForAudit);
@@ -44,6 +91,19 @@ router.get('/admin/applicant/:applicantId/status', kycController.getApplicantSta
  * Webhook endpoint for Sumsub applicant review events
  */
 router.post('/webhook/applicant-reviewed', kycController.handleApplicantReviewedWebhook);
+
+
+
+/**
+ * GET /kyc/admin/applicant/:applicantId
+ * Get full applicant data for audit purposes (Sumsub only)
+ */
+router.get('/admin/applicant/:applicantId', kycController.getApplicantDataForAudit);
+
+/**
+ * Get applicant status for audit purposes (Sumsub only)
+ */
+router.get('/admin/applicant/:applicantId/status', kycController.getApplicantStatusForAudit);
 
 /**
  * GET /kyc/admin/verified-users

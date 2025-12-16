@@ -48,18 +48,27 @@ export default async function handler(
       });
     }
 
-    // Forward request to KYC microservice with user data
+    // Forward request to KYC microservice with proper cookie forwarding
+    // Convert cookies object to cookie header string
+    const cookieHeader = Object.entries(req.cookies)
+      .map(([key, value]) => `${key}=${value}`)
+      .join('; ');
+
     const response = await fetch(`${KYC_SERVICE_URL}/kyc/create-link-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${user.id}`, // Pass user ID for service-side validation
+        'Cookie': cookieHeader, // Forward Better Auth session cookie
+        'Authorization': req.headers.authorization || `Bearer ${user.id}`, // Pass user ID as backup
       },
       body: JSON.stringify({
         userId: user.id,
         email: user.email,
         ...req.body,
       }),
+    }).catch(err => {
+      console.error('❌ Failed to connect to KYC service:', err.message);
+      throw new Error(`KYC service unavailable: ${err.message}`);
     });
 
     console.log('📤 KYC Service Response:', response.status, response.statusText);
