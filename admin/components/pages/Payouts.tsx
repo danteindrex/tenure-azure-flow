@@ -40,9 +40,11 @@ import { supabase } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 async function fetchPayoutData() {
+  // Add timestamp to prevent caching
+  const timestamp = Date.now();
   const [payoutsRes, queueRes] = await Promise.allSettled([
-    fetch('/api/payouts'),
-    fetch('/api/membership-queue')
+    fetch(`/api/payouts?t=${timestamp}`),
+    fetch(`/api/membership-queue?t=${timestamp}`)
   ]);
 
   return {
@@ -90,7 +92,9 @@ export default function Payouts() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['payout-data'],
     queryFn: fetchPayoutData,
-    refetchInterval: 10000, // Refetch every 10 seconds for real-time updates
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    staleTime: 0, // Always consider data stale to force fresh fetches
   });
 
   const { data: statusesData } = useQuery({
@@ -101,19 +105,26 @@ export default function Payouts() {
   const updateStatusMutation = useMutation({
     mutationFn: ({ memberId, status }: { memberId: string; status: string }) =>
       updateMemberStatus(memberId, status),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       toast.success(data.message || 'Member status updated successfully');
-      queryClient.invalidateQueries({ queryKey: ['payout-data'] });
+      
+      // Force immediate refresh with multiple strategies
+      await queryClient.invalidateQueries({ queryKey: ['payout-data'] });
+      await queryClient.refetchQueries({ queryKey: ['payout-data'] });
+      
+      // Wait a moment and refresh again to ensure data is updated
+      setTimeout(async () => {
+        await queryClient.refetchQueries({ queryKey: ['payout-data'] });
+      }, 1000);
+      
       setIsEditingStatus(false);
       setNewStatus("");
-      // Update the selected member with new status
-      if (selectedMember) {
-        setSelectedMember({
-          ...selectedMember,
-          member_status: data.member.status,
-          status: data.member.status
-        });
-      }
+      setIsDetailsOpen(false); // Close the dialog to force re-render
+      
+      // Show success message with the new status
+      setTimeout(() => {
+        toast.success(`Status successfully changed to ${data.member?.status || status}`);
+      }, 1500);
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to update member status');
@@ -125,10 +136,19 @@ export default function Payouts() {
     const channel = supabase
       .channel('payout-realtime')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'membership_queue' },
+        { event: '*', schema: 'public', table: 'user_memberships' },
         (payload) => {
-          console.log('Membership queue change received:', payload);
+          console.log('User memberships change received:', payload);
           queryClient.invalidateQueries({ queryKey: ['payout-data'] });
+          queryClient.refetchQueries({ queryKey: ['payout-data'] });
+        }
+      )
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'member_eligibility_statuses' },
+        (payload) => {
+          console.log('Member status change received:', payload);
+          queryClient.invalidateQueries({ queryKey: ['payout-data'] });
+          queryClient.refetchQueries({ queryKey: ['payout-data'] });
         }
       )
       .on('postgres_changes', 
@@ -136,13 +156,7 @@ export default function Payouts() {
         (payload) => {
           console.log('Payment change received:', payload);
           queryClient.invalidateQueries({ queryKey: ['payout-data'] });
-        }
-      )
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'payout_management' },
-        (payload) => {
-          console.log('Payout management change received:', payload);
-          queryClient.invalidateQueries({ queryKey: ['payout-data'] });
+          queryClient.refetchQueries({ queryKey: ['payout-data'] });
         }
       )
       .subscribe();
