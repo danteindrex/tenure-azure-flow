@@ -14,6 +14,7 @@ import { useCMSPosts } from "@/hooks/useCMSPosts";
 import { useStatusValues, getStatusColor, getStatusDisplayName } from "@/hooks/useStatusValues";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemberStatus } from "@/hooks/useMemberStatus";
+import PaymentStatusWidget from "@/components/dashboard/PaymentStatusWidget";
 
 const DashboardSimple = () => {
 
@@ -371,6 +372,9 @@ const DashboardSimple = () => {
           <span className="hidden sm:inline">Refresh</span>
         </Button>
       </div>
+
+      {/* Payment Status Widget */}
+      <PaymentStatusWidget />
 
       {/* Smart Action Section - Morphs based on subscription state */}
       {(memberStatusData?.data?.canRejoin || memberStatusData?.data?.canUndoCancel) && (

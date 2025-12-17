@@ -27,7 +27,7 @@ const SignUp = () => {
 
   // Always initialize to 1 to prevent hydration mismatch (server vs client)
   // URL step will be synced in useEffect after hydration
-  const [step, setStep] = useState(1); // 1: Email+Password, 2: Email Verification, 3: Personal Info + Address, 4: Phone Verification, 5: Payment
+  const [step, setStep] = useState(1); // 1: Email+Password, 2: Email Verification, 3: Personal Info + Address, 4: Phone Verification
   const [isHydrated, setIsHydrated] = useState(false);
   const [isOAuthUser, setIsOAuthUser] = useState(false); // Track if user signed up via OAuth
 
@@ -44,7 +44,7 @@ const SignUp = () => {
 
     if (stepParam) {
       const stepNumber = parseInt(stepParam, 10);
-      if (stepNumber >= 1 && stepNumber <= 5) {
+      if (stepNumber >= 1 && stepNumber <= 4) {
         setStep(stepNumber);
       }
     }
@@ -72,8 +72,7 @@ const SignUp = () => {
     state: "",
     zipCode: "",
     country: "UG", // Default to Uganda
-    // Step 5: Payment Consent
-    agreeToPayment: false,
+    // Removed Step 5 - Payment now handled in dashboard
   });
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -276,8 +275,8 @@ const SignUp = () => {
     else if (session?.user && !isPending && !bypassed && !sessionIdParam) {
       setIsLoadingStep(true);
 
-      // Add small delay to ensure webhook has processed (if just completed payment)
-      const checkDelay = stepParam === '5' ? 2000 : 0;
+      // No delay needed since payment is now handled in dashboard
+      const checkDelay = 0;
 
       setTimeout(() => {
         fetch('/api/onboarding/status', {
@@ -295,11 +294,13 @@ const SignUp = () => {
                 const correctStep = data.status.nextStep;
                 console.log(`Database says user should be on step ${correctStep}, URL says step ${step}`);
 
-                // Handle legacy step 5 users by redirecting to step 3 (merged step)
+                // Handle legacy users - redirect to dashboard if they completed steps 1-4
                 let targetStep = correctStep;
-                if (correctStep === 7) {
-                  targetStep = 5; // Payment step
-                } else if (correctStep >= 1 && correctStep <= 6) {
+                if (correctStep === 7 || correctStep >= 5) {
+                  // User completed onboarding, redirect to dashboard
+                  navigate.push('/dashboard');
+                  return;
+                } else if (correctStep >= 1 && correctStep <= 4) {
                   targetStep = correctStep;
                 }
 
@@ -1102,8 +1103,9 @@ const SignUp = () => {
         })
       });
 
-      setStep(5);
-      toast.success("Phone verified successfully! Please proceed to payment.");
+      // Redirect to dashboard instead of Step 5
+      toast.success("Phone verified successfully! Redirecting to dashboard...");
+      navigate.push('/dashboard');
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "OTP verification failed";
@@ -1260,9 +1262,10 @@ const SignUp = () => {
 
       // Update local state
       setBypassed(true);
-      setStep(5);
-
-      toast.success("Profile complete! Proceeding to payment...");
+      
+      // Redirect to dashboard instead of Step 5
+      toast.success("Profile complete! Redirecting to dashboard...");
+      navigate.push('/dashboard');
 
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to save profile";
@@ -1272,53 +1275,7 @@ const SignUp = () => {
     }
   };
 
-  // Step 5: Payment
-  const handlePayment = async (): Promise<void> => {
-    // Check payment consent first
-    if (!formData.agreeToPayment) {
-      toast.error("Please agree to the payment terms to continue");
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // Create Stripe checkout session
-      const checkoutResp = await fetch("/api/subscriptions/create-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!checkoutResp.ok) {
-        let msg = "Failed to create payment session";
-        try {
-          const data = await checkoutResp.json();
-          if (data?.error) msg = data.error;
-        } catch (parseError) {
-          console.error('Failed to parse checkout error response:', parseError);
-        }
-
-        toast.error(msg);
-        return;
-      }
-
-      const checkoutData = await checkoutResp.json();
-
-      if (checkoutData.success && checkoutData.checkoutUrl) {
-        toast.success("Redirecting to payment...");
-        window.location.href = checkoutData.checkoutUrl;
-      } else {
-        toast.error("Failed to initialize payment. Please try again.");
-      }
-
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unexpected error during payment setup";
-      await logError(`Payment initialization error: ${errorMessage}`, userId || undefined);
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Step 5 removed - Payment now handled in dashboard
 
   // Toggle between light and dark theme
   const toggleTheme = () => {
@@ -2057,107 +2014,7 @@ const SignUp = () => {
           </>
         )}
 
-        {/* Step 5: Payment */}
-        {step === 5 && (
-          <>
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold mb-2 text-foreground">Complete Your Membership</h1>
-              <p className="text-muted-foreground">Review payment details to join the queue</p>
-            </div>
-
-            <div className="space-y-6">
-              <Card className="p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg dark:shadow-[0_20px_50px_rgba(75,_85,_99,_0.7)] hover:shadow-xl dark:hover:shadow-[0_25px_60px_rgba(75,_85,_99,_0.9)] transition-shadow duration-300">
-                <div className="text-center space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Non-refundable Signup Fee</p>
-                    <p className="text-4xl font-bold text-accent">$300</p>
-                    <p className="text-xs text-muted-foreground mt-1">One-time payment</p>
-                  </div>
-                  <div className="border-t border-border pt-4">
-                    <p className="text-sm text-muted-foreground mb-1">Recurring Monthly Membership Fee</p>
-                    <p className="text-2xl font-semibold text-foreground">$25</p>
-                    <p className="text-xs text-muted-foreground mt-1">Billed monthly</p>
-                  </div>
-                </div>
-              </Card>
-
-              <div className="space-y-4 p-4 bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                <h3 className="font-semibold text-foreground">What happens next:</h3>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-accent" />
-                    You'll be redirected to our secure payment processor
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-accent" />
-                    Enter your payment information safely
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-accent" />
-                    Your membership will be activated immediately
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-accent" />
-                    You'll be added to the membership queue
-                  </li>
-                </ul>
-              </div>
-
-              {/* Payment Consent Checkbox - REQUIRED */}
-              <div className="p-4 bg-accent/5 border-2 border-accent/20 rounded-lg">
-                <div className="flex items-start space-x-3">
-                  <Checkbox
-                    id="agreeToPayment"
-                    checked={formData.agreeToPayment}
-                    onCheckedChange={(checked: boolean) => handleInputChange("agreeToPayment", checked)}
-                    className="mt-1"
-                  />
-                  <Label htmlFor="agreeToPayment" className="text-sm text-foreground leading-relaxed cursor-pointer">
-                    I explicitly consent to the payment of the <strong>non-refundable $300 signup fee</strong> and the <strong>recurring $25 monthly membership fee</strong> as outlined in the{" "}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowTermsModal(true);
-                      }}
-                      className="text-accent hover:text-accent/80 hover:underline font-semibold"
-                    >
-                      Terms & Conditions
-                    </button>.
-                  </Label>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setStep(4)}
-                  className="w-full"
-                  disabled={loading}
-                >
-                  <ChevronLeft className="mr-2 h-4 w-4" />
-                  Back
-                </Button>
-                <Button
-                  onClick={handlePayment}
-                  disabled={loading || !formData.agreeToPayment}
-                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    "Proceed to Payment"
-                  )}
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
+        {/* Step 5 removed - Payment now handled in dashboard */}
 
         {/* Divider */}
         {step === 1 && (

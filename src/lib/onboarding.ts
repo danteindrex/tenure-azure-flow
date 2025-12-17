@@ -438,9 +438,19 @@ export class OnboardingService {
           status.step = 'dashboard'
           status.canAccessDashboard = true
           status.nextRoute = '/dashboard'
-          status.nextStep = 6
+          status.nextStep = 5  // Step 5 now happens in dashboard
           return status
         }
+      }
+
+      // Allow dashboard access after completing Steps 1-4 (email, profile, phone)
+      // regardless of payment status - payment is now handled in dashboard
+      if (isEmailVerified && hasProfile && isPhoneVerified && userStatusId === USER_STATUS.ONBOARDED) {
+        status.step = 'dashboard'
+        status.canAccessDashboard = true
+        status.nextRoute = '/dashboard'
+        status.nextStep = 5
+        return status
       }
 
       // DYNAMIC ROUTING: Get onboarding steps from database
