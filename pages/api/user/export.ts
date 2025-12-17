@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { auth } from "@/lib/auth";
 import { db } from "@/drizzle/db";
-import { user, userProfiles, userContacts, userAddresses, userMemberships } from "@/drizzle/schema";
+import { users as user, userProfiles, userContacts, userAddresses, userMemberships } from "@/drizzle/migrations/schema";
 import { eq } from "drizzle-orm";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -21,7 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Get user ID from our users table
-    const userData = await db.query.user.findFirst({
+    const userData = await db.query.users.findFirst({
       where: eq(user.id, session.user.id),
       columns: { id: true }
     });

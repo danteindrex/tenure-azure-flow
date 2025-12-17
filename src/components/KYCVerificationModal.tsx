@@ -1,6 +1,8 @@
+'use client';
+
 import { useState, useEffect } from 'react';
-import { usePlaidLink } from 'react-plaid-link';
 import { useToast } from '@/components/ui/use-toast';
+import { useSession } from '@/lib/auth-client';
 import {
   Dialog,
   DialogContent,
@@ -8,8 +10,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Shield, Loader2 } from 'lucide-react';
+import { StepIndicator } from './KYCVerificationModal/StepIndicator';
+import { DocumentUploadForm } from './KYCVerificationModal/DocumentUploadForm';
+import { LivenessCheckForm } from './KYCVerificationModal/LivenessCheckForm';
+
 
 interface KYCVerificationModalProps {
   isOpen: boolean;
@@ -17,43 +21,72 @@ interface KYCVerificationModalProps {
   onSuccess?: () => void;
 }
 
+type VerificationStep = 'document-upload' | 'liveness-check';
+
 export function KYCVerificationModal({
   isOpen,
   onClose,
   onSuccess,
 }: KYCVerificationModalProps) {
-  const [linkToken, setLinkToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
+  const [currentStep, setCurrentStep] = useState<VerificationStep>('document-upload');
+  const [applicantId, setApplicantId] = useState<string>('');
+
+  const [isCreatingApplicant, setIsCreatingApplicant] = useState(false);
   const { toast } = useToast();
+  const { data: session } = useSession();
+  const user = session?.user;
 
-  // Fetch link token when modal opens
+  // Create applicant when modal opens
   useEffect(() => {
-    if (isOpen && !linkToken) {
-      fetchLinkToken();
+    if (isOpen && !applicantId && !isCreatingApplicant && user?.id) {
+      createApplicant();
     }
-  }, [isOpen]);
+  }, [isOpen, applicantId, isCreatingApplicant, user?.id]);
 
-  const fetchLinkToken = async () => {
+  const createApplicant = async () => {
+    if (!user?.id) {
+      console.log('❌ No user ID available');
+      toast({
+        title: 'Error',
+        description: 'User not authenticated. Please log in again.',
+        variant: 'destructive',
+      });
+      onClose();
+      return;
+    }
+
+    console.log('🚀 Starting applicant creation for user:', user.id);
+    setIsCreatingApplicant(true);
+
     try {
-      setIsLoading(true);
-      const response = await fetch('/api/kyc/create-link-token', {
+      console.log('📡 Making API call to /api/kyc/create-applicant');
+      const response = await fetch('/api/kyc/create-applicant', {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          email: user.email,
+        }),
       });
 
+      console.log('📥 API Response status:', response.status, response.statusText);
+
       const data = await response.json();
+      console.log('📦 API Response data:', data);
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to create link token');
+        throw new Error(data.error || `API error: ${response.status} ${response.statusText}`);
       }
 
-      setLinkToken(data.data.linkToken);
+      if (!data.data?.id) {
+        throw new Error('No applicant ID returned from API');
+      }
+
+      console.log('✅ Applicant created successfully:', data.data.id);
+      setApplicantId(data.data.id);
     } catch (error: any) {
-      console.error('Error fetching link token:', error);
+      console.error('❌ Error creating applicant:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to initialize verification. Please try again.',
@@ -61,135 +94,87 @@ export function KYCVerificationModal({
       });
       onClose();
     } finally {
-      setIsLoading(false);
+      console.log('🏁 Setting isCreatingApplicant to false');
+      setIsCreatingApplicant(false);
     }
   };
 
-  const handlePlaidSuccess = async (public_token: string, metadata: any) => {
-    try {
-      setIsVerifying(true);
-
-      // The metadata contains the identity_verification_id (session ID)
-      const sessionId = metadata.link_session_id;
-
-      const response = await fetch('/api/kyc/verify', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ sessionId }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to verify identity');
-      }
-
-      toast({
-        title: 'Verification Successful',
-        description: 'Your identity has been verified successfully!',
-      });
-
-      if (onSuccess) {
-        onSuccess();
-      }
-
-      onClose();
-    } catch (error: any) {
-      console.error('Error verifying KYC:', error);
-      toast({
-        title: 'Verification Failed',
-        description: error.message || 'Failed to complete verification. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsVerifying(false);
-    }
+  const handleDocumentComplete = () => {
+    setCurrentStep('liveness-check');
   };
 
-  const handlePlaidExit = (error: any, metadata: any) => {
-    if (error) {
-      console.error('Plaid Link error:', error);
-      toast({
-        title: 'Verification Cancelled',
-        description: 'Identity verification was cancelled or failed.',
-        variant: 'destructive',
-      });
-    }
+  const handleLivenessComplete = () => {
+    // Skip verification status display - just close the modal
+    // Results are stored in database via webhook
     onClose();
   };
 
-  const { open, ready } = usePlaidLink({
-    token: linkToken,
-    onSuccess: handlePlaidSuccess,
-    onExit: handlePlaidExit,
-  });
 
-  const handleStartVerification = () => {
-    if (ready) {
-      open();
+
+  const handleBack = () => {
+    if (currentStep === 'liveness-check') {
+      setCurrentStep('document-upload');
+    }
+  };
+
+  const getStepNumber = (): number => {
+    switch (currentStep) {
+      case 'document-upload': return 1;
+      case 'liveness-check': return 2;
+      default: return 1;
+    }
+  };
+
+  const renderCurrentStep = () => {
+    if (isCreatingApplicant) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Setting up verification...</p>
+          </div>
+        </div>
+      );
+    }
+
+    switch (currentStep) {
+      case 'document-upload':
+        return (
+          <DocumentUploadForm
+            applicantId={applicantId}
+            onComplete={handleDocumentComplete}
+            onBack={onClose}
+          />
+        );
+
+      case 'liveness-check':
+        return (
+          <LivenessCheckForm
+            applicantId={applicantId}
+            onComplete={handleLivenessComplete}
+            onBack={handleBack}
+          />
+        );
+
+      default:
+        return null;
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center gap-2 mb-2">
-            <Shield className="w-6 h-6 text-blue-500" />
-            <DialogTitle>Identity Verification</DialogTitle>
-          </div>
+          <DialogTitle>Identity Verification</DialogTitle>
           <DialogDescription>
-            Complete identity verification to access all features and ensure account security.
+            Complete your identity verification to access all platform features.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="space-y-2 text-sm">
-            <p className="font-medium">What you'll need:</p>
-            <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-              <li>Government-issued ID (passport, driver's license, or national ID)</li>
-              <li>Access to your device camera</li>
-              <li>2-3 minutes to complete</li>
-            </ul>
-          </div>
+        <div className="space-y-6">
+          <StepIndicator currentStep={getStepNumber()} />
 
-          <div className="bg-muted p-3 rounded-lg text-sm">
-            <p className="text-muted-foreground">
-              <strong>Secure & Private:</strong> Your information is encrypted and verified by
-              our trusted partner, Plaid. We never store your ID images.
-            </p>
-          </div>
-
-          <Button
-            onClick={handleStartVerification}
-            disabled={!ready || isLoading || isVerifying}
-            className="w-full"
-            size="lg"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Initializing...
-              </>
-            ) : isVerifying ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Verifying...
-              </>
-            ) : (
-              <>
-                <Shield className="mr-2 h-4 w-4" />
-                Start Verification
-              </>
-            )}
-          </Button>
-
-          <p className="text-xs text-center text-muted-foreground">
-            By continuing, you agree to share your identity information for verification purposes.
-          </p>
+          {renderCurrentStep()}
         </div>
       </DialogContent>
     </Dialog>

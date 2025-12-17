@@ -25,49 +25,37 @@ export { user } from './auth'
 // 1. USER PROFILES: Personal Information (EXISTING TABLE - EXACT MAPPING)
 // ============================================================================
 export const userProfiles = pgTable('user_profiles', {
-  id: varchar('id').primaryKey(),
-  userId: uuid('user_id').references(() => user.id, { onDelete: 'cascade' }),
+  id: varchar('id', { length: 255 }).primaryKey(),
+  userId: uuid('user_id').notNull(),
   firstName: varchar('first_name'),
   lastName: varchar('last_name'),
   middleName: varchar('middle_name'),
   dateOfBirth: date('date_of_birth'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
-}, (table) => ({
-  userIdIdx: index('idx_user_profiles_user_id').on(table.userId),
-  nameIdx: index('idx_user_profiles_name').on(table.firstName, table.lastName)
-}))
+})
 
 // ============================================================================
 // 3. USER CONTACTS: Contact Information (EXISTING TABLE - EXACT MAPPING)
 // ============================================================================
 export const userContacts = pgTable('user_contacts', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull(),
   contactType: varchar('contact_type', { length: 20 }).notNull(), // 'phone', 'email', 'emergency'
   contactValue: varchar('contact_value', { length: 255 }).notNull(),
-  countryCode: varchar('country_code', { length: 10 }), // Phone country code (e.g., +1, +44, +256)
   isPrimary: boolean('is_primary').default(false),
   isVerified: boolean('is_verified').default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
-}, (table) => ({
-  userIdIdx: index('idx_user_contacts_user_id').on(table.userId),
-  typeIdx: index('idx_user_contacts_type').on(table.contactType),
-  primaryIdx: index('idx_user_contacts_primary').on(table.userId, table.isPrimary),
-  uniqueContact: unique('user_contacts_user_id_contact_type_contact_value_key').on(
-    table.userId,
-    table.contactType,
-    table.contactValue
-  )
-}))
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  countryCode: varchar('country_code', { length: 10 }), // Phone country code (e.g., +1, +44, +256)
+})
 
 // ============================================================================
 // 4. USER ADDRESSES: Physical Addresses (EXISTING TABLE - EXACT MAPPING)
 // ============================================================================
 export const userAddresses = pgTable('user_addresses', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull(),
   addressType: varchar('address_type', { length: 20 }).default('primary'),
   streetAddress: varchar('street_address', { length: 255 }).notNull(),
   addressLine2: varchar('address_line_2', { length: 255 }), // Optional - apartments, suites, etc.
@@ -90,8 +78,8 @@ export const userAddresses = pgTable('user_addresses', {
 // Each subscription creates its own membership entry in the queue
 export const userMemberships = pgTable('user_memberships', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => user.id, { onDelete: 'cascade' }), // NO unique constraint - users can have multiple memberships
-  subscriptionId: uuid('subscription_id').unique().references(() => userSubscriptions.id, { onDelete: 'cascade' }), // One membership per subscription
+  userId: uuid('user_id'), // NO unique constraint - users can have multiple memberships
+  subscriptionId: uuid('subscription_id').unique(), // One membership per subscription
   joinDate: date('join_date').notNull().defaultNow(),
 
   // Member eligibility status - references member_eligibility_statuses lookup table
@@ -101,6 +89,10 @@ export const userMemberships = pgTable('user_memberships', {
   // Verification status - references verification_statuses lookup table
   // 1 = Pending, 2 = Verified, 3 = Failed, 4 = Skipped
   verificationStatusId: integer('verification_status_id').default(1),
+
+  // Member eligibility status - references member_eligibility_statuses lookup table
+  // 1 = Inactive, 2 = Active, 3 = Suspended, 4 = Cancelled, 5 = Won, 6 = Paid
+  memberEligibilityStatusId: integer('member_eligibility_status_id').default(1),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
@@ -123,23 +115,23 @@ export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
   })
 }))
 
-export const userContactsRelations = relations(userContacts, ({ one }) => ({
-  user: one(user, {
-    fields: [userContacts.userId],
-    references: [user.id]
-  })
-}))
+// export const userContactsRelations = relations(userContacts, ({ one }) => ({
+//   user: one(user, {
+//     fields: [userContacts.userId],
+//     references: [user.id]
+//   })
+// }))
 
-export const userAddressesRelations = relations(userAddresses, ({ one }) => ({
-  user: one(user, {
-    fields: [userAddresses.userId],
-    references: [user.id]
-  })
-}))
+// export const userAddressesRelations = relations(userAddresses, ({ one }) => ({
+//   user: one(user, {
+//     fields: [userAddresses.userId],
+//     references: [user.id]
+//   })
+// }))
 
-export const userMembershipsRelations = relations(userMemberships, ({ one }) => ({
-  user: one(user, {
-    fields: [userMemberships.userId],
-    references: [user.id]
-  })
-}))
+// export const userMembershipsRelations = relations(userMemberships, ({ one }) => ({
+//   user: one(user, {
+//     fields: [userMemberships.userId],
+//     references: [user.id]
+//   })
+// }))

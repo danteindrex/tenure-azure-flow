@@ -84,17 +84,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           userStatus: member.userStatus,
 
           // Tenure details
-          tenureStart: tenureStart?.toISOString() || null,
+          tenureStart: tenureStart || null,
           continuousTenure,
           totalMonthsSubscribed: member.totalMonthsSubscribed,
 
           // Payment details
           totalPaid: Number(member.lifetimePaymentTotal || 0),
-          lastPaymentDate: member.lastPaymentDate?.toISOString() || null,
+          lastPaymentDate: member.lastPaymentDate || null,
 
           // Payout status
           hasReceivedPayout: member.hasReceivedPayout,
-          joinedQueueAt: member.joinedQueueAt?.toISOString() || null
+          joinedQueueAt: member.joinedQueueAt || null
         };
       })
     );

@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { auth } from "@/lib/auth";
 import { db } from "@/drizzle/db";
-import { user, membershipQueue, userPayments } from "@/drizzle/schema";
+import { users as user, membershipQueue, userPayments } from "@/drizzle/migrations/schema";
 import { eq, gte, and } from "drizzle-orm";
 import { PAYMENT_STATUS } from "@/lib/status-ids";
 
@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Resolve current user_id
     let userId: string | null = null;
-    const userData = await db.query.user.findFirst({
+    const userData = await db.query.users.findFirst({
       where: eq(user.id, session.user.id),
       columns: { id: true }
     });
@@ -56,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const myPayments = await db.query.userPayments.findMany({
         where: and(
           eq(userPayments.userId, userId),
-          gte(userPayments.paymentDate, fromDate)
+          gte(userPayments.paymentDate, fromDate.toISOString())
         ),
         columns: {
           amount: true,

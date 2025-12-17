@@ -1,10 +1,13 @@
 # KYC Microservice
 
-Identity Verification microservice using Plaid Identity Verification (IDV) for KYC compliance.
+Identity Verification microservice supporting both Plaid Identity Verification (IDV) and Sumsub WebSDK for KYC compliance.
 
 ## Features
 
-- ✅ Plaid Identity Verification integration
+- ✅ **Dual Provider Support**: Plaid Identity Verification (IDV) and Sumsub WebSDK
+- ✅ **Environment-based Provider Switching**: Switch between providers via `KYC_PROVIDER` env var
+- ✅ **Unified API**: Same endpoints work with both providers
+- ✅ **Audit Compliance**: Sumsub provides comprehensive audit APIs and data access
 - ✅ Better Auth session validation (shared with main app)
 - ✅ Shared database using Drizzle ORM
 - ✅ TypeScript + Express.js
@@ -21,10 +24,18 @@ This microservice:
 
 ## Prerequisites
 
+### For Plaid Integration
 1. **Plaid Account** - Sign up at https://dashboard.plaid.com/
 2. **Plaid IDV Template** - Create a template in the Plaid Dashboard
-3. **Node.js 18+**
-4. **PostgreSQL** (shared with main app)
+
+### For Sumsub Integration
+1. **Sumsub Account** - Sign up at https://sumsub.com/
+2. **Sumsub API Credentials** - Get App Token and Secret Key from dashboard
+3. **Webhook Configuration** - Configure webhook URL in Sumsub dashboard
+
+### General Requirements
+- **Node.js 18+**
+- **PostgreSQL** (shared with main app)
 
 ## Setup
 
@@ -78,26 +89,40 @@ Health check endpoint
 ```
 
 ### `POST /kyc/create-link-token`
-Create a Plaid Link token for Identity Verification
+Create a verification token for Identity Verification (Plaid Link token or Sumsub access token)
 
 **Headers:**
 ```
 Cookie: better-auth.session_token=xxxxx
 ```
 
-**Response:**
+**Response (Plaid):**
 ```json
 {
   "success": true,
   "data": {
     "linkToken": "link-sandbox-xxxxx",
-    "expiration": "2025-01-15T11:00:00Z"
+    "expiration": "2025-01-15T11:00:00Z",
+    "provider": "plaid"
+  }
+}
+```
+
+**Response (Sumsub):**
+```json
+{
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+    "expiresAt": "2025-01-15T11:00:00Z",
+    "applicantId": "applicant_123",
+    "provider": "sumsub"
   }
 }
 ```
 
 ### `POST /kyc/verify`
-Verify KYC using Plaid session ID and store results
+Verify KYC using session ID (Plaid) or applicant ID (Sumsub) and store results
 
 **Headers:**
 ```
@@ -105,10 +130,17 @@ Cookie: better-auth.session_token=xxxxx
 Content-Type: application/json
 ```
 
-**Body:**
+**Body (Plaid):**
 ```json
 {
   "sessionId": "idv-sandbox-xxxxx"
+}
+```
+
+**Body (Sumsub):**
+```json
+{
+  "applicantId": "applicant_123"
 }
 ```
 
@@ -140,12 +172,40 @@ Cookie: better-auth.session_token=xxxxx
     "status": "verified",
     "verified": true,
     "verifiedAt": "2025-01-15T10:30:00.000Z",
-    "verificationProvider": "plaid",
-    "riskScore": 0,
+    "verificationProvider": "sumsub",
+    "riskScore": 15,
     "createdAt": "2025-01-15T10:25:00.000Z"
   }
 }
 ```
+
+### `POST /kyc/webhook/applicant-reviewed` (Sumsub Only)
+Webhook endpoint for receiving Sumsub verification status updates
+
+**Headers:**
+```
+Content-Type: application/json
+X-Signature: sumsub-signature
+```
+
+**Body:**
+```json
+{
+  "type": "applicantReviewed",
+  "applicantId": "applicant_123",
+  "reviewStatus": "completed",
+  "reviewResult": { ... },
+  "createdAtMs": 1640995200000
+}
+```
+
+### Admin Audit Endpoints (Sumsub Only)
+
+#### `GET /kyc/admin/applicant/:applicantId`
+Get full applicant data for audit purposes
+
+#### `GET /kyc/admin/applicant/:applicantId/status`
+Get applicant status for audit purposes
 
 ## Docker
 
@@ -187,16 +247,30 @@ Uses the existing `kyc_verification` table:
 - `risk_score` - 0-100 (lower is better)
 - `verified_at` - Timestamp
 
-## Plaid Setup Guide
+## Provider Setup Guide
 
+### Plaid Setup
 1. Sign up at https://dashboard.plaid.com/
 2. Go to **Team Settings > Keys** to get your Client ID and Secret
 3. Go to **Products > Identity Verification > Templates**
 4. Create a new template with:
-   - Document Verification (enabled)
-   - Selfie Check (enabled)
-   - Data Source Verification (optional)
+    - Document Verification (enabled)
+    - Selfie Check (enabled)
+    - Data Source Verification (optional)
 5. Copy the Template ID (starts with `idvtpl_`)
+
+### Sumsub Setup
+1. Sign up at https://sumsub.com/
+2. Go to **Developer > API Credentials** to get your App Token and Secret Key
+3. Go to **Webhooks** section and add webhook URL:
+   ```
+   https://yourdomain.com/api/kyc/webhook
+   ```
+4. Select these webhook events:
+   - `applicantReviewed` (required)
+   - `applicantCreated` (optional)
+   - `applicantPending` (optional)
+5. Set the verification level name (default: "Home solutions verify")
 
 ## Security
 
@@ -242,10 +316,15 @@ npm start
 |----------|-------------|---------|
 | `PORT` | Server port | `3002` |
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://...` |
+| `KYC_PROVIDER` | KYC provider (`plaid` or `sumsub`) | `sumsub` |
 | `PLAID_CLIENT_ID` | Plaid client ID | `xxxxx` |
 | `PLAID_SECRET` | Plaid secret (sandbox) | `xxxxx` |
 | `PLAID_ENV` | Plaid environment | `sandbox` |
 | `PLAID_IDV_TEMPLATE_ID` | Plaid template ID | `idvtpl_xxxxx` |
+| `SUMSUB_APP_TOKEN` | Sumsub app token | `sbx:...` |
+| `SUMSUB_SECRET_KEY` | Sumsub secret key | `xxxxx` |
+| `SUMSUB_BASE_URL` | Sumsub API base URL | `https://api.sumsub.com` |
+| `SUMSUB_LEVEL_NAME` | Sumsub verification level | `Home solutions verify` |
 | `ALLOWED_ORIGINS` | CORS origins | `http://localhost:3000` |
 
 ## License

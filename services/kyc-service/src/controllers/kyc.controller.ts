@@ -1,49 +1,108 @@
 import { Request, Response } from 'express';
 import { db } from '../../drizzle/db';
-import { kycVerification, userMemberships } from '../../drizzle/schema';
-import { eq } from 'drizzle-orm';
+import { kycVerification, userMemberships, users } from '../../drizzle/schema';
+import { eq, count } from 'drizzle-orm';
 import * as plaidService from '../services/plaid.service';
-import { KYC_STATUS } from '../config/status-constants';
+import { createSumsubService, DocumentMetadata } from '../services/sumsub.service';
+import { KYC_STATUS, getKycStatusName } from '../config/status-constants';
+
+// Initialize Sumsub service
+const sumsubService = createSumsubService();
+
+// KYC provider configuration
+const KYC_PROVIDER = (process.env.KYC_PROVIDER || 'sumsub').trim(); // 'sumsub' or 'plaid'
+console.log('🔧 KYC_PROVIDER:', KYC_PROVIDER);
 
 /**
- * Create Plaid Link Token for Identity Verification
+ * Create Link Token/Access Token for Identity Verification
  * POST /kyc/create-link-token
+ * Supports both Plaid and Sumsub providers based on KYC_PROVIDER env var
  */
 export async function createLinkToken(req: Request, res: Response) {
   try {
-    if (!req.user || !req.userId) {
+    // Try to get user from session validation (for direct calls)
+    let userId = req.userId;
+    let email = req.user?.email;
+
+    // If no session validation, try to get from request body (from frontend proxy)
+    if (!userId) {
+      userId = req.body?.userId;
+      email = req.body?.email;
+    }
+
+    // Also check Authorization header for user ID
+    if (!userId) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        userId = authHeader.substring(7); // Remove 'Bearer ' prefix
+      }
+    }
+
+    if (!userId || !email) {
       return res.status(401).json({
         success: false,
         error: 'User not authenticated'
       });
     }
 
-    const { email, id: userId } = req.user;
-
     // Check if user already has a verified KYC
     const existingKYC = await db.query.kycVerification.findFirst({
       where: eq(kycVerification.userId, userId)
     });
 
-    if (existingKYC && existingKYC.status === KYC_STATUS.VERIFIED) {
+    if (existingKYC && existingKYC.kycStatusId === KYC_STATUS.VERIFIED) {
       return res.status(400).json({
         success: false,
         error: 'User already has verified KYC'
       });
     }
 
-    // Create Plaid Link token
-    const { linkToken, expiration } = await plaidService.createIdentityVerificationLinkToken(
-      userId,
-      email
-    );
+    let tokenData;
+
+    console.log('🔄 About to check KYC_PROVIDER for createLinkToken:', KYC_PROVIDER);
+    console.log('KYC_PROVIDER === "sumsub":', KYC_PROVIDER === 'sumsub');
+    if (KYC_PROVIDER === 'sumsub') {
+      console.log('🔄 Using Sumsub provider for createLinkToken');
+      // Create Sumsub applicant first
+      const applicant = await sumsubService.createApplicant({
+        externalUserId: userId,
+        levelName: 'basic-kyc-level',
+        email: email
+      });
+
+      // For direct API integration, we don't need access tokens
+      // The frontend will call our API endpoints directly
+      const accessTokenValue = 'direct-api-integration';
+      const expiresAtValue = new Date(Date.now() + (24 * 60 * 60 * 1000)); // 24 hours
+
+      const accessToken = accessTokenValue;
+      const expiresAt = expiresAtValue;
+      const applicantId = applicant.id;
+
+      tokenData = {
+        accessToken,
+        expiresAt,
+        applicantId,
+        provider: 'sumsub'
+      };
+    } else {
+      console.log('🔄 Using Plaid provider for createLinkToken');
+      // Create Plaid Link token (default)
+      const { linkToken, expiration } = await plaidService.createIdentityVerificationLinkToken(
+        userId,
+        email
+      );
+
+      tokenData = {
+        linkToken,
+        expiration,
+        provider: 'plaid'
+      };
+    }
 
     res.status(200).json({
       success: true,
-      data: {
-        linkToken,
-        expiration
-      }
+      data: tokenData
     });
   } catch (error: any) {
     console.error('Create link token error:', error);
@@ -57,36 +116,95 @@ export async function createLinkToken(req: Request, res: Response) {
 /**
  * Verify KYC and store results
  * POST /kyc/verify
+ * Supports both Plaid and Sumsub providers based on KYC_PROVIDER env var
  */
 export async function verifyKYC(req: Request, res: Response) {
   try {
-    if (!req.user || !req.userId) {
+    // Try to get user from session validation (for direct calls)
+    let userId = req.userId;
+
+    // If no session validation, try to get from request body or Authorization header
+    if (!userId) {
+      userId = req.body?.userId;
+    }
+
+    // Also check Authorization header for user ID
+    if (!userId) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        userId = authHeader.substring(7); // Remove 'Bearer ' prefix
+      }
+    }
+
+    if (!userId) {
       return res.status(401).json({
         success: false,
         error: 'User not authenticated'
       });
     }
 
-    const { sessionId } = req.body;
+    const { sessionId, applicantId } = req.body;
+    const verificationId = sessionId || applicantId;
 
-    if (!sessionId) {
+    if (!verificationId) {
       return res.status(400).json({
         success: false,
-        error: 'Session ID is required'
+        error: 'Session ID or Applicant ID is required'
       });
     }
 
-    // Get verification results from Plaid
-    const verificationData = await plaidService.getIdentityVerification(sessionId);
+    let verificationData: any;
+    let status: number;
+    let riskScore: number;
+    let documentType: string | null = null;
+    let provider: string;
 
-    // Map Plaid status to internal status
-    const status = plaidService.mapPlaidStatusToInternal(verificationData.status);
+    if (KYC_PROVIDER === 'sumsub') {
+      // Get verification results from Sumsub
+      verificationData = await sumsubService.getApplicantData(verificationId);
+
+    // Map Sumsub status to internal status ID
+    const statusName = sumsubService.mapSumsubStatusToInternal(verificationData.review?.reviewStatus || 'pending');
+    const statusMap: Record<string, number> = {
+      'pending': KYC_STATUS.PENDING,
+      'in_review': KYC_STATUS.IN_REVIEW,
+      'verified': KYC_STATUS.VERIFIED,
+      'rejected': KYC_STATUS.REJECTED,
+      'expired': KYC_STATUS.EXPIRED
+    };
+    status = statusMap[statusName] || KYC_STATUS.PENDING;
 
     // Calculate risk score
-    const riskScore = plaidService.extractRiskScore(verificationData);
+    riskScore = sumsubService.extractRiskScore(verificationData);
+
+    // Extract document info
+    const docInfo = sumsubService.extractDocumentInfo(verificationData);
+    documentType = docInfo.documentType || null;
+
+    provider = 'sumsub';
+    } else {
+      // Get verification results from Plaid (default)
+      verificationData = await plaidService.getIdentityVerification(verificationId);
+
+    // Map Plaid status to internal status ID
+    const statusName = plaidService.mapPlaidStatusToInternal(verificationData.status);
+    const statusMap: Record<string, number> = {
+      'pending': KYC_STATUS.PENDING,
+      'in_review': KYC_STATUS.IN_REVIEW,
+      'verified': KYC_STATUS.VERIFIED,
+      'rejected': KYC_STATUS.REJECTED,
+      'expired': KYC_STATUS.EXPIRED
+    };
+    status = statusMap[statusName] || KYC_STATUS.PENDING;
+
+    // Calculate risk score
+    riskScore = plaidService.extractRiskScore(verificationData);
 
     // Extract document info if available
-    const documentType = (verificationData.documentary_verification as any)?.documents?.[0]?.type;
+    documentType = (verificationData.documentary_verification as any)?.documents?.[0]?.type;
+
+    provider = 'plaid';
+    }
 
     // Check if KYC record exists
     const existingKYC = await db.query.kycVerification.findFirst({
@@ -98,9 +216,9 @@ export async function verifyKYC(req: Request, res: Response) {
       await db
         .update(kycVerification)
         .set({
-          status,
-          verificationProvider: 'plaid',
-          providerVerificationId: sessionId,
+          kycStatusId: status,
+          verificationProvider: provider,
+          providerVerificationId: verificationId,
           verificationData: verificationData as any,
           documentType: documentType || existingKYC.documentType,
           riskScore,
@@ -112,14 +230,14 @@ export async function verifyKYC(req: Request, res: Response) {
       // Create new record
       await db.insert(kycVerification).values({
         userId: req.userId,
-        status,
-        verificationProvider: 'plaid',
-        providerVerificationId: sessionId,
+        kycStatusId: status,
+        verificationProvider: provider,
+        providerVerificationId: verificationId,
         verificationData: verificationData as any,
-        verificationMethod: 'plaid',
+        verificationMethod: provider === 'sumsub' ? 'plaid' : provider, // Use 'plaid' for sumsub to match constraint
         documentType: documentType || null,
         riskScore,
-        verifiedAt: status === 'verified' ? new Date().toISOString() : null,
+        verifiedAt: status === KYC_STATUS.VERIFIED ? new Date().toISOString() : null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -130,7 +248,7 @@ export async function verifyKYC(req: Request, res: Response) {
       await db
         .update(userMemberships)
         .set({
-          verificationStatus: 'VERIFIED',
+          verificationStatusId: 2, // 2 = Verified in verification_statuses table
           updatedAt: new Date().toISOString(),
         })
         .where(eq(userMemberships.userId, req.userId));
@@ -139,9 +257,10 @@ export async function verifyKYC(req: Request, res: Response) {
     res.status(200).json({
       success: true,
       data: {
-        status,
-        verifiedAt: status === 'verified' ? new Date().toISOString() : null,
+        status: getKycStatusName(status),
+        verifiedAt: status === KYC_STATUS.VERIFIED ? new Date().toISOString() : null,
         riskScore,
+        provider,
       }
     });
   } catch (error: any) {
@@ -159,7 +278,18 @@ export async function verifyKYC(req: Request, res: Response) {
  */
 export async function getKYCStatus(req: Request, res: Response) {
   try {
-    if (!req.userId) {
+    // Try to get user from session validation (for direct calls)
+    let userId = req.userId;
+
+    // If no session validation, check Authorization header for user ID
+    if (!userId) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        userId = authHeader.substring(7); // Remove 'Bearer ' prefix
+      }
+    }
+
+    if (!userId) {
       return res.status(401).json({
         success: false,
         error: 'User not authenticated'
@@ -167,7 +297,7 @@ export async function getKYCStatus(req: Request, res: Response) {
     }
 
     const kycRecord = await db.query.kycVerification.findFirst({
-      where: eq(kycVerification.userId, req.userId)
+      where: eq(kycVerification.userId, userId)
     });
 
     if (!kycRecord) {
@@ -183,8 +313,8 @@ export async function getKYCStatus(req: Request, res: Response) {
     res.status(200).json({
       success: true,
       data: {
-        status: kycRecord.status,
-        verified: kycRecord.status === KYC_STATUS.VERIFIED,
+        status: getKycStatusName(kycRecord.kycStatusId),
+        verified: kycRecord.kycStatusId === KYC_STATUS.VERIFIED,
         verifiedAt: kycRecord.verifiedAt,
         verificationProvider: kycRecord.verificationProvider,
         riskScore: kycRecord.riskScore,
@@ -196,6 +326,573 @@ export async function getKYCStatus(req: Request, res: Response) {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to get KYC status'
+    });
+  }
+}
+
+/**
+ * Get applicant data for admin audit (Sumsub only)
+ * GET /kyc/admin/applicant/:applicantId
+ */
+export async function getApplicantDataForAudit(req: Request, res: Response) {
+  try {
+    // TODO: Add admin authentication check
+    const { applicantId } = req.params;
+
+    if (!applicantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Applicant ID is required'
+      });
+    }
+
+    if (KYC_PROVIDER !== 'sumsub') {
+      return res.status(400).json({
+        success: false,
+        error: 'Audit endpoints only available for Sumsub provider'
+      });
+    }
+
+    const applicantData = await sumsubService.getApplicantData(applicantId);
+
+    res.status(200).json({
+      success: true,
+      data: applicantData
+    });
+  } catch (error: any) {
+    console.error('Get applicant data for audit error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get applicant data'
+    });
+  }
+}
+
+/**
+ * Get applicant status for admin audit (Sumsub only)
+ * GET /kyc/admin/applicant/:applicantId/status
+ */
+export async function getApplicantStatusForAudit(req: Request, res: Response) {
+  try {
+    // TODO: Add admin authentication check
+    const { applicantId } = req.params;
+
+    if (!applicantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Applicant ID is required'
+      });
+    }
+
+    if (KYC_PROVIDER !== 'sumsub') {
+      return res.status(400).json({
+        success: false,
+        error: 'Audit endpoints only available for Sumsub provider'
+      });
+    }
+
+    const statusData = await sumsubService.getApplicantStatus(applicantId);
+
+    res.status(200).json({
+      success: true,
+      data: statusData
+    });
+  } catch (error: any) {
+    console.error('Get applicant status for audit error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get applicant status'
+    });
+  }
+}
+
+/**
+ * Handle Sumsub applicant reviewed webhook
+ * POST /kyc/webhook/applicant-reviewed
+ */
+export async function handleApplicantReviewedWebhook(req: Request, res: Response) {
+  try {
+    const { applicantId, reviewStatus, reviewResult, webhookData } = req.body;
+
+    console.log('🔗 Processing Sumsub webhook:', {
+      applicantId,
+      reviewStatus,
+      reviewAnswer: reviewResult?.reviewAnswer,
+      correlationId: req.body.correlationId,
+      timestamp: new Date().toISOString()
+    });
+
+    // Find the KYC record by provider verification ID (applicantId)
+    const existingKYC = await db.query.kycVerification.findFirst({
+      where: eq(kycVerification.providerVerificationId, applicantId)
+    });
+
+    if (!existingKYC) {
+      console.log('❌ No KYC record found for applicant:', applicantId);
+      console.log('📊 Available applicant IDs in database:');
+
+      // Log all existing applicant IDs for debugging
+      const allRecords = await db.select({
+        providerVerificationId: kycVerification.providerVerificationId,
+        userId: kycVerification.userId,
+        createdAt: kycVerification.createdAt
+      }).from(kycVerification);
+
+      allRecords.forEach(record => {
+        console.log(`  - ${record.providerVerificationId} (user: ${record.userId}, created: ${record.createdAt})`);
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'No matching KYC record found'
+      });
+    }
+
+    // Update the KYC record with the new status
+    const statusName = sumsubService.mapSumsubStatusToInternal(reviewStatus);
+    const statusMap: Record<string, number> = {
+      'pending': KYC_STATUS.PENDING,
+      'in_review': KYC_STATUS.IN_REVIEW,
+      'verified': KYC_STATUS.VERIFIED,
+      'rejected': KYC_STATUS.REJECTED,
+      'expired': KYC_STATUS.EXPIRED
+    };
+    const status = statusMap[statusName] || KYC_STATUS.PENDING;
+
+    // Get full applicant data for risk scoring
+    let verificationData: any = existingKYC.verificationData;
+    let riskScore = existingKYC.riskScore;
+
+    try {
+      const applicantData = await sumsubService.getApplicantData(applicantId);
+      verificationData = applicantData;
+      riskScore = sumsubService.extractRiskScore(applicantData);
+
+      // Extract document info
+      const docInfo = sumsubService.extractDocumentInfo(applicantData);
+    } catch (error) {
+      console.error('Error fetching updated applicant data:', error);
+    }
+
+    await db
+      .update(kycVerification)
+      .set({
+        kycStatusId: status,
+        verificationData,
+        riskScore,
+        verifiedAt: status === KYC_STATUS.VERIFIED ? new Date().toISOString() : existingKYC.verifiedAt,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(kycVerification.id, existingKYC.id));
+
+    // Update userMemberships table based on verification result
+    let membershipStatusId = 1; // Default to Pending
+
+    if (status === KYC_STATUS.VERIFIED) {
+      membershipStatusId = 2; // 2 = Verified in verification_statuses table
+    } else if (status === KYC_STATUS.REJECTED) {
+      membershipStatusId = 3; // 3 = Failed in verification_statuses table
+    }
+
+    await db
+      .update(userMemberships)
+      .set({
+        verificationStatusId: membershipStatusId,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(userMemberships.userId, existingKYC.userId));
+
+    console.log('Successfully updated KYC record for applicant:', applicantId, 'new status:', status);
+
+    res.status(200).json({
+      success: true,
+      message: 'Webhook processed successfully'
+    });
+  } catch (error: any) {
+    console.error('Webhook processing error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to process webhook'
+    });
+  }
+}
+
+/**
+ * Get all verified KYC users for admin audit
+ * GET /kyc/admin/verified-users
+ */
+export async function getAllVerifiedUsers(req: Request, res: Response) {
+  try {
+    // TODO: Add admin authentication check
+
+    const verifiedUsers = await db.query.kycVerification.findMany({
+      where: eq(kycVerification.kycStatusId, KYC_STATUS.VERIFIED),
+      orderBy: (table, { desc }) => [desc(table.verifiedAt)],
+    });
+
+    // Get user details for each verification
+    const usersWithDetails = await Promise.all(
+      verifiedUsers.map(async (verification) => {
+        // Get user membership details
+        const membership = await db.query.userMemberships.findFirst({
+          where: eq(userMemberships.userId, verification.userId)
+        });
+
+        return {
+          id: verification.id,
+          userId: verification.userId,
+          status: getKycStatusName(verification.kycStatusId),
+          verificationProvider: verification.verificationProvider,
+          providerVerificationId: verification.providerVerificationId,
+          documentType: verification.documentType,
+          documentNumber: verification.documentNumber,
+          riskScore: verification.riskScore,
+          verifiedAt: verification.verifiedAt,
+          createdAt: verification.createdAt,
+          verificationData: verification.verificationData,
+          membership: membership ? {
+            memberId: membership.id,
+            status: membership.verificationStatusId,
+            joinDate: membership.createdAt,
+          } : null,
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      data: usersWithDetails,
+      total: usersWithDetails.length,
+    });
+  } catch (error: any) {
+    console.error('Error fetching verified users:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch verified users'
+    });
+  }
+}
+
+/**
+ * Get KYC statistics for admin dashboard
+ * GET /kyc/admin/stats
+ */
+/**
+ * POST /kyc/create-applicant
+ * Create a new Sumsub applicant for direct API integration
+ */
+export async function createApplicant(req: Request, res: Response) {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    const { externalUserId, email, phone } = req.body;
+
+    // externalUserId is optional - Sumsub will generate one if not provided
+
+    console.log('👤 Creating Sumsub applicant for user:', userId);
+
+    const applicantData: any = {
+      levelName: process.env.SUMSUB_LEVEL_NAME || 'basic-kyc-level',
+    };
+
+    // Only include optional fields if provided
+    if (externalUserId) applicantData.externalUserId = externalUserId;
+    if (email) applicantData.email = email;
+    if (phone) applicantData.phone = phone;
+
+    const result = await sumsubService.createApplicant(applicantData);
+
+    // Store the applicant in our database
+    console.log('🔄 Storing applicant in database:', {
+      userId: req.userId,
+      sumsubApplicantId: result.id,
+      applicantType: result.type,
+      createdAtMs: result.createdAtMs
+    });
+
+    await db.insert(kycVerification).values({
+      userId: req.userId,
+      verificationProvider: 'sumsub',
+      providerVerificationId: result.id,
+      kycStatusId: KYC_STATUS.PENDING,
+      verificationData: result,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    console.log('✅ Applicant stored in database with ID:', result.id);
+
+    res.json({
+      success: true,
+      message: 'Applicant created successfully',
+      data: result,
+      nextSteps: {
+        uploadDocuments: 'Upload ID documents (front/back separately)',
+        performLiveness: 'Use Sumsub SDK for liveness verification',
+        startVerification: 'Start verification process after both steps'
+      }
+    });
+  } catch (error) {
+    console.error('Error creating applicant:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create applicant'
+    });
+  }
+}
+
+/**
+ * POST /kyc/upload-document
+ * Upload document for KYC verification
+ */
+export async function uploadDocument(req: Request, res: Response) {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    // Debug: Log what we received
+    console.log('📥 Raw request body:', req.body);
+    console.log('📥 Raw request files:', req.files);
+
+    // Parse metadata from FormData
+    let metadata;
+    try {
+      const metadataField = req.body.metadata;
+      console.log('🔍 Metadata field:', metadataField, typeof metadataField);
+
+      if (typeof metadataField === 'string') {
+        metadata = JSON.parse(metadataField);
+        console.log('✅ Parsed metadata:', metadata);
+      } else {
+        metadata = metadataField;
+        console.log('⚠️ Metadata not a string:', metadata);
+      }
+    } catch (error) {
+      console.error('❌ Failed to parse metadata:', error);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid metadata format: ' + error.message
+      });
+    }
+
+    const { idDocType: documentType, country = 'US', idDocSubType } = metadata || {};
+    const applicantId = req.body.applicantId;
+
+    console.log('📄 Upload Document Request:', {
+      userId,
+      applicantId,
+      documentType,
+      country,
+      idDocSubType,
+      hasFile: !!req.files,
+      files: req.files ? Object.keys(req.files) : [],
+      metadata
+    });
+
+    if (!applicantId || !documentType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: applicantId, documentType'
+      });
+    }
+
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    if (!files || (!files.content && !files.backFile)) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file uploaded'
+      });
+    }
+
+    const results = [];
+
+    // Upload front side (content)
+    if (files.content && files.content[0]) {
+      const frontFile = files.content[0];
+      const frontFileData = {
+        buffer: frontFile.buffer,
+        originalname: frontFile.originalname,
+        mimetype: frontFile.mimetype,
+        size: frontFile.size,
+      };
+
+      const frontMetadata: DocumentMetadata = {
+        idDocType: documentType,
+        country,
+        idDocSubType: idDocSubType || 'FRONT_SIDE'
+      };
+
+      console.log('📄 Uploading front side:', frontMetadata);
+      const frontResult = await sumsubService.uploadDocument(
+        applicantId,
+        frontFileData,
+        frontMetadata
+      );
+      results.push({ side: 'front', ...frontResult });
+    }
+
+    // Upload back side (backFile)
+    if (files.backFile && files.backFile[0]) {
+      const backFile = files.backFile[0];
+      const backFileData = {
+        buffer: backFile.buffer,
+        originalname: backFile.originalname,
+        mimetype: backFile.mimetype,
+        size: backFile.size,
+      };
+
+      const backMetadata: DocumentMetadata = {
+        idDocType: documentType,
+        country,
+        idDocSubType: 'BACK_SIDE'
+      };
+
+      console.log('📄 Uploading back side:', backMetadata);
+      const backResult = await sumsubService.uploadDocument(
+        applicantId,
+        backFileData,
+        backMetadata
+      );
+      results.push({ side: 'back', ...backResult });
+    }
+
+    const result = results.length === 1 ? results[0] : results;
+
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+
+  } catch (error: any) {
+    console.error('Error uploading document:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to upload document'
+    });
+  }
+}
+
+/**
+ * POST /kyc/start-verification
+ * Start the verification process for an applicant
+ */
+export async function startVerification(req: Request, res: Response) {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    const { applicantId } = req.body;
+
+    if (!applicantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required field: applicantId'
+      });
+    }
+
+    console.log('🚀 Starting verification for applicant:', applicantId);
+
+    // First check the current verification status
+    const statusResult = await sumsubService.getVerificationStatus(applicantId);
+    console.log('📊 Current verification status:', statusResult);
+
+    const result = await sumsubService.startVerification(applicantId);
+
+    res.json({
+      success: true,
+      message: 'Verification started successfully',
+      data: result,
+      currentStatus: statusResult
+    });
+  } catch (error) {
+    console.error('Error starting verification:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to start verification'
+    });
+  }
+}
+
+/**
+ * POST /kyc/get-sdk-token
+ * Get Sumsub SDK access token for liveness verification
+ */
+export async function getSdkToken(req: Request, res: Response) {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+}
+
+    const { applicantId } = req.body;
+
+    if (!applicantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Applicant ID is required'
+      });
+    }
+
+    console.log('🔑 Generating SDK token for applicant:', applicantId);
+
+    const result = await sumsubService.getSdkToken(applicantId);
+
+    res.json({
+      success: true,
+      message: 'SDK token generated successfully',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error generating SDK token:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate SDK token'
+    });
+  }
+}
+
+export async function getKYCStats(req: Request, res: Response) {
+  try {
+    const [verifiedCount] = await db.select({ count: count() }).from(kycVerification).where(eq(kycVerification.kycStatusId, KYC_STATUS.VERIFIED));
+    const [pendingCount] = await db.select({ count: count() }).from(kycVerification).where(eq(kycVerification.kycStatusId, KYC_STATUS.PENDING));
+    const [rejectedCount] = await db.select({ count: count() }).from(kycVerification).where(eq(kycVerification.kycStatusId, KYC_STATUS.REJECTED));
+    const [sumsubCount] = await db.select({ count: count() }).from(kycVerification).where(eq(kycVerification.verificationProvider, 'sumsub'));
+    const [plaidCount] = await db.select({ count: count() }).from(kycVerification).where(eq(kycVerification.verificationProvider, 'plaid'));
+
+    res.status(200).json({
+      success: true,
+      data: {
+        verifiedUsers: verifiedCount?.count || 0,
+        pendingUsers: pendingCount?.count || 0,
+        rejectedUsers: rejectedCount?.count || 0,
+        sumsubUsers: sumsubCount?.count || 0,
+        plaidUsers: plaidCount?.count || 0,
+      }
+    });
+  } catch (error: any) {
+    console.error('Error getting KYC stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get KYC statistics'
     });
   }
 }

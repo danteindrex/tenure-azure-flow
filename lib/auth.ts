@@ -17,6 +17,7 @@ import { nextCookies } from 'better-auth/next-js'
 import { twoFactor, organization, emailOTP } from 'better-auth/plugins'
 import { passkey } from '@better-auth/passkey'
 import { db } from '../drizzle/db'
+import * as schema from '../drizzle/migrations/schema'
 import { emailService } from '../src/lib/email'
 
 // SMTP email service initialized
@@ -24,11 +25,15 @@ import { emailService } from '../src/lib/email'
 export const auth = betterAuth({
   // Database adapter
   database: drizzleAdapter(db, {
-    provider: 'pg'
+    provider: 'pg',
+    schema: {
+      ...schema,
+      user: schema.users, // Map 'user' to 'users' table for Better Auth
+    }
   }),
 
   // Base URL for authentication
-  baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
+  baseURL: process.env.BETTER_AUTH_URL!,
 
   // Secret for JWT tokens
   secret: process.env.BETTER_AUTH_SECRET!,
@@ -105,20 +110,20 @@ export const auth = betterAuth({
             await emailService.sendVerificationEmail({
               to: email,
               token: otp,
-              url: `${process.env.BETTER_AUTH_URL}/verify-email?email=${email}&otp=${otp}`
+              url: `${process.env.BETTER_AUTH_URL!}/verify-email?email=${email}&otp=${otp}`
             })
           } else if (type === 'forget-password') {
             await emailService.sendPasswordResetEmail({
               to: email,
               token: otp,
-              url: `${process.env.BETTER_AUTH_URL}/reset-password?email=${email}&otp=${otp}`
+              url: `${process.env.BETTER_AUTH_URL!}/reset-password?email=${email}&otp=${otp}`
             })
           } else if (type === 'sign-in') {
             // For sign-in OTP, we can use the verification template
             await emailService.sendVerificationEmail({
               to: email,
               token: otp,
-              url: `${process.env.BETTER_AUTH_URL}/sign-in?email=${email}&otp=${otp}`
+              url: `${process.env.BETTER_AUTH_URL!}/sign-in?email=${email}&otp=${otp}`
             })
           }
 
@@ -140,7 +145,7 @@ export const auth = betterAuth({
         ? process.env.PASSKEY_RP_ID || new URL(process.env.BETTER_AUTH_URL || 'http://localhost:3000').hostname
         : 'localhost',
       // Origin should match your full app URL
-      origin: process.env.BETTER_AUTH_URL || 'http://localhost:3000'
+      origin: process.env.BETTER_AUTH_URL!
     }),
 
     // Two-Factor Authentication plugin (TOTP + backup codes)
@@ -182,7 +187,7 @@ export const auth = betterAuth({
     // Uses ALLOWED_ORIGINS env var (same as microservices)
     trustedOrigins: process.env.ALLOWED_ORIGINS
       ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-      : ['http://localhost:3000'],
+      : [process.env.BETTER_AUTH_URL!],
     // Cross-origin settings for API
     crossSubDomainCookies: {
       enabled: false

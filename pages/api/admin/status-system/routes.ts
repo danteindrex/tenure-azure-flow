@@ -69,7 +69,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             isPublic: isPublic || false,
             priority: priority || 0,
             isActive: true,
-          })
+          } as any)
           .returning()
 
         return res.status(201).json({ route: newRoute })

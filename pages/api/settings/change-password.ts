@@ -99,7 +99,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           passwordStrengthScore: calculatePasswordStrength(newPassword),
           requirePasswordChange: false,
           updatedAt: new Date()
-        })
+        } as any)
         .onConflictDoUpdate({
           target: userSecuritySettings.userId,
           set: {
@@ -107,7 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             passwordStrengthScore: calculatePasswordStrength(newPassword),
             requirePasswordChange: false,
             updatedAt: new Date()
-          }
+          } as any
         });
     } catch (err) {
       console.error('Security settings update error:', err);

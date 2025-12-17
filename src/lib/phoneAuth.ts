@@ -2,8 +2,7 @@
 import { authClient } from '../../lib/auth-client';
 import { sendVerificationCode, verifyPhoneNumber, formatPhoneNumber } from './twilio';
 import { db } from '../../drizzle/db';
-import { userContacts } from '../../drizzle/schema/users';
-import { verificationCodes } from '../../drizzle/schema/verification';
+import { userContacts, verificationCodes } from '../../drizzle/migrations/schema';
 import { eq, and } from 'drizzle-orm';
 import {
   PhoneSignupStep1Data,
@@ -49,7 +48,7 @@ export class PhoneAuthService {
           contactValue: formattedPhone,
           isPrimary: true,
           isVerified: false
-        });
+        } as any);
 
         // Send verification code via Twilio
         const verificationResult = await sendVerificationCode(formattedPhone);
@@ -68,11 +67,12 @@ export class PhoneAuthService {
         // Store verification code in database for tracking
         await db.insert(verificationCodes).values({
           userId: authData.user.id,
-          phone: formattedPhone,
+          email: formattedPhone, // Using email field for phone number
           code: 'TWILIO_MANAGED', // Twilio manages the actual code
-          verified: false,
+          linkToken: `phone_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          used: false,
           expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
-        });
+        } as any);
       }
 
       return {
@@ -158,15 +158,15 @@ export class PhoneAuthService {
 
       // Update verification status in database
       await db.update(verificationCodes)
-        .set({ verified: true })
+        .set({ used: true } as any)
         .where(and(
-          eq(verificationCodes.phone, data.phone),
-          eq(verificationCodes.verified, false)
+          eq(verificationCodes.email, data.phone), // email field stores phone number
+          eq(verificationCodes.used, false)
         ));
 
       // Update user_contacts to mark phone as verified
       await db.update(userContacts)
-        .set({ isVerified: true })
+        .set({ isVerified: true } as any)
         .where(and(
           eq(userContacts.contactValue, data.phone),
           eq(userContacts.contactType, 'phone')
