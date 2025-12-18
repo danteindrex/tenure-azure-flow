@@ -8,9 +8,12 @@ import { Check, Loader2, CreditCard, RefreshCw, Trophy } from 'lucide-react';
 import { useMemberStatus } from '@/hooks/useMemberStatus';
 import { MEMBER_STATUS } from '@/lib/status-ids';
 import { toast } from 'sonner';
+import { useSession } from '@/lib/auth-client';
 
 const PaymentStatusWidget: React.FC = () => {
   const { data: memberStatus, refetch } = useMemberStatus();
+  const { data: session } = useSession();
+  const user = session?.user;
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [agreeToPayment, setAgreeToPayment] = useState(false);
@@ -19,12 +22,11 @@ const PaymentStatusWidget: React.FC = () => {
 
   const { memberStatusId, memberStatus: statusName } = memberStatus.data;
 
-  // Only show for statuses that need action (exclude Active=2, Paid=6, Suspended=3)
-  const shouldShow = [
-    MEMBER_STATUS.INACTIVE,    // 1 - Need to pay
-    MEMBER_STATUS.CANCELLED,   // 4 - Need to rejoin  
-    MEMBER_STATUS.WON         // 5 - Can rejoin again
-  ].includes(memberStatusId);
+  // Only show for statuses that need action (exclude Active=2, Paid=6)
+  const shouldShow = memberStatusId === MEMBER_STATUS.INACTIVE ||
+                     memberStatusId === MEMBER_STATUS.SUSPENDED ||  // Add suspended
+                     memberStatusId === MEMBER_STATUS.CANCELLED ||
+                     memberStatusId === MEMBER_STATUS.WON;
 
   if (!shouldShow) return null;
 
@@ -36,6 +38,13 @@ const PaymentStatusWidget: React.FC = () => {
           icon: <CreditCard className="w-4 h-4" />,
           variant: "default" as const,
           description: "Complete your membership to join the payout queue"
+        };
+      case MEMBER_STATUS.SUSPENDED:
+        return {
+          text: "Update Payment Method",
+          icon: <CreditCard className="w-4 h-4" />,
+          variant: "destructive" as const,
+          description: "Your payment failed. Update your payment method to restore access"
         };
       case MEMBER_STATUS.CANCELLED:
         return {
@@ -75,6 +84,9 @@ const PaymentStatusWidget: React.FC = () => {
       if (memberStatusId === MEMBER_STATUS.INACTIVE) {
         // New payment - create checkout session
         apiEndpoint = "/api/subscriptions/create-checkout";
+      } else if (memberStatusId === MEMBER_STATUS.SUSPENDED) {
+        // Update payment method - use update payment API
+        apiEndpoint = `/api/subscriptions/${user?.id}/update-payment`;
       } else if (memberStatusId === MEMBER_STATUS.CANCELLED || memberStatusId === MEMBER_STATUS.WON) {
         // Rejoin - use rejoin API
         apiEndpoint = "/api/subscriptions/rejoin";
@@ -101,6 +113,9 @@ const PaymentStatusWidget: React.FC = () => {
       if (memberStatusId === MEMBER_STATUS.INACTIVE && data.success && data.checkoutUrl) {
         toast.success("Redirecting to payment...");
         window.location.href = data.checkoutUrl;
+      } else if (memberStatusId === MEMBER_STATUS.SUSPENDED && data.success && data.data?.url) {
+        toast.success("Redirecting to update payment method...");
+        window.location.href = data.data.url;
       } else if ((memberStatusId === MEMBER_STATUS.CANCELLED || memberStatusId === MEMBER_STATUS.WON) && data.success) {
         toast.success("Membership reactivated successfully!");
         setShowModal(false);
@@ -142,7 +157,9 @@ const PaymentStatusWidget: React.FC = () => {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-center">
-              {memberStatusId === MEMBER_STATUS.INACTIVE ? "Complete Your Membership" : "Rejoin Membership"}
+              {memberStatusId === MEMBER_STATUS.INACTIVE ? "Complete Your Membership" : 
+               memberStatusId === MEMBER_STATUS.SUSPENDED ? "Update Payment Method" : 
+               "Rejoin Membership"}
             </DialogTitle>
           </DialogHeader>
 
@@ -204,6 +221,22 @@ const PaymentStatusWidget: React.FC = () => {
               </>
             )}
 
+            {/* Payment Failed Message for Suspended Members */}
+            {memberStatusId === MEMBER_STATUS.SUSPENDED && (
+              <div className="text-center space-y-4">
+                <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <CreditCard className="w-8 h-8 text-red-600 mx-auto mb-2" />
+                  <h3 className="font-semibold text-red-900 dark:text-red-100">Payment Failed</h3>
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    Your recent payment failed. You have 30 days to update your payment method before your membership is cancelled.
+                  </p>
+                </div>
+                <p className="text-muted-foreground">
+                  Click below to update your payment method and restore your membership.
+                </p>
+              </div>
+            )}
+
             {/* Rejoin Message for Cancelled/Won Members */}
             {(memberStatusId === MEMBER_STATUS.CANCELLED || memberStatusId === MEMBER_STATUS.WON) && (
               <div className="text-center space-y-4">
@@ -244,7 +277,9 @@ const PaymentStatusWidget: React.FC = () => {
                     Processing...
                   </>
                 ) : (
-                  memberStatusId === MEMBER_STATUS.INACTIVE ? "Proceed to Payment" : "Rejoin Now"
+                  memberStatusId === MEMBER_STATUS.INACTIVE ? "Proceed to Payment" : 
+                  memberStatusId === MEMBER_STATUS.SUSPENDED ? "Update Payment Method" :
+                  "Rejoin Now"
                 )}
               </Button>
             </div>

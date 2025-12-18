@@ -814,6 +814,17 @@ export class StripeService {
         lifetimeTotal,
       });
 
+      // SYNC: Reactivate subscription_status_id to ACTIVE on successful payment
+      // This handles subscriptions that were paused due to payment failures
+      await pool.query(
+        `UPDATE user_subscriptions
+         SET subscription_status_id = $1,
+             updated_at = NOW()
+         WHERE id = $2
+         AND subscription_status_id = $3`,
+        [SUBSCRIPTION_STATUS.ACTIVE, dbSubscription.id, SUBSCRIPTION_STATUS.CANCELED]
+      );
+
       // SYNC: Reactivate member_status_id to ACTIVE on successful payment
       // This handles users who were Suspended and made a successful payment to cure
       // Only reactivate if currently Suspended (don't override Won/Paid states)
@@ -826,7 +837,7 @@ export class StripeService {
         [MEMBER_STATUS.ACTIVE, dbSubscription.id, MEMBER_STATUS.SUSPENDED]
       );
 
-      logger.info(`Member status reactivated to Active (ID: ${MEMBER_STATUS.ACTIVE}) for subscription ${dbSubscription.id} (if was Suspended)`);
+      logger.info(`Subscription and member status reactivated to Active for subscription ${dbSubscription.id} (if was paused/suspended)`);
 
       // Refresh the queue to reflect updated payment stats
       try {
@@ -960,10 +971,41 @@ export class StripeService {
       const isFinalAttempt = invoice.next_payment_attempt === null;
       const attemptCount = invoice.attempt_count || 1;
 
-      if (isFinalAttempt) {
+      if (attemptCount === 1) {
+        // FIRST PAYMENT FAILURE - Set to Suspended (grace period starts)
+        logger.warn(`First payment attempt failed for subscription ${subscriptionId}. Setting member to Suspended (grace period).`);
+
+        // Update member_status_id to SUSPENDED on first payment failure
+        // User can still access dashboard and update payment method
+        await pool.query(
+          `UPDATE user_memberships
+           SET member_status_id = $1,
+               updated_at = NOW()
+           WHERE subscription_id = $2`,
+          [MEMBER_STATUS.SUSPENDED, dbSubscription.id]
+        );
+
+        logger.info(`Member status set to Suspended (ID: ${MEMBER_STATUS.SUSPENDED}) for subscription ${dbSubscription.id} on first payment failure - grace period started`);
+
+      } else if (!isFinalAttempt && attemptCount > 1) {
+        // INTERMEDIATE PAYMENT FAILURES (attempts 2-3) - Keep as Suspended
+        logger.warn(`Payment attempt ${attemptCount} failed for subscription ${subscriptionId}. Keeping member Suspended (grace period continues).`);
+        
+        // Ensure member stays suspended (in case status was changed elsewhere)
+        await pool.query(
+          `UPDATE user_memberships
+           SET member_status_id = $1,
+               updated_at = NOW()
+           WHERE subscription_id = $2 AND member_status_id != $1`,
+          [MEMBER_STATUS.SUSPENDED, dbSubscription.id]
+        );
+
+        logger.info(`Member remains Suspended (ID: ${MEMBER_STATUS.SUSPENDED}) for subscription ${dbSubscription.id} on attempt ${attemptCount} - grace period continues`);
+
+      } else if (isFinalAttempt) {
         // FINAL ATTEMPT FAILED - All Stripe retries exhausted
-        // Now we cancel/suspend the subscription
-        logger.warn(`Final payment attempt failed for subscription ${subscriptionId}. Suspending member.`);
+        // Now we cancel the subscription and set member to cancelled
+        logger.warn(`Final payment attempt failed for subscription ${subscriptionId}. Cancelling member.`);
 
         try {
           // Pause collection rather than cancel - gives user chance to update payment method
@@ -983,17 +1025,17 @@ export class StripeService {
             [SUBSCRIPTION_STATUS.CANCELED, dbSubscription.id]
           );
 
-          // SYNC: Update member_status_id to SUSPENDED on final payment failure
-          // This removes user from queue eligibility
+          // SYNC: Update member_status_id to CANCELLED on final payment failure
+          // This removes user from queue and requires rejoin
           await pool.query(
             `UPDATE user_memberships
              SET member_status_id = $1,
                  updated_at = NOW()
              WHERE subscription_id = $2`,
-            [MEMBER_STATUS.SUSPENDED, dbSubscription.id]
+            [MEMBER_STATUS.CANCELLED, dbSubscription.id]
           );
 
-          logger.info(`Member status set to Suspended (ID: ${MEMBER_STATUS.SUSPENDED}) for subscription ${dbSubscription.id} after ${attemptCount} failed attempts`);
+          logger.info(`Member status set to Cancelled (ID: ${MEMBER_STATUS.CANCELLED}) for subscription ${dbSubscription.id} after ${attemptCount} failed attempts - must rejoin`);
 
           // Refresh the queue to reflect the status change
           try {
