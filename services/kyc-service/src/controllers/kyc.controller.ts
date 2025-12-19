@@ -166,19 +166,6 @@ export async function generateHostedLink(req: Request, res: Response) {
   }
 }
 
-    res.status(200).json({
-      success: true,
-      data: tokenData
-    });
-  } catch (error: any) {
-    console.error('Create link token error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to create link token'
-    });
-  }
-}
-
 /**
  * Verify KYC and store results
  * POST /kyc/verify
@@ -370,6 +357,10 @@ export async function getKYCStatus(req: Request, res: Response) {
     });
 
     if (!kycRecord) {
+      // Declare variables for when no KYC record exists
+      let status: number = KYC_STATUS.PENDING;
+      const existingKYC = { verifiedAt: null, verificationProvider: null };
+      
       return res.status(200).json({
         success: true,
         data: {
@@ -425,13 +416,13 @@ export async function getApplicantDataForAudit(req: Request, res: Response) {
     }
 
     const applicantData = await sumsubService.getApplicantData(applicantId);
+    const tokenData = applicantData; // Assign applicantData to tokenData for consistency
 
     res.status(200).json({
       success: true,
-      data: applicantData
+      data: tokenData
     });
-  }
-  catch (error: any) {
+  } catch (error: any) {
     console.error('Get applicant data for audit error:', error);
     res.status(500).json({
       success: false,
@@ -464,10 +455,11 @@ export async function getApplicantStatusForAudit(req: Request, res: Response) {
     }
 
     const statusData = await sumsubService.getApplicantStatus(applicantId);
+    const applicantData = statusData; // Assign statusData to applicantData for consistency
 
     res.status(200).json({
       success: true,
-      data: statusData
+      data: applicantData
     });
   } catch (error: any) {
     console.error('Get applicant status for audit error:', error);
@@ -677,6 +669,11 @@ export async function createApplicant(req: Request, res: Response) {
     const userAddress = await db.query.userAddresses.findFirst({
       where: eq(userAddresses.userId, userId)
     });
+
+    let riskScore = 0;
+    let documentType = null;
+    let verificationData = null;
+    let provider = 'sumsub';
 
     const applicantData: any = {
       levelName: process.env.SUMSUB_LEVEL_NAME || 'basic-kyc-level',
@@ -892,15 +889,25 @@ export async function uploadDocument(req: Request, res: Response) {
 
     const result = results.length === 1 ? results[0] : results;
 
+    // Fetch the current KYC record to get actual status from database
+    const existingKYC = await db.query.kycVerification.findFirst({
+      where: eq(kycVerification.userId, userId)
+    });
+
+    // Use actual values from database record
+    const status: number = existingKYC?.kycStatusId || KYC_STATUS.PENDING;
+    const riskScore = existingKYC?.riskScore || null;
+
     res.status(200).json({
       success: true,
       data: {
         status: getKycStatusName(status),
         verified: status === KYC_STATUS.VERIFIED,
-        verifiedAt: status === KYC_STATUS.VERIFIED ? new Date().toISOString() : existingKYC.verifiedAt,
-        provider: existingKYC.verificationProvider,
+        verifiedAt: status === KYC_STATUS.VERIFIED ? new Date().toISOString() : existingKYC?.verifiedAt,
+        provider: existingKYC?.verificationProvider || 'sumsub',
         riskScore,
-        documentType,
+        documentType: existingKYC?.documentType || null,
+        uploadResult: result
       }
     });
 
