@@ -165,15 +165,23 @@ export function KYCVerificationModal({
       const data = await response.json();
       setHostedUrl(data.url);
 
-      // Generate QR code
-      const qrDataUrl = await QRCode.toDataURL(data.url, {
-        width: 200,
+      // Create canvas element manually to ensure it's available
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+
+      // Generate QR code using the canvas element
+      await QRCode.toCanvas(canvas, data.url, {
+        width: 256,
         margin: 2,
         color: {
           dark: '#000000',
           light: '#FFFFFF'
         }
       });
+
+      // Convert canvas to data URL
+      const qrDataUrl = canvas.toDataURL('image/png');
       setQrCodeDataUrl(qrDataUrl);
 
       setCurrentStep('phone-verification');
@@ -300,7 +308,7 @@ export function KYCVerificationModal({
             <div className="flex justify-center">
               <div className="p-4 bg-white border rounded-lg">
                 {qrCodeDataUrl && (
-                  <img src={qrCodeDataUrl} alt="QR Code for verification" className="w-48 h-48" />
+                  <img src={qrCodeDataUrl} alt="QR Code for verification" className="w-64 h-64" />
                 )}
               </div>
             </div>
