@@ -233,14 +233,20 @@ export class SumsubService {
    * Map Sumsub status to internal status
    */
   mapSumsubStatusToInternal(sumsubStatus: any): number {
+    console.log('🔧 mapSumsubStatusToInternal called with:', JSON.stringify(sumsubStatus));
     const status = sumsubStatus?.reviewStatus;
+    console.log('🔧 Extracted status:', status);
+
     switch (status) {
       case 'completed':
-        return sumsubStatus.reviewResult?.reviewAnswer === 'GREEN' ? 3 : 4; // verified or rejected
+        const answer = sumsubStatus.reviewResult?.reviewAnswer;
+        console.log('🔧 Review answer for completed:', answer);
+        return answer === 'GREEN' ? 3 : 4; // verified or rejected
       case 'pending':
       case 'review':
         return 2; // review
       default:
+        console.log('🔧 Default case hit, returning 1');
         return 1; // pending
     }
   }

@@ -513,15 +513,11 @@ export async function handleApplicantReviewedWebhook(req: Request, res: Response
     }
 
     // Update the KYC record with the new status
-    const statusName = sumsubService.mapSumsubStatusToInternal(reviewStatus);
-    const statusMap: Record<string, number> = {
-      'pending': KYC_STATUS.PENDING,
-      'in_review': KYC_STATUS.IN_REVIEW,
-      'verified': KYC_STATUS.VERIFIED,
-      'rejected': KYC_STATUS.REJECTED,
-      'expired': KYC_STATUS.EXPIRED
-    };
-    const status = statusMap[statusName] || KYC_STATUS.PENDING;
+    console.log('🔍 Status mapping input:', { reviewStatus, reviewResult });
+    const mappingInput = { reviewStatus, reviewResult };
+    console.log('🔍 Mapping input object:', JSON.stringify(mappingInput));
+    const status = sumsubService.mapSumsubStatusToInternal(mappingInput);
+    console.log('📊 Mapped status result:', status, 'KYC_STATUS.VERIFIED:', KYC_STATUS.VERIFIED);
 
     // Get full applicant data for risk scoring
     let verificationData: any = existingKYC.verificationData;
