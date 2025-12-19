@@ -163,26 +163,66 @@ export function KYCVerificationModal({
       }
 
       const data = await response.json();
-      setHostedUrl(data.url);
+      console.log('🔗 Hosted link response:', data);
 
-      // Create canvas element manually to ensure it's available
-      const canvas = document.createElement('canvas');
-      canvas.width = 256;
-      canvas.height = 256;
+      if (!data.success || !data.data?.hostedUrl) {
+        throw new Error('No URL returned from hosted link API');
+      }
 
-      // Generate QR code using the canvas element
-      await QRCode.toCanvas(canvas, data.url, {
-        width: 256,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
+      setHostedUrl(data.data.hostedUrl);
+
+      // Generate QR code with error handling
+      try {
+        // Ensure canvas is available
+        if (typeof document === 'undefined' || !document.createElement) {
+          throw new Error('Document not available for canvas creation');
         }
-      });
 
-      // Convert canvas to data URL
-      const qrDataUrl = canvas.toDataURL('image/png');
-      setQrCodeDataUrl(qrDataUrl);
+        const canvas = document.createElement('canvas');
+        if (!canvas || !canvas.getContext) {
+          throw new Error('Canvas not supported');
+        }
+
+        canvas.width = 256;
+        canvas.height = 256;
+
+        // Generate QR code using the canvas element
+        await QRCode.toCanvas(canvas, data.data.hostedUrl, {
+          width: 256,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
+
+        // Convert canvas to data URL
+        const qrDataUrl = canvas.toDataURL('image/png');
+        setQrCodeDataUrl(qrDataUrl);
+      } catch (canvasError: any) {
+        console.error('Canvas QR generation failed:', canvasError);
+        // Fallback: try using toDataURL directly (might work in some environments)
+        try {
+          const qrDataUrl = await QRCode.toDataURL(data.data.hostedUrl, {
+            width: 256,
+            margin: 2,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF'
+            }
+          });
+          setQrCodeDataUrl(qrDataUrl);
+        } catch (fallbackError: any) {
+          console.error('Fallback QR generation also failed:', fallbackError);
+          toast({
+            title: 'QR Code Error',
+            description: 'Unable to generate QR code. Please try again.',
+            variant: 'destructive',
+          });
+          onClose();
+          return;
+        }
+      }
 
       setCurrentStep('phone-verification');
     } catch (error: any) {
