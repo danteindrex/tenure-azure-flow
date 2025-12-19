@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'Authorization': `Bearer ${session.user.id}`,
       },
       body: JSON.stringify({
-        returnUrl: returnUrl || `${process.env.NEXT_PUBLIC_APP_URL!}/dashboard/settings`
+        returnUrl: returnUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'https://home-solutions-eta.vercel.app'}/dashboard/settings`
       }),
     }).catch(err => {
       console.error('Failed to connect to subscription service:', err);

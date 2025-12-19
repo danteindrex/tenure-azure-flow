@@ -117,4 +117,14 @@ router.get('/admin/verified-users', kycController.getAllVerifiedUsers);
  */
 router.get('/admin/stats', kycController.getKYCStats);
 
+/**
+ * POST /kyc/generate-hosted-link
+ * Generate hosted verification link for QR code
+ */
+router.post(
+  '/generate-hosted-link',
+  validateSession,
+  kycController.generateHostedLink
+);
+
 export default router;

@@ -13,6 +13,16 @@ export interface ApplicantData {
   levelName: string;
   email?: string;
   phone?: string;
+  firstName?: string;
+  lastName?: string;
+  addresses?: Array<{
+    country: string;
+    postCode?: string;
+    town?: string;
+    street?: string;
+    subStreet?: string;
+    state?: string;
+  }>;
 }
 
 export interface DocumentMetadata {
@@ -137,11 +147,20 @@ export class SumsubService {
     const levelName = data.levelName || this.config.levelName;
     const endpoint = `/resources/applicants?levelName=${encodeURIComponent(levelName)}`;
 
-    const body = {
+    const body: any = {
       externalUserId: data.externalUserId,
       email: data.email,
       phone: data.phone,
     };
+
+    // Add fixedInfo if personal data is provided
+    if (data.firstName || data.lastName || (data.addresses && data.addresses.length > 0)) {
+      body.fixedInfo = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        addresses: data.addresses
+      };
+    }
 
     return this.makeRequest('POST', endpoint, body);
   }
@@ -260,6 +279,32 @@ export class SumsubService {
   async getSdkToken(applicantId: string): Promise<any> {
     const endpoint = `/resources/accessTokens?userId=${encodeURIComponent(applicantId)}&levelName=${encodeURIComponent(this.config.levelName)}&ttlInSecs=600`;
     return this.makeRequest('POST', endpoint);
+  }
+
+  /**
+   * Generate access token for hosted verification
+   */
+  async generateAccessToken(userId: string, email?: string): Promise<string> {
+    const endpoint = `/resources/accessTokens?userId=${encodeURIComponent(userId)}&levelName=${encodeURIComponent(this.config.levelName)}&ttlInSecs=3600`;
+
+    const response = await this.makeRequest('POST', endpoint, {
+      email,
+    });
+
+    return response.token;
+  }
+
+  /**
+   * Generate hosted verification URL for QR code
+   */
+  async generateHostedUrl(accessToken: string): Promise<string> {
+    const endpoint = `/resources/applicantActions/-/urlForAction`;
+
+    const response = await this.makeRequest('POST', endpoint, {
+      accessToken,
+    });
+
+    return response.url;
   }
 }
 

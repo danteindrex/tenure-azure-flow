@@ -110,7 +110,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const isFullyCanceled = memberData.memberStatusId === MEMBER_STATUS.CANCELLED || 
                            subscriptionStatusId === SUBSCRIPTION_STATUS.CANCELED;
 
-    const canRejoin = memberData.memberStatusId === MEMBER_STATUS.PAID || isFullyCanceled;
+    const canRejoin = memberData.memberStatusId === MEMBER_STATUS.PAID || 
+                     memberData.memberStatusId === MEMBER_STATUS.WON || 
+                     isFullyCanceled;
     const canUndoCancel = isInGracePeriod;
 
     return res.status(200).json({

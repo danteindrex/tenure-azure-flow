@@ -69,6 +69,7 @@ export interface CreateCheckoutSessionRequest {
   userId: string;
   successUrl?: string;
   cancelUrl?: string;
+  isRejoin?: boolean;
 }
 
 export interface CreateCheckoutSessionResponse {

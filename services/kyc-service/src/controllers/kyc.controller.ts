@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../../drizzle/db';
-import { kycVerification, userMemberships, users } from '../../drizzle/schema';
+import { kycVerification, userMemberships, users, userAddresses } from '../../drizzle/schema';
 import { eq, count } from 'drizzle-orm';
 import * as plaidService from '../services/plaid.service';
 import { createSumsubService, DocumentMetadata } from '../services/sumsub.service';
@@ -12,6 +12,42 @@ const sumsubService = createSumsubService();
 // KYC provider configuration
 const KYC_PROVIDER = (process.env.KYC_PROVIDER || 'sumsub').trim(); // 'sumsub' or 'plaid'
 console.log('🔧 KYC_PROVIDER:', KYC_PROVIDER);
+
+/**
+ * Convert country code to alpha-3 format for Sumsub
+ */
+function convertToAlpha3(countryCode: string): string {
+  const countryMap: Record<string, string> = {
+    'US': 'USA',
+    'CA': 'CAN',
+    'GB': 'GBR',
+    'UK': 'GBR',
+    'DE': 'DEU',
+    'FR': 'FRA',
+    'IT': 'ITA',
+    'ES': 'ESP',
+    'AU': 'AUS',
+    'JP': 'JPN',
+    'CN': 'CHN',
+    'IN': 'IND',
+    'BR': 'BRA',
+    'MX': 'MEX',
+    'AR': 'ARG',
+    'CO': 'COL',
+    'PE': 'PER',
+    'CL': 'CHL',
+    'VE': 'VEN',
+    'UY': 'URY',
+    'PY': 'PRY',
+    'BO': 'BOL',
+    'EC': 'ECU',
+    'GY': 'GUY',
+    'SR': 'SUR',
+    'FK': 'FLK'
+  };
+
+  return countryMap[countryCode.toUpperCase()] || countryCode.toUpperCase();
+}
 
 /**
  * Create Link Token/Access Token for Identity Verification
@@ -45,45 +81,16 @@ export async function createLinkToken(req: Request, res: Response) {
       });
     }
 
-    // Check if user already has a verified KYC
-    const existingKYC = await db.query.kycVerification.findFirst({
-      where: eq(kycVerification.userId, userId)
-    });
-
-    if (existingKYC && existingKYC.kycStatusId === KYC_STATUS.VERIFIED) {
-      return res.status(400).json({
-        success: false,
-        error: 'User already has verified KYC'
-      });
-    }
-
     let tokenData;
 
     console.log('🔄 About to check KYC_PROVIDER for createLinkToken:', KYC_PROVIDER);
     console.log('KYC_PROVIDER === "sumsub":', KYC_PROVIDER === 'sumsub');
     if (KYC_PROVIDER === 'sumsub') {
       console.log('🔄 Using Sumsub provider for createLinkToken');
-      // Create Sumsub applicant first
-      const applicant = await sumsubService.createApplicant({
-        externalUserId: userId,
-        levelName: 'basic-kyc-level',
-        email: email
-      });
-
-      // For direct API integration, we don't need access tokens
-      // The frontend will call our API endpoints directly
-      const accessTokenValue = 'direct-api-integration';
-      const expiresAtValue = new Date(Date.now() + (24 * 60 * 60 * 1000)); // 24 hours
-
-      const accessToken = accessTokenValue;
-      const expiresAt = expiresAtValue;
-      const applicantId = applicant.id;
-
+      // Sumsub doesn't need link tokens - return success
       tokenData = {
-        accessToken,
-        expiresAt,
-        applicantId,
-        provider: 'sumsub'
+        provider: 'sumsub',
+        message: 'Sumsub provider - no link token needed'
       };
     } else {
       console.log('🔄 Using Plaid provider for createLinkToken');
@@ -99,6 +106,65 @@ export async function createLinkToken(req: Request, res: Response) {
         provider: 'plaid'
       };
     }
+
+    res.status(200).json({
+      success: true,
+      data: tokenData
+    });
+  } catch (error: any) {
+    console.error('Create link token error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to create link token'
+    });
+  }
+}
+
+/**
+ * Generate hosted verification link for QR code
+ * POST /kyc/generate-hosted-link
+ */
+export async function generateHostedLink(req: Request, res: Response) {
+  try {
+    // Get user from session validation
+    const userId = req.userId || req.body?.userId;
+    const email = req.user?.email || req.body?.email;
+
+    if (!userId || !email) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    if (KYC_PROVIDER !== 'sumsub') {
+      return res.status(400).json({
+        success: false,
+        error: 'Hosted links only available for Sumsub provider'
+      });
+    }
+
+    // Generate access token
+    const accessToken = await sumsubService.generateAccessToken(userId, email);
+
+    // Generate hosted URL
+    const hostedUrl = await sumsubService.generateHostedUrl(accessToken);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        hostedUrl,
+        accessToken
+      }
+    });
+  } catch (error: any) {
+    console.error('Generate hosted link error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate hosted link'
+    });
+  }
+}
 
     res.status(200).json({
       success: true,
@@ -258,9 +324,12 @@ export async function verifyKYC(req: Request, res: Response) {
       success: true,
       data: {
         status: getKycStatusName(status),
+        verified: status === KYC_STATUS.VERIFIED,
         verifiedAt: status === KYC_STATUS.VERIFIED ? new Date().toISOString() : null,
         riskScore,
         provider,
+        documentType,
+        verificationData
       }
     });
   } catch (error: any) {
@@ -304,8 +373,10 @@ export async function getKYCStatus(req: Request, res: Response) {
       return res.status(200).json({
         success: true,
         data: {
-          status: 'not_started',
-          verified: false
+          status: getKycStatusName(status),
+          verified: status === KYC_STATUS.VERIFIED,
+          verifiedAt: status === KYC_STATUS.VERIFIED ? new Date().toISOString() : existingKYC.verifiedAt,
+          provider: existingKYC.verificationProvider
         }
       });
     }
@@ -316,9 +387,9 @@ export async function getKYCStatus(req: Request, res: Response) {
         status: getKycStatusName(kycRecord.kycStatusId),
         verified: kycRecord.kycStatusId === KYC_STATUS.VERIFIED,
         verifiedAt: kycRecord.verifiedAt,
-        verificationProvider: kycRecord.verificationProvider,
-        riskScore: kycRecord.riskScore,
-        createdAt: kycRecord.createdAt,
+        provider: kycRecord.verificationProvider,
+        applicantId: kycRecord.providerVerificationId,
+        createdAt: kycRecord.createdAt
       }
     });
   } catch (error: any) {
@@ -359,7 +430,8 @@ export async function getApplicantDataForAudit(req: Request, res: Response) {
       success: true,
       data: applicantData
     });
-  } catch (error: any) {
+  }
+  catch (error: any) {
     console.error('Get applicant data for audit error:', error);
     res.status(500).json({
       success: false,
@@ -444,7 +516,7 @@ export async function handleApplicantReviewedWebhook(req: Request, res: Response
 
       return res.status(200).json({
         success: true,
-        message: 'No matching KYC record found'
+        message: 'Webhook processed - no matching KYC record found'
       });
     }
 
@@ -591,11 +663,20 @@ export async function createApplicant(req: Request, res: Response) {
       });
     }
 
-    const { externalUserId, email, phone } = req.body;
+    const { externalUserId, email, phone, firstName, lastName, dob, country, ...other } = req.body;
 
     // externalUserId is optional - Sumsub will generate one if not provided
 
     console.log('👤 Creating Sumsub applicant for user:', userId);
+
+    // Fetch user details from DB to pre-fill Sumsub
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId)
+    });
+
+    const userAddress = await db.query.userAddresses.findFirst({
+      where: eq(userAddresses.userId, userId)
+    });
 
     const applicantData: any = {
       levelName: process.env.SUMSUB_LEVEL_NAME || 'basic-kyc-level',
@@ -605,6 +686,47 @@ export async function createApplicant(req: Request, res: Response) {
     if (externalUserId) applicantData.externalUserId = externalUserId;
     if (email) applicantData.email = email;
     if (phone) applicantData.phone = phone;
+
+    // Include personal info in info object as per Sumsub API
+    const info: any = {};
+
+    // Use provided personal info first, fallback to DB
+    if (firstName) info.firstName = firstName;
+    else if (user?.name) {
+      const nameParts = user.name.trim().split(' ');
+      if (nameParts.length > 0) {
+        info.firstName = nameParts[0];
+      }
+    }
+
+    if (lastName) info.lastName = lastName;
+    else if (user?.name) {
+      const nameParts = user.name.trim().split(' ');
+      if (nameParts.length > 1) {
+        info.lastName = nameParts.slice(1).join(' ');
+      }
+    }
+
+    if (dob) info.dob = dob;
+    if (country) info.country = country;
+
+    if (Object.keys(info).length > 0) {
+      applicantData.info = info;
+    }
+
+
+
+    // Map address if available
+    if (userAddress) {
+      applicantData.addresses = [{
+        country: convertToAlpha3(userAddress.countryCode || country || 'US'), // Convert to alpha-3 for Sumsub
+        postCode: userAddress.postalCode,
+        town: userAddress.city,
+        street: userAddress.streetAddress,
+        subStreet: userAddress.addressLine2,
+        state: userAddress.state
+      }];
+    }
 
     const result = await sumsubService.createApplicant(applicantData);
 
@@ -686,7 +808,8 @@ export async function uploadDocument(req: Request, res: Response) {
       });
     }
 
-    const { idDocType: documentType, country = 'US', idDocSubType } = metadata || {};
+    const { idDocType: documentType, country: rawCountry = 'US', idDocSubType } = metadata || {};
+    const country = convertToAlpha3(rawCountry);
     const applicantId = req.body.applicantId;
 
     console.log('📄 Upload Document Request:', {
@@ -771,7 +894,14 @@ export async function uploadDocument(req: Request, res: Response) {
 
     res.status(200).json({
       success: true,
-      data: result
+      data: {
+        status: getKycStatusName(status),
+        verified: status === KYC_STATUS.VERIFIED,
+        verifiedAt: status === KYC_STATUS.VERIFIED ? new Date().toISOString() : existingKYC.verifiedAt,
+        provider: existingKYC.verificationProvider,
+        riskScore,
+        documentType,
+      }
     });
 
   } catch (error: any) {

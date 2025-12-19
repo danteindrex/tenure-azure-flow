@@ -474,24 +474,30 @@ const DashboardSimple = () => {
               <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 shrink-0" />
             </div>
             <div className="space-y-1">
-              {monthlyPaymentDate && (
-                <div>
-                  <p className="text-[10px] xs:text-xs text-muted-foreground">Monthly</p>
-                  <p className="text-sm sm:text-base md:text-lg font-bold">
-                    {new Date(monthlyPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </p>
-                </div>
-              )}
-              {yearlyPaymentDate && (
-                <div>
-                  <p className="text-[10px] xs:text-xs text-muted-foreground">Yearly</p>
-                  <p className="text-sm sm:text-base md:text-lg font-bold">
-                    {new Date(yearlyPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </p>
-                </div>
-              )}
-              {!monthlyPaymentDate && !yearlyPaymentDate && (
-                <p className="text-sm text-muted-foreground">No payments due</p>
+              {!['Cancelled', 'Won', 'Paid'].includes(memberStatusData?.data?.memberStatus) ? (
+                <>
+                  {monthlyPaymentDate && (
+                    <div>
+                      <p className="text-[10px] xs:text-xs text-muted-foreground">Monthly</p>
+                      <p className="text-sm sm:text-base md:text-lg font-bold">
+                        {new Date(monthlyPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </p>
+                    </div>
+                  )}
+                  {yearlyPaymentDate && (
+                    <div>
+                      <p className="text-[10px] xs:text-xs text-muted-foreground">Yearly</p>
+                      <p className="text-sm sm:text-base md:text-lg font-bold">
+                        {new Date(yearlyPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </p>
+                    </div>
+                  )}
+                  {!monthlyPaymentDate && !yearlyPaymentDate && (
+                    <p className="text-sm text-muted-foreground">No payments due</p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Subscription Inactive</p>
               )}
             </div>
           </div>
@@ -672,34 +678,45 @@ const DashboardSimple = () => {
             <span className="truncate">Payment & Billing</span>
           </h3>
           <div className="space-y-3 sm:space-y-4">
-            {/* Monthly and Annual Billing Schedules */}
-            {billingSchedules.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {billingSchedules.map((schedule) => (
-                  <div key={schedule.billingCycle} className="p-3 rounded-lg bg-accent/5 border border-accent/20">
-                    <p className="text-xs text-muted-foreground mb-1">
-                      {schedule.billingCycle === 'MONTHLY' ? 'Monthly Payment' : 'Annual Payment'}
-                    </p>
-                    <p className="text-xl sm:text-2xl font-bold">
-                      ${schedule.amount.toFixed(2)}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(schedule.nextBillingDate).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                      })}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-3 rounded-lg bg-accent/5 border border-accent/20">
-                <p className="text-xs sm:text-sm text-muted-foreground">Next Payment Due</p>
-                <p className="text-xl sm:text-2xl md:text-3xl font-bold">
-                  {stats.paymentAmount > 0 ? `$${stats.paymentAmount}.00` : "$25.00"}
+            {/* Monthly and Annual Billing Schedules - Hidden for Inactive Subscriptions */}
+            {!['Cancelled', 'Won', 'Paid'].includes(memberStatusData?.data?.memberStatus) && (
+              billingSchedules.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {billingSchedules.map((schedule) => (
+                    <div key={schedule.billingCycle} className="p-3 rounded-lg bg-accent/5 border border-accent/20">
+                      <p className="text-xs text-muted-foreground mb-1">
+                        {schedule.billingCycle === 'MONTHLY' ? 'Monthly Payment' : 'Annual Payment'}
+                      </p>
+                      <p className="text-xl sm:text-2xl font-bold">
+                        ${schedule.amount.toFixed(2)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(schedule.nextBillingDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg bg-accent/5 border border-accent/20">
+                  <p className="text-xs sm:text-sm text-muted-foreground">Next Payment Due</p>
+                  <p className="text-xl sm:text-2xl md:text-3xl font-bold">
+                    {stats.paymentAmount > 0 ? `$${stats.paymentAmount}.00` : "$25.00"}
+                  </p>
+                  <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground mt-1">{userData.nextPaymentDue}</p>
+                </div>
+              )
+            )}
+
+            {/* Show message for inactive subscriptions */}
+            {['Cancelled', 'Won', 'Paid'].includes(memberStatusData?.data?.memberStatus) && (
+              <div className="p-3 rounded-lg bg-muted/50 border border-muted">
+                <p className="text-sm text-muted-foreground text-center">
+                  No active payment schedule
                 </p>
-                <p className="text-[10px] xs:text-xs sm:text-sm text-muted-foreground mt-1">{userData.nextPaymentDue}</p>
               </div>
             )}
 

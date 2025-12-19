@@ -15,7 +15,7 @@ const envSchema = z.object({
   ANNUAL_PAYMENT_AMOUNT: z.string().default('300'),
   CURRENCY: z.string().default('usd'),
   ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
-  FRONTEND_URL: z.string().default('http://localhost:3000'),
+  FRONTEND_URL: z.string().optional(),
 });
 
 const env = envSchema.parse(process.env);
@@ -38,5 +38,5 @@ export const config = {
   cors: {
     allowedOrigins: env.ALLOWED_ORIGINS.split(','),
   },
-  frontendUrl: env.FRONTEND_URL,
+  frontendUrl: env.FRONTEND_URL || (env.NODE_ENV === 'production' ? 'https://home-solutions-eta.vercel.app' : 'http://localhost:3000'),
 };

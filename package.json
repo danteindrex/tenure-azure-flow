@@ -33,7 +33,7 @@
     "test:install": "playwright install"
   },
   "dependencies": {
-    "@base-ui-components/react": "*",
+    "@base-ui-components/react": "^1.0.0-rc.0",
     "@better-auth/passkey": "*",
     "@floating-ui/react": "*",
     "@headlessui/react": "*",
@@ -92,6 +92,7 @@
     "next-themes": "^0.3.0",
     "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.10",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",

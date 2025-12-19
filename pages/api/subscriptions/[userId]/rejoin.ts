@@ -42,8 +42,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
       body: JSON.stringify({
         userId: userId,
-        successUrl: successUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: cancelUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard?canceled=true`,
+        successUrl: successUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'https://home-solutions-eta.vercel.app'}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: cancelUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'https://home-solutions-eta.vercel.app'}/dashboard?canceled=true`,
         isRejoin: true // Flag to indicate this is a rejoin
       }),
     }).catch(err => {

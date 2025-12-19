@@ -89,12 +89,16 @@ const PaymentStatusWidget: React.FC = () => {
         apiEndpoint = `/api/subscriptions/${user?.id}/update-payment`;
       } else if (memberStatusId === MEMBER_STATUS.CANCELLED || memberStatusId === MEMBER_STATUS.WON) {
         // Rejoin - use rejoin API
-        apiEndpoint = "/api/subscriptions/rejoin";
+        apiEndpoint = `/api/subscriptions/${user?.id}/rejoin`;
       }
 
       const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          successUrl: `${window.location.origin}/dashboard?rejoined=true`,
+          cancelUrl: `${window.location.origin}/dashboard?canceled=true`
+        }),
       });
 
       if (!response.ok) {

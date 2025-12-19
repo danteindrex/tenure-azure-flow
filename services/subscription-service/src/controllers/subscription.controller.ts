@@ -7,6 +7,7 @@ const CreateCheckoutSchema = z.object({
   userId: z.string().uuid(),
   successUrl: z.string().url().optional(),
   cancelUrl: z.string().url().optional(),
+  isRejoin: z.boolean().optional(),
 });
 
 export class SubscriptionController {

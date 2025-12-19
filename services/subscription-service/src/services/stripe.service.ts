@@ -29,7 +29,7 @@ export class StripeService {
     data: CreateCheckoutSessionRequest
   ): Promise<CreateCheckoutSessionResponse> {
     try {
-      const { userId, successUrl, cancelUrl } = data;
+      const { userId, successUrl, cancelUrl, isRejoin = false } = data;
 
       // Get user details from normalized schema
       const userQuery = `
@@ -53,22 +53,48 @@ export class StripeService {
 
       // 1. Check for ANY active subscription - users should only have ONE active subscription
       // Using subscription_status_id FK column: 1=Active, 2=Trialing
-      const activeSubscriptionQuery = `
-        SELECT us.id, us.provider_subscription_id, us.created_at
-        FROM user_subscriptions us
-        WHERE us.user_id = $1
-        AND us.subscription_status_id IN ($2, $3)
-        ORDER BY us.created_at DESC
-        LIMIT 1
-      `;
-      const activeSub = await pool.query(activeSubscriptionQuery, [userId, SUBSCRIPTION_STATUS.ACTIVE, SUBSCRIPTION_STATUS.TRIALING]);
+      // For rejoins, we allow suspended members to create new subscriptions
+      if (!isRejoin) {
+        const activeSubscriptionQuery = `
+          SELECT us.id, us.provider_subscription_id, us.created_at
+          FROM user_subscriptions us
+          WHERE us.user_id = $1
+          AND us.subscription_status_id IN ($2, $3)
+          ORDER BY us.created_at DESC
+          LIMIT 1
+        `;
+        const activeSub = await pool.query(activeSubscriptionQuery, [userId, SUBSCRIPTION_STATUS.ACTIVE, SUBSCRIPTION_STATUS.TRIALING]);
 
-      if (activeSub.rows.length > 0) {
-        logger.warn(`User ${userId} already has an active subscription, preventing duplicate checkout`, {
-          existingSubscriptionId: activeSub.rows[0].provider_subscription_id,
-          createdAt: activeSub.rows[0].created_at
-        });
-        throw new Error('DUPLICATE_SUBSCRIPTION: You already have an active subscription. Please refresh the page.');
+        if (activeSub.rows.length > 0) {
+          logger.warn(`User ${userId} already has an active subscription, preventing duplicate checkout`, {
+            existingSubscriptionId: activeSub.rows[0].provider_subscription_id,
+            createdAt: activeSub.rows[0].created_at
+          });
+          throw new Error('DUPLICATE_SUBSCRIPTION: You already have an active subscription. Please refresh the page.');
+        }
+      } else {
+        // For rejoins, check if user is actually suspended/cancelled
+        const memberStatusQuery = `
+          SELECT um.member_status_id, us.subscription_status_id
+          FROM user_memberships um
+          LEFT JOIN user_subscriptions us ON um.subscription_id = us.id
+          WHERE um.user_id = $1
+          ORDER BY um.created_at DESC
+          LIMIT 1
+        `;
+        const memberStatus = await pool.query(memberStatusQuery, [userId]);
+        
+        if (memberStatus.rows.length > 0) {
+          const { member_status_id } = memberStatus.rows[0];
+          // Only allow rejoins for cancelled (4), won (5), or paid (6) members
+          // Suspended members (3) must update payment method via billing portal, not create new subscription
+          if (![MEMBER_STATUS.CANCELLED, MEMBER_STATUS.WON, MEMBER_STATUS.PAID].includes(member_status_id)) {
+            logger.warn(`User ${userId} attempted rejoin but has member status ${member_status_id}`, {
+              memberStatusId: member_status_id
+            });
+            throw new Error('INVALID_REJOIN: You can only rejoin if your membership is cancelled, paid off, or won. Suspended members should update payment method.');
+          }
+        }
       }
 
       // 2. Check for recent successful payments (within last 5 minutes)
@@ -1294,21 +1320,31 @@ export class StripeService {
         throw new Error('No Stripe customer ID found for subscription');
       }
 
-      // Create billing portal session with restricted permissions
-      // Only allow payment method updates - no subscription cancellation or pausing
-      const session = await stripe.billingPortal.sessions.create({
-        customer: provider_customer_id,
-        return_url: returnUrl || `${config.frontendUrl}/dashboard`,
-        flow_data: {
-          type: 'payment_method_update',
-        },
-      });
+      // Create billing portal session
+      // Try with flow_data (deep link) first, fallback to standard portal if it fails
+      try {
+        const session = await stripe.billingPortal.sessions.create({
+          customer: provider_customer_id,
+          return_url: returnUrl || `${config.frontendUrl}/dashboard`,
+          flow_data: {
+            type: 'payment_method_update',
+          },
+        });
 
-      logger.info(`Created billing portal session for user ${userId}, customer ${provider_customer_id}`);
+        logger.info(`Created billing portal session (deep link) for user ${userId}, customer ${provider_customer_id}`);
+        return { url: session.url };
+      } catch (deepLinkError: any) {
+        logger.warn(`Failed to create deep link portal session for user ${userId}: ${deepLinkError.message}. Retrying with standard portal.`);
+        
+        // Fallback to standard portal
+        const session = await stripe.billingPortal.sessions.create({
+          customer: provider_customer_id,
+          return_url: returnUrl || `${config.frontendUrl}/dashboard`,
+        });
 
-      return {
-        url: session.url,
-      };
+        logger.info(`Created standard billing portal session for user ${userId}, customer ${provider_customer_id}`);
+        return { url: session.url };
+      }
     } catch (error) {
       logger.error('Error creating billing portal session:', error);
       throw error;
