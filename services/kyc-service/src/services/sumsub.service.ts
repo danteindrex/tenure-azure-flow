@@ -287,9 +287,7 @@ export class SumsubService {
   async generateAccessToken(userId: string, email?: string): Promise<string> {
     const endpoint = `/resources/accessTokens?userId=${encodeURIComponent(userId)}&levelName=${encodeURIComponent(this.config.levelName)}&ttlInSecs=3600`;
 
-    const response = await this.makeRequest('POST', endpoint, {
-      email,
-    });
+    const response = await this.makeRequest('POST', endpoint);
 
     return response.token;
   }
@@ -297,12 +295,15 @@ export class SumsubService {
   /**
    * Generate hosted verification URL for QR code
    */
-  async generateHostedUrl(accessToken: string): Promise<string> {
-    const endpoint = `/resources/applicantActions/-/urlForAction`;
+  async generateHostedUrl(userId: string, email?: string): Promise<string> {
+    const endpoint = `/resources/sdkIntegrations/levels/${encodeURIComponent(this.config.levelName)}/websdkLink?ttlInSecs=3600&externalUserId=${encodeURIComponent(userId)}&lang=en`;
 
-    const response = await this.makeRequest('POST', endpoint, {
-      accessToken,
-    });
+    const body: any = {};
+    if (email) {
+      body.applicantIdentifiers = { email };
+    }
+
+    const response = await this.makeRequest('POST', endpoint, Object.keys(body).length > 0 ? body : undefined);
 
     return response.url;
   }
