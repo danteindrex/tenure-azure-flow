@@ -40,15 +40,71 @@ export function KYCVerificationModal({
   const { data: session } = useSession();
   const user = session?.user;
 
-  // Reset state when modal opens
+  // Reset state when modal opens and auto-generate QR code
   useEffect(() => {
     if (isOpen) {
       setCurrentStep('device-choice');
       setApplicantId('');
       setHostedUrl('');
+      setQrCodeDataUrl('');
       setShowSuccessMessage(false);
+      
+      // Auto-generate QR code when modal opens
+      generateQRCode();
     }
   }, [isOpen]);
+
+  // Function to generate QR code automatically
+  const generateQRCode = async () => {
+    if (!user?.email) return;
+    
+    setIsCreatingApplicant(true);
+    try {
+      const response = await fetch('/api/kyc/generate-hosted-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: user.email,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate hosted link');
+      }
+
+      const data = await response.json();
+      console.log('🔗 Hosted link response:', data);
+
+      if (!data.success || !data.data?.hostedUrl) {
+        throw new Error('No URL returned from hosted link API');
+      }
+
+      setHostedUrl(data.data.hostedUrl);
+
+      // Generate QR code with error handling
+      try {
+        const qrDataUrl = await QRCode.toDataURL(data.data.hostedUrl, {
+          width: 256,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
+        setQrCodeDataUrl(qrDataUrl);
+      } catch (qrError: any) {
+        console.error('QR generation failed:', qrError);
+        // Don't show error toast for auto-generation, just log it
+      }
+    } catch (error: any) {
+      console.error('Error auto-generating hosted link:', error);
+      // Don't show error toast for auto-generation, just log it
+    } finally {
+      setIsCreatingApplicant(false);
+    }
+  };
 
   const createApplicant = async () => {
     if (!user?.id) {
@@ -145,98 +201,6 @@ export function KYCVerificationModal({
     createApplicant();
   };
 
-  const handleChoosePhone = async () => {
-    setIsCreatingApplicant(true);
-    try {
-      const response = await fetch('/api/kyc/generate-hosted-link', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: user?.email,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate hosted link');
-      }
-
-      const data = await response.json();
-      console.log('🔗 Hosted link response:', data);
-
-      if (!data.success || !data.data?.hostedUrl) {
-        throw new Error('No URL returned from hosted link API');
-      }
-
-      setHostedUrl(data.data.hostedUrl);
-
-      // Generate QR code with error handling
-      try {
-        // Ensure canvas is available
-        if (typeof document === 'undefined' || !document.createElement) {
-          throw new Error('Document not available for canvas creation');
-        }
-
-        const canvas = document.createElement('canvas');
-        if (!canvas || !canvas.getContext) {
-          throw new Error('Canvas not supported');
-        }
-
-        canvas.width = 256;
-        canvas.height = 256;
-
-        // Generate QR code using the canvas element
-        await QRCode.toCanvas(canvas, data.data.hostedUrl, {
-          width: 256,
-          margin: 2,
-          color: {
-            dark: '#000000',
-            light: '#FFFFFF'
-          }
-        });
-
-        // Convert canvas to data URL
-        const qrDataUrl = canvas.toDataURL('image/png');
-        setQrCodeDataUrl(qrDataUrl);
-      } catch (canvasError: any) {
-        console.error('Canvas QR generation failed:', canvasError);
-        // Fallback: try using toDataURL directly (might work in some environments)
-        try {
-          const qrDataUrl = await QRCode.toDataURL(data.data.hostedUrl, {
-            width: 256,
-            margin: 2,
-            color: {
-              dark: '#000000',
-              light: '#FFFFFF'
-            }
-          });
-          setQrCodeDataUrl(qrDataUrl);
-        } catch (fallbackError: any) {
-          console.error('Fallback QR generation also failed:', fallbackError);
-          toast({
-            title: 'QR Code Error',
-            description: 'Unable to generate QR code. Please try again.',
-            variant: 'destructive',
-          });
-          onClose();
-          return;
-        }
-      }
-
-      setCurrentStep('phone-verification');
-    } catch (error: any) {
-      console.error('Error generating hosted link:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate phone verification link. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsCreatingApplicant(false);
-    }
-  };
-
   const handleDocumentComplete = () => {
     setCurrentStep('liveness-check');
   };
@@ -300,40 +264,83 @@ export function KYCVerificationModal({
     switch (currentStep) {
       case 'device-choice':
         return (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold mb-2">Choose Verification Method</h3>
-              <p className="text-gray-600 mb-6">How would you like to complete your identity verification?</p>
+          <div className="space-y-6 p-6">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-2">Let's get you verified</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button
-                onClick={handleChooseWeb}
-                className="p-6 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <h4 className="font-semibold mb-1">Continue on Web</h4>
-                  <p className="text-sm text-gray-600">Complete verification directly in your browser</p>
+
+            {/* Instructions */}
+            <div className="space-y-4 mb-8">
+              {/* Document preparation */}
+              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
                 </div>
-              </button>
-              <button
-                onClick={handleChoosePhone}
-                className="p-6 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <h4 className="font-semibold mb-1">Verify on Phone</h4>
-                  <p className="text-sm text-gray-600">Scan QR code to verify on your mobile device</p>
+                <div>
+                  <p className="font-medium text-gray-900">Prepare a valid document</p>
+                  <p className="text-sm text-gray-600">Make sure it's not expired or physically damaged</p>
                 </div>
-              </button>
+              </div>
+
+              {/* Smartphone requirement */}
+              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Use a smartphone</p>
+                  <p className="text-sm text-gray-600">You need a smartphone in order to continue</p>
+                </div>
+              </div>
+            </div>
+
+            {/* QR Code Section */}
+            <div className="text-center space-y-4">
+              <div className="mb-4">
+                <h3 className="font-medium text-gray-900 mb-2">Scan QR code</h3>
+                <p className="text-sm text-gray-600 mb-4">Scan the QR code to continue on another device</p>
+              </div>
+
+              {/* QR Code - auto-generated on modal open */}
+              <div className="flex justify-center mb-6">
+                <div className="w-48 h-48 bg-white border-2 border-gray-200 rounded-lg flex items-center justify-center p-2">
+                  {isCreatingApplicant ? (
+                    <div className="text-center">
+                      <div className="w-8 h-8 border-4 border-gray-300 border-t-blue-600 rounded-full animate-spin mx-auto mb-2"></div>
+                      <p className="text-xs text-gray-500">Loading...</p>
+                    </div>
+                  ) : qrCodeDataUrl ? (
+                    <img src={qrCodeDataUrl} alt="QR Code for verification" className="w-full h-full object-contain" />
+                  ) : (
+                    <div className="text-center">
+                      <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M12 12h-4.01M12 12v4m6-4h.01M12 8h.01" />
+                      </svg>
+                      <p className="text-xs text-gray-500">QR code unavailable</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Privacy notice */}
+              <div className="text-xs text-gray-500 mb-6">
+                Read more about your personal data processing in Veriff's Privacy Notice.
+              </div>
+
+              {/* Continue with web option */}
+              <div className="pt-4 border-t border-gray-200">
+                <button
+                  onClick={handleChooseWeb}
+                  className="w-full text-sm text-gray-600 hover:text-gray-800 font-medium py-2 px-4 transition-colors"
+                >
+                  Don't have a smartphone? Continue with your current device
+                </button>
+              </div>
             </div>
           </div>
         );
