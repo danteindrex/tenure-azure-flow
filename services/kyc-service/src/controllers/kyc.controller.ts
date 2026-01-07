@@ -1,9 +1,12 @@
 import { Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { db } from '../../drizzle/db';
 import { kycVerification, userMemberships, users, userAddresses } from '../../drizzle/schema';
 import { eq, count } from 'drizzle-orm';
 import * as plaidService from '../services/plaid.service';
 import { createSumsubService, DocumentMetadata } from '../services/sumsub.service';
+import { storageService } from '../services/storage.service';
 import { KYC_STATUS, getKycStatusName } from '../config/status-constants';
 
 // Initialize Sumsub service
@@ -216,47 +219,47 @@ export async function verifyKYC(req: Request, res: Response) {
       // Get verification results from Sumsub
       verificationData = await sumsubService.getApplicantData(verificationId);
 
-    // Map Sumsub status to internal status ID
-    const statusName = sumsubService.mapSumsubStatusToInternal(verificationData.review?.reviewStatus || 'pending');
-    const statusMap: Record<string, number> = {
-      'pending': KYC_STATUS.PENDING,
-      'in_review': KYC_STATUS.IN_REVIEW,
-      'verified': KYC_STATUS.VERIFIED,
-      'rejected': KYC_STATUS.REJECTED,
-      'expired': KYC_STATUS.EXPIRED
-    };
-    status = statusMap[statusName] || KYC_STATUS.PENDING;
+      // Map Sumsub status to internal status ID
+      const statusName = sumsubService.mapSumsubStatusToInternal(verificationData.review?.reviewStatus || 'pending');
+      const statusMap: Record<string, number> = {
+        'pending': KYC_STATUS.PENDING,
+        'in_review': KYC_STATUS.IN_REVIEW,
+        'verified': KYC_STATUS.VERIFIED,
+        'rejected': KYC_STATUS.REJECTED,
+        'expired': KYC_STATUS.EXPIRED
+      };
+      status = statusMap[statusName] || KYC_STATUS.PENDING;
 
-    // Calculate risk score
-    riskScore = sumsubService.extractRiskScore(verificationData);
+      // Calculate risk score
+      riskScore = sumsubService.extractRiskScore(verificationData);
 
-    // Extract document info
-    const docInfo = sumsubService.extractDocumentInfo(verificationData);
-    documentType = docInfo.documentType || null;
+      // Extract document info
+      const docInfo = sumsubService.extractDocumentInfo(verificationData);
+      documentType = docInfo.documentType || null;
 
-    provider = 'sumsub';
+      provider = 'sumsub';
     } else {
       // Get verification results from Plaid (default)
       verificationData = await plaidService.getIdentityVerification(verificationId);
 
-    // Map Plaid status to internal status ID
-    const statusName = plaidService.mapPlaidStatusToInternal(verificationData.status);
-    const statusMap: Record<string, number> = {
-      'pending': KYC_STATUS.PENDING,
-      'in_review': KYC_STATUS.IN_REVIEW,
-      'verified': KYC_STATUS.VERIFIED,
-      'rejected': KYC_STATUS.REJECTED,
-      'expired': KYC_STATUS.EXPIRED
-    };
-    status = statusMap[statusName] || KYC_STATUS.PENDING;
+      // Map Plaid status to internal status ID
+      const statusName = plaidService.mapPlaidStatusToInternal(verificationData.status);
+      const statusMap: Record<string, number> = {
+        'pending': KYC_STATUS.PENDING,
+        'in_review': KYC_STATUS.IN_REVIEW,
+        'verified': KYC_STATUS.VERIFIED,
+        'rejected': KYC_STATUS.REJECTED,
+        'expired': KYC_STATUS.EXPIRED
+      };
+      status = statusMap[statusName] || KYC_STATUS.PENDING;
 
-    // Calculate risk score
-    riskScore = plaidService.extractRiskScore(verificationData);
+      // Calculate risk score
+      riskScore = plaidService.extractRiskScore(verificationData);
 
-    // Extract document info if available
-    documentType = (verificationData.documentary_verification as any)?.documents?.[0]?.type;
+      // Extract document info if available
+      documentType = (verificationData.documentary_verification as any)?.documents?.[0]?.type;
 
-    provider = 'plaid';
+      provider = 'plaid';
     }
 
     // Check if KYC record exists
@@ -360,7 +363,7 @@ export async function getKYCStatus(req: Request, res: Response) {
       // Declare variables for when no KYC record exists
       let status: number = KYC_STATUS.PENDING;
       const existingKYC = { verifiedAt: null, verificationProvider: null };
-      
+
       return res.status(200).json({
         success: true,
         data: {
@@ -833,6 +836,60 @@ export async function uploadDocument(req: Request, res: Response) {
 
     const results = [];
 
+    // Helper to upload file to Supabase Storage
+    const uploadToGenericStorage = async (file: Express.Multer.File, type: 'front' | 'back') => {
+      const timestamp = Date.now();
+      const ext = path.extname(file.originalname);
+      // Sanitize filename to be safe
+      const safeApplicantId = applicantId.replace(/[^a-zA-Z0-9]/g, '_');
+
+      // Structure: userId/applicantId/type_timestamp.ext
+      const storagePath = `${userId}/${safeApplicantId}/${type}_${timestamp}${ext}`;
+
+      console.log(`☁️ Uploading ${type} document to Supabase: ${storagePath}`);
+      await storageService.uploadFile(storagePath, file.buffer, file.mimetype);
+      return storagePath;
+    };
+
+    let frontPath = null;
+    let backPath = null;
+
+    // Upload files to Supabase first
+    if (files.content && files.content[0]) {
+      try {
+        frontPath = await uploadToGenericStorage(files.content[0], 'front');
+      } catch (err) {
+        console.error('Failed to upload front document to storage:', err);
+        // Continue but log error - crucial to fail? Maybe not if Sumsub upload succeeds? 
+        // Let's treat it as non-blocking but log it.
+      }
+    }
+    if (files.backFile && files.backFile[0]) {
+      try {
+        backPath = await uploadToGenericStorage(files.backFile[0], 'back');
+      } catch (err) {
+        console.error('Failed to upload back document to storage:', err);
+      }
+    }
+
+    // Update database with storage paths
+    if (frontPath || backPath) {
+      const existingRecord = await db.query.kycVerification.findFirst({
+        where: eq(kycVerification.userId, userId)
+      });
+
+      if (existingRecord) {
+        await db.update(kycVerification)
+          .set({
+            documentFrontUrl: frontPath || existingRecord.documentFrontUrl,
+            documentBackUrl: backPath || existingRecord.documentBackUrl,
+            updatedAt: new Date().toISOString()
+          })
+          .where(eq(kycVerification.id, existingRecord.id));
+        console.log('💾 Updated database with storage paths');
+      }
+    }
+
     // Upload front side (content)
     if (files.content && files.content[0]) {
       const frontFile = files.content[0];
@@ -974,7 +1031,7 @@ export async function getSdkToken(req: Request, res: Response) {
         success: false,
         error: 'User not authenticated'
       });
-}
+    }
 
     const { applicantId } = req.body;
 
