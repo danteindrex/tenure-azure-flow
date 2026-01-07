@@ -84,7 +84,7 @@ const SignUp = () => {
   const [otpReady, setOtpReady] = useState(true); // Track if OTP is ready for verification
   const [waitingForPayment, setWaitingForPayment] = useState(false); // Track if waiting for Stripe webhook
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Modal states
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
@@ -424,37 +424,37 @@ const SignUp = () => {
     if (!email || email.trim().length === 0) {
       return false;
     }
-    
+
     const trimmedEmail = email.trim();
-    
+
     // Check if email contains @ symbol
     if (!trimmedEmail.includes('@')) {
       return false;
     }
-    
+
     // Split email into local and domain parts
     const parts = trimmedEmail.split('@');
     if (parts.length !== 2) {
       return false;
     }
-    
+
     const [localPart, domainPart] = parts;
-    
+
     // Check if both parts exist
     if (!localPart || !domainPart) {
       return false;
     }
-    
+
     // Check for consecutive dots
     if (localPart.includes('..') || domainPart.includes('..')) {
       return false;
     }
-    
+
     // Domain must contain at least one dot (for TLD)
     if (!domainPart.includes('.')) {
       return false;
     }
-    
+
     // Basic email validation regex
     const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
     return emailRegex.test(trimmedEmail);
@@ -482,11 +482,11 @@ const SignUp = () => {
   // Validation asterisk component
   const ValidationAsterisk = ({ isValid, touched }: { isValid: boolean; touched: boolean }) => {
     let colorClass = 'text-muted-foreground'; // Default for untouched
-    
+
     if (touched) {
       colorClass = isValid ? 'text-green-500' : 'text-red-500';
     }
-    
+
     return <span className={colorClass}>*</span>;
   };
 
@@ -497,11 +497,11 @@ const SignUp = () => {
 
   const handleInputChange = (field: string, value: string | boolean): void => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    
+
     // Validate fields and update validation state
     if (typeof value === 'string') {
       let isValid = false;
-      
+
       switch (field) {
         case 'email':
           isValid = validateEmail(value);
@@ -532,7 +532,7 @@ const SignUp = () => {
         default:
           return;
       }
-      
+
       updateFieldValidation(field, value, isValid);
     }
   };
@@ -1091,7 +1091,7 @@ const SignUp = () => {
 
       // Phone is now verified, save profile and move to payment
       await saveCompleteProfile();
-      
+
       // Update progress in database
       await fetch('/api/onboarding/update-progress', {
         method: 'POST',
@@ -1262,7 +1262,7 @@ const SignUp = () => {
 
       // Update local state
       setBypassed(true);
-      
+
       // Redirect to dashboard instead of Step 5
       toast.success("Profile complete! Redirecting to dashboard...");
       navigate.push('/dashboard');
@@ -1339,12 +1339,12 @@ const SignUp = () => {
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${step >= i
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${step >= i
                   ? "bg-accent text-accent-foreground shadow-lg"
                   : "bg-muted border border-border text-muted-foreground"
                   }`}
               >
-                {step > i ? <Check className="w-4 h-4" /> : i}
+                {step > i ? <Check className="w-4 h-4" /> : ""}
               </div>
               {i < 5 && (
                 <div
@@ -1398,13 +1398,12 @@ const SignUp = () => {
                   placeholder="you@example.com"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
-                  className={`bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors ${
-                    fieldValidation.email.touched 
-                      ? fieldValidation.email.isValid 
-                        ? 'border-green-500 focus:border-green-500' 
-                        : 'border-red-500 focus:border-red-500'
-                      : ''
-                  }`}
+                  className={`bg-input border-border focus:border-accent text-foreground placeholder-muted-foreground transition-colors ${fieldValidation.email.touched
+                    ? fieldValidation.email.isValid
+                      ? 'border-green-500 focus:border-green-500'
+                      : 'border-red-500 focus:border-red-500'
+                    : ''
+                    }`}
                   required
                 />
                 {fieldValidation.email.touched && !fieldValidation.email.isValid && formData.email.length > 0 && (
@@ -1794,26 +1793,26 @@ const SignUp = () => {
                   />
                 </div>
 
-                 <div className="space-y-2">
-                   <Label htmlFor="country" className="text-foreground">Country <span className="text-muted-foreground">*</span></Label>
-                   <SearchableSelect
-                     options={countriesLoading ? [] : (countries?.map((country) => ({
-                       value: country.code,
-                       label: `${country.flag} ${country.name}`
-                     })) || [])}
-                     value={formData.country}
-                     onValueChange={(value) => {
-                       handleInputChange("country", value);
-                       // Clear state when country changes since states are country-specific
-                       setFormData(prev => ({ ...prev, state: "" }));
-                     }}
-                     placeholder="Select country"
-                     searchPlaceholder="Search countries..."
-                     emptyMessage="No countries found."
-                     disabled={countriesLoading}
-                     className="bg-input border-border focus:border-accent"
-                   />
-                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="country" className="text-foreground">Country <span className="text-muted-foreground">*</span></Label>
+                  <SearchableSelect
+                    options={countriesLoading ? [] : (countries?.map((country) => ({
+                      value: country.code,
+                      label: `${country.flag} ${country.name}`
+                    })) || [])}
+                    value={formData.country}
+                    onValueChange={(value) => {
+                      handleInputChange("country", value);
+                      // Clear state when country changes since states are country-specific
+                      setFormData(prev => ({ ...prev, state: "" }));
+                    }}
+                    placeholder="Select country"
+                    searchPlaceholder="Search countries..."
+                    emptyMessage="No countries found."
+                    disabled={countriesLoading}
+                    className="bg-input border-border focus:border-accent"
+                  />
+                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="city" className="text-foreground">
@@ -2021,16 +2020,16 @@ const SignUp = () => {
           <>
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-700"></div>
+                <div className="w-full border-t border-border"></div>
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-card px-2 text-gray-400">Or continue with</span>
+                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
               </div>
             </div>
 
             {/* Google Signup */}
             <Button
-              className="w-full mb-6 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white transition-colors"
+              className="w-full mb-6 bg-secondary hover:bg-secondary/80 border border-border text-secondary-foreground transition-colors"
               onClick={handleGoogleSignup}
               disabled={loading}
             >
@@ -2047,7 +2046,7 @@ const SignUp = () => {
 
         {/* Login Link / Logout Button */}
         {step === 1 ? (
-          <p className="text-center text-sm text-gray-400">
+          <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link href="/login" className="text-accent hover:text-accent/80 hover:underline font-medium transition-colors">
               Back to Login
