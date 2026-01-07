@@ -187,7 +187,7 @@ const Login = () => {
         </span>
       </Button>
 
-      <LiquidGlassCard className="w-full max-w-xl" glassSize="lg">
+      <LiquidGlassCard className="w-full max-w-xl mx-auto" glassSize="lg">
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <div className="flex items-center gap-2">
