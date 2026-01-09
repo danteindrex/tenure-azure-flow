@@ -17,7 +17,6 @@ import baseLogger from "@/lib/baseLogger";
 import { useTheme } from "@/contexts/ThemeContext";
 import { TermsModal } from "@/components/TermsModal";
 import { PrivacyModal } from "@/components/PrivacyModal";
-import { BeamsBackground } from "@/components/ui/beams-background";
 import { LiquidGlassCard } from "@/components/ui/liquid-glass-card";
 
 const SignUp = () => {
@@ -1306,13 +1305,13 @@ const SignUp = () => {
   };
 
   return (
-    <BeamsBackground intensity="medium" className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       {/* Theme Toggle Button */}
       <Button
         variant="ghost"
         size="sm"
         onClick={toggleTheme}
-        className="absolute top-4 right-4 z-20 flex items-center gap-2 hover:bg-white/20 dark:hover:bg-black/20 p-2 text-foreground"
+        className="absolute top-4 right-4 z-20 flex items-center gap-2 hover:bg-accent/10 p-2"
         title={`Switch to ${actualTheme === 'light' ? 'dark' : 'light'} mode`}
       >
         {actualTheme === 'light' ? (
@@ -1325,7 +1324,7 @@ const SignUp = () => {
         </span>
       </Button>
 
-      <LiquidGlassCard className="w-full max-w-2xl mx-auto" glassSize="lg">
+      <LiquidGlassCard className="w-full max-w-md mx-auto" glassSize="lg">
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <div className="flex items-center gap-2">
@@ -2029,7 +2028,7 @@ const SignUp = () => {
 
             {/* Google Signup */}
             <Button
-              className="w-full mb-6 bg-secondary hover:bg-secondary/80 border border-border text-secondary-foreground transition-colors"
+              className="w-full mb-6 bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-colors"
               onClick={handleGoogleSignup}
               disabled={loading}
             >
@@ -2098,7 +2097,7 @@ const SignUp = () => {
       {/* Terms and Privacy Modals */}
       <TermsModal open={showTermsModal} onOpenChange={setShowTermsModal} />
       <PrivacyModal open={showPrivacyModal} onOpenChange={setShowPrivacyModal} />
-    </BeamsBackground>
+    </div>
   );
 };
 

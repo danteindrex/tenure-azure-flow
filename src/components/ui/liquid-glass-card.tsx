@@ -66,7 +66,6 @@ function LiquidGlassCard({
         className={cn(
           "relative rounded-2xl overflow-hidden",
           "bg-white/95 dark:bg-zinc-900/95",
-          "border border-zinc-200/80 dark:border-zinc-800/80",
           "shadow-[0_8px_40px_rgba(0,0,0,0.08)]",
           "dark:shadow-[0_8px_40px_rgba(0,0,0,0.4)]",
           "backdrop-blur-xl",
